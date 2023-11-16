@@ -8,4 +8,7 @@ I have made the following modifications from the distributed .zip files:
 # Normalized line endings--different versions of the distributed source code have a mixture of Windows and UNIX line endings, and sometimes entire files change line endings between versions.  Normalization makes diffs between versions simpler.
 # Standarized the main program filename to SDT.ino.  In the distributed source code, the file is renamed with each version, in the pattern SDTVer<ver>.ino.  Again, this change is made primarily to increase the usability of inter-version diffs.
 
+h3. Tags
+I have created tags for each discrete software release as they are committed.
+
 Jonathan Burchmore KN6LFB
