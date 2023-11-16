@@ -67,42 +67,65 @@ void ButtonMenuDecrease()
 void ButtonBandIncrease()
 {
   int tempIndex;
-
-  tempIndex = currentBand;                                      // Save the current index
-  currentBand++;
-
+  tempIndex = currentBandA;
   if (currentBand == NUMBER_OF_BANDS) {                         // Incremented too far?
     currentBand = 0;                                            // Yep. Roll to list front.
   }
   NCOFreq = 0L;
   switch (activeVFO) {
     case VFO_A:
-    lastFrequencies[tempIndex][VFO_A] = currentFreqA;
+      tempIndex = currentBandA;
+      if (save_last_frequency == 1) {
+        lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
+      } else {
+        if (save_last_frequency == 0) {
+          if ( directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_A] = TxRxFreqOld;
+          } else {
+            if ( directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
+        }
+      }
       currentBandA++;
       if (currentBandA == NUMBER_OF_BANDS) {                         // Incremented too far?
         currentBandA = 0;                                            // Yep. Roll to list front.
       }
-               // Save pre-increment frequency for VFO A
       currentBand = currentBandA;
-      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;   
+      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
       break;
 
     case VFO_B:
-    lastFrequencies[tempIndex][VFO_B] = currentFreqB;
+      tempIndex = currentBandB;
+      if (save_last_frequency == 1) {
+        lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
+      } else {
+        if (save_last_frequency == 0) {
+          if ( directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_B] = TxRxFreqOld;
+          } else {
+            if ( directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
+        }
+      }
       currentBandB++;
       if (currentBandB == NUMBER_OF_BANDS) {                         // Incremented too far?
-       currentBandB = 0;                                            // Yep. Roll to list front.
-      }
-               // Same for VFO B
-      currentBand = currentBandB;    
-      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;    
+        currentBandB = 0;                                            // Yep. Roll to list front.
+      }     
+      currentBand = currentBandB;
+      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
       break;
 
     case VFO_SPLIT:
       DoSplitVFO();
       break;
   }
-
+  directFreqFlag = 0;
   EraseSpectrumDisplayContainer();
   DrawSpectrumDisplayContainer();
   DrawFrequencyBarValue();
@@ -127,7 +150,7 @@ void ButtonBandIncrease()
 void ButtonBandDecrease()
 {
   int tempIndex = currentBand;;
-//  NCOFreq = 0L;
+  //  NCOFreq = 0L;
 
   currentBand--;                                                // decrement band index
 
@@ -136,32 +159,65 @@ void ButtonBandDecrease()
   }
 
   switch (activeVFO) {
-    case VFO_A:  
-    lastFrequencies[tempIndex][VFO_A] = currentFreqA;// Save pre-increment frequency for VFO A
-      currentBandA--;
-      if (currentBandA < 0) {                         // Incremented too far?
-        currentBandA = NUMBER_OF_BANDS - 1;                                            // Yep. Roll to list front.
+    case VFO_A:
+      if (save_last_frequency == 1) {
+        lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
+      } else {
+        if (save_last_frequency == 0) {
+          if ( directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_A] = TxRxFreqOld;
+
+          } else {
+            if ( directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
+        }
       }
-             
+      currentBandA--;
+      if (currentBandA == NUMBER_OF_BANDS) {                         // decremented too far?
+        currentBandA = 0;                                            // Yep. Roll to list front.
+      }
+      if (currentBandA < 0) {                         // Incremented too far?
+        currentBandA = NUMBER_OF_BANDS -1;                                            // Yep. Roll to list front.
+      }
       currentBand = currentBandA;
       centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
       break;
 
-    case VFO_B:   
-    lastFrequencies[tempIndex][VFO_B] = currentFreqB;// 
-      currentBandB--;
-      if (currentBandB < 0) {                         // Incremented too far?
-        currentBandB = NUMBER_OF_BANDS - 1;                                            // Yep. Roll to list front.
+    case VFO_B:
+      if (save_last_frequency == 1) {
+        lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
+      } else {
+        if (save_last_frequency == 0) {
+          if ( directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_B] = TxRxFreqOld;
+
+          } else {
+            if ( directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
+        }
       }
-               // Same for VFO B
+      currentBandB--;
+      if (currentBandB == NUMBER_OF_BANDS) {                         // Incremented too far?
+        currentBandB = 0;                                            // Yep. Roll to list front.
+      }
+      if (currentBandB < 0) {                         // Incremented too far?
+        currentBandB = NUMBER_OF_BANDS -1;                                            // Yep. Roll to list front.
+      }
       currentBand = currentBandB;
       centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
       break;
 
-    case VFO_SPLIT:                                             // 3
+    case VFO_SPLIT:
       DoSplitVFO();
       break;
   }
+  directFreqFlag = 0;
   EraseSpectrumDisplayContainer();
   DrawSpectrumDisplayContainer();
   DrawFrequencyBarValue();
@@ -172,6 +228,7 @@ void ButtonBandDecrease()
   ShowSpectrumdBScale();
   AudioInterrupts();
   EEPROMWrite();
+
 }
 
 
@@ -242,7 +299,7 @@ void ButtonDemodMode()
     bands[currentBand].mode = DEMOD_MIN;            // cycle thru demod modes
   }
   //AudioNoInterrupts();
-   DrawBandWidthIndicatorBar();
+  DrawBandWidthIndicatorBar();
   BandInformation();
   SetupMode(bands[currentBand].mode);
   ShowFrequency();
@@ -265,7 +322,6 @@ void ButtonDemodMode()
 *****/
 void ButtonMode()        //====== Changed AFP 10-05-22  =================
 {
-  //Serial.print("in ButtonMode()= ");Serial.println(xmtMode);
   if (xmtMode == CW_MODE) {                     // Toggle the current mode
     xmtMode = SSB_MODE;
   } else {
@@ -282,7 +338,7 @@ void ButtonMode()        //====== Changed AFP 10-05-22  =================
   AGCPrep();
   UpdateAGCField();
   EncoderVolume();
-  ShowDefaultSettings();
+  UpdateInfoWindow();
   ControlFilterF();
   BandInformation();
   FilterBandwidth();
@@ -429,8 +485,8 @@ int Unused3()
   Return value;
     int           the current noise floor value
 *****/
-void ResetZoom(int zoomIndex1){
- if (zoomIndex1 == MAX_ZOOM_ENTRIES) {
+void ResetZoom(int zoomIndex1) {
+  if (zoomIndex1 == MAX_ZOOM_ENTRIES) {
     zoomIndex1 = 0;
   }
   if (zoomIndex1 <= 0)
@@ -445,6 +501,231 @@ void ResetZoom(int zoomIndex1){
   DrawFrequencyBarValue();
   ShowFrequency();
   ShowBandwidth();
-  //ResetTuning(); 
-  RedrawDisplayScreen();   
+  //ResetTuning();
+  RedrawDisplayScreen();
+}
+
+/*****
+  Purpose: Direct Frequrncy Entry
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+    Base Code courtesy of Harry  GM3RVL
+*****/
+void ButtonFrequencyEntry()
+{
+  TxRxFreqOld = TxRxFreq;
+
+#define show_FEHelp
+  bool doneFE = false;                            // set to true when a valid frequency is entered
+  long enteredF = 0L;                                  // desired frequency
+  char strF[6] = {' ', ' ', ' ', ' ', ' '};       // container for frequency string during entry
+  String stringF;
+  int valPin;
+  int key;
+  int numdigits = 0;                              // number of digits entered
+  int pushButtonSwitchIndex;
+  lastFrequencies[currentBand][VFO_A] = TxRxFreq;
+  //save_last_frequency = false;                    // prevents crazy frequencies when you change bands/save_last_frequency = true;
+  // Arrays for allocating values associated with keys and switches - choose whether USB keypad or analogue switch matrix
+  // USB keypad and analogue switch matrix
+  int numKeys[] = {0x0D, 0x7F, 0x58,    // values to be allocated to each key push
+                   0x37, 0x38, 0x39,
+                   0x34, 0x35, 0x36,
+                   0x31, 0x32, 0x33,
+                   0x30, 0x7F, 0x7F,
+                   0x7F, 0x7F, 0x99
+                  };
+  EraseMenus();
+#ifdef  show_FEHelp
+  int keyCol[] = {YELLOW, RED, RED,
+                  RA8875_BLUE, RA8875_GREEN, RA8875_GREEN,
+                  RA8875_BLUE, RA8875_BLUE, RA8875_BLUE,
+                  RED, RED, RED,
+                  RED, RA8875_BLACK, RA8875_BLACK,
+                  YELLOW, YELLOW, RA8875_BLACK
+                 };
+  int textCol[] = {RA8875_BLACK, RA8875_WHITE, RA8875_WHITE,
+                   RA8875_WHITE, RA8875_BLACK, RA8875_BLACK,
+                   RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
+                   RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
+                   RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
+                   RA8875_BLACK, RA8875_BLACK, RA8875_WHITE
+                  };
+  const char *key_labels[]   = {"<", "", "X",
+                                "7", "8", "9",
+                                "4", "5", "6",
+                                "1", "2", "3",
+                                "0", "D", "",
+                                "", "", "S"
+                               };
+
+#define KEYPAD_LEFT  350
+#define KEYPAD_TOP  SPECTRUM_TOP_Y + 35
+#define KEYPAD_WIDTH  150
+#define KEYPAD_HEIGHT  300
+#define BUTTONS_LEFT   KEYPAD_LEFT + 30
+#define BUTTONS_TOP    KEYPAD_TOP + 30
+#define BUTTONS_SPACE  45
+#define BUTTONS_RADIUS  15
+#define TEXT_OFFSET   -8
+
+  tft.writeTo(L1);
+  tft.fillRect(WATERFALL_LEFT_X, SPECTRUM_TOP_Y + 1, MAX_WATERFALL_WIDTH, WATERFALL_BOTTOM - SPECTRUM_TOP_Y, RA8875_BLACK); // Make space for FEInfo
+  tft.fillRect(MAX_WATERFALL_WIDTH, WATERFALL_TOP_Y - 10, 15, 30, RA8875_BLACK);
+  tft.writeTo(L2);
+
+  tft.fillRect(WATERFALL_LEFT_X, SPECTRUM_TOP_Y + 1, MAX_WATERFALL_WIDTH, WATERFALL_BOTTOM - SPECTRUM_TOP_Y, RA8875_BLACK);
+
+  tft.setCursor(centerLine - 140, WATERFALL_TOP_Y );
+  tft.drawRect(SPECTRUM_LEFT_X - 1, SPECTRUM_TOP_Y, MAX_WATERFALL_WIDTH + 2, 360,  RA8875_YELLOW);  // Spectrum box
+
+  // Draw keypad box
+  tft.fillRect(KEYPAD_LEFT, KEYPAD_TOP, KEYPAD_WIDTH, KEYPAD_HEIGHT, DARKGREY);
+  // put some circles
+  tft.setFontScale( (enum RA8875tsize) 1);
+  for (unsigned i = 0; i < 6; i++) {
+    for (unsigned j = 0; j < 3; j++) {
+      tft.fillCircle(BUTTONS_LEFT + j * BUTTONS_SPACE, BUTTONS_TOP + i * BUTTONS_SPACE, BUTTONS_RADIUS, keyCol[j + 3 * i]);
+      tft.setCursor(BUTTONS_LEFT + j * BUTTONS_SPACE + TEXT_OFFSET, BUTTONS_TOP + i * BUTTONS_SPACE - 18);
+      tft.setTextColor(textCol[j + 3 * i]);
+      tft.print(key_labels[j + 3 * i]);
+    }
+  }
+  tft.setFontScale( (enum RA8875tsize) 0);
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 50);
+  tft.setTextColor(RA8875_WHITE);
+  tft.print("Direct Frequency Entry");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 100);
+  tft.print("<   Apply entered frequency");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 130);
+  tft.print("X   Exit without changing frequency");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 160);
+  tft.print("D   Delete last digit");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 190);
+  tft.print("S   Save Direct to Last Freq. (On/Off)");
+
+#endif
+
+  tft.writeTo(L2);
+
+  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setTextColor(RA8875_WHITE);
+  tft.setCursor(10, 0);
+  tft.print("Enter Frequency");
+
+  tft.fillRect(SECONDARY_MENU_X + 20 , MENUS_Y, EACH_MENU_WIDTH + 10 , CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.setTextColor(RA8875_WHITE);
+  tft.setCursor(SECONDARY_MENU_X + 21, MENUS_Y + 1);
+  tft.print("kHz or MHz:");
+  tft.setFontScale( (enum RA8875tsize) 0);
+  tft.setCursor(WATERFALL_LEFT_X + 50, SPECTRUM_TOP_Y + 260);
+  tft.print("Save Direct to Last Freq.= ");
+  tft.setCursor(WATERFALL_LEFT_X + 270, SPECTRUM_TOP_Y + 260);
+  if (save_last_frequency == 0) {
+    tft.setTextColor(RA8875_MAGENTA);
+    tft.print("Off");
+  } else {
+    if (save_last_frequency == 1) {
+      tft.setTextColor(RA8875_GREEN);
+      tft.print("On");
+    }
+  }
+
+  while (doneFE == false) {
+    valPin = ReadSelectedPushButton();                        // Poll UI push buttons
+    if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
+      pushButtonSwitchIndex = ProcessButtonPress(valPin);     // Winner, winner...chicken dinner!
+      key = numKeys[pushButtonSwitchIndex];
+      switch (key) {
+        case  0x7F :                                    // erase last digit =127
+          if (numdigits != 0) {
+            numdigits --;
+            strF[numdigits] = ' ';
+          }
+          break;
+        case 0x58 :                                     // Exit without updating frequency =88
+          doneFE = true;
+          break;
+        case 0x0D :                                     // Apply the entered frequency (if valid) =13
+          stringF = String(strF);
+          enteredF = stringF.toInt();
+          if ((numdigits == 1) || (numdigits == 2)) {
+            enteredF = enteredF * 1000000;
+          }
+          if ((numdigits == 4) || (numdigits == 5)) {
+            enteredF = enteredF * 1000;
+          }
+          if ((enteredF > 30000000) || (enteredF < 1250000)) {
+            stringF = "     ";          // 5 spaces
+            stringF.toCharArray(strF, stringF.length());
+            numdigits = 0;
+          }
+          else {
+            doneFE = true;
+          }
+          break;
+        case 0x99 :
+          save_last_frequency = !save_last_frequency;
+          tft.setFontScale( (enum RA8875tsize) 0);
+          tft.fillRect(WATERFALL_LEFT_X + 269 , SPECTRUM_TOP_Y + 255,  50 , CHAR_HEIGHT, RA8875_BLACK);
+          tft.setCursor(WATERFALL_LEFT_X + 270, SPECTRUM_TOP_Y + 260);
+          if (save_last_frequency == 0) {
+            tft.setTextColor(RA8875_MAGENTA);
+            tft.print("Off");
+            save_last_frequency = 0;
+            break;
+          } else {
+            if (save_last_frequency == 1) {
+              tft.setTextColor(RA8875_GREEN);
+              tft.print("On");
+              save_last_frequency = 1;
+            }
+          }
+          break;
+        default :
+          if ((numdigits == 5) || ((key == 0x30) & (numdigits == 0))) {
+          }
+          else {
+            strF[numdigits] = char(key);
+            numdigits ++;
+          }
+          break;
+      }
+      tft.setTextColor(RA8875_WHITE);
+      tft.setFontScale( (enum RA8875tsize) 1);
+      tft.fillRect(SECONDARY_MENU_X + 195, MENUS_Y + 1, 85, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 200, MENUS_Y + 1);
+      tft.print(strF);
+      MyDelay(250);          // only for analogue switch matrix
+    }
+  }
+  if (key != 0x58) {
+
+    TxRxFreq = enteredF;
+  }
+  NCOFreq = 0L;
+  directFreqFlag = 1;
+  centerFreq = TxRxFreq;
+  centerTuneFlag = 1;
+  //}
+  if (save_last_frequency == 1) {
+    lastFrequencies[currentBand][VFO_A] = enteredF;
+  } else {
+    if (save_last_frequency == 0) {
+      lastFrequencies[currentBand][VFO_A]  = TxRxFreqOld;
+    }
+  }
+  tft.writeTo(L1);
+  EraseSpectrumDisplayContainer();
+  EraseMenus();
+  BandInformation();
+  //SetBand();
+  DrawSpectrumDisplayContainer();
+  DrawFrequencyBarValue();
+  ShowFrequency();
+  SetFreq();
 }

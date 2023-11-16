@@ -314,8 +314,7 @@ int SetWPM()
     val = ProcessButtonPress(val);
     if (val == MENU_OPTION_SELECT) {                             // Make a choice??
       currentWPM = lastWPM;
-      EEPROMData.wordsPerMinute = currentWPM;
-      EEPROMWrite();
+      EEPROMData.currentWPM = currentWPM;
       UpdateWPMField();
       break;
     }
@@ -382,7 +381,7 @@ long SetTransmitDelay()                               // new function JJP 9/1/22
     void
 
   Return value;
-    int               cannot return value
+    void               cannot return value from interrupt
 *****/
 FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
 void EncoderFineTune()
@@ -402,10 +401,6 @@ void EncoderFineTune()
   }
   //if (spectrum_zoom == 0) {
   NCOFreq += stepFT * fineTuneEncoderMove; //AFP 11-01-22
-  //} else {
-  // NCOFreq += stepFT * fineTuneEncoderMove * (1 << (spectrum_zoom - 1));
-  //}
-  currentFreqA = centerFreq + NCOFreq;
   centerTuneFlag = 1;
 
   // ============  AFP 10-28-22
@@ -417,20 +412,19 @@ void EncoderFineTune()
   // ===============  Recentering at band edges ==========
   if (spectrum_zoom != 0) {
     if (NCOFreq > (95000 / (1 << spectrum_zoom)) || NCOFreq < (-93000 / (1 << spectrum_zoom))) {
-      NCOFreq = 0L;
-      centerFreq = TxRxFreq = currentFreqA ;
+      NCOFreq    = 0L;
+      centerFreq = TxRxFreq = currentFreqA;
     }
   } else {
     if (NCOFreq > (142000) || NCOFreq < (-43000)) {  // Offset tuning window in zoom 1x
-      NCOFreq = 0L;
-      centerFreq = TxRxFreq = currentFreqA ;  //AFP 10-28-22
+      NCOFreq    = 0L;
+      centerFreq = TxRxFreq = currentFreqA;  //AFP 10-28-22
     }
     centerTuneFlag = 1;
   }
   fineTuneEncoderMove = 0L;
 }
 FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
-
 
 
 

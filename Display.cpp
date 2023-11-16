@@ -531,15 +531,10 @@ void BandInformation() // SSB or CW
   tft.fillRect(OPERATION_STATS_X + 90, FREQUENCY_Y + 30, 70, tft.getFontHeight(), RA8875_BLACK); //AFP 10-18-22
   tft.setTextColor(RA8875_GREEN);
   tft.setCursor(OPERATION_STATS_X + 90, FREQUENCY_Y + 30);               //AFP 10-18-22
-  /*  if (xmtMode == CW_MODE ) {
-      tft.print("CW ");
-      tft.setCursor(OPERATION_STATS_X + 115, FREQUENCY_Y + 30);  //AFP 10-18-22
-      tft.print(CWFilter[CWFilterIndex]);                        //AFP 10-18-22
-    } else {
-  */
+
   //================  AFP 10-19-22
   if (xmtMode == CW_MODE ) {
-     tft.fillRect(OPERATION_STATS_X + 85, FREQUENCY_Y + 30, 70, tft.getFontHeight(), RA8875_BLACK);
+    tft.fillRect(OPERATION_STATS_X + 85, FREQUENCY_Y + 30, 70, tft.getFontHeight(), RA8875_BLACK);
     tft.print("CW ");
     tft.setCursor(OPERATION_STATS_X + 115, FREQUENCY_Y + 30);  //AFP 10-18-22
     tft.print(CWFilter[CWFilterIndex]);                        //AFP 10-18-22
@@ -571,7 +566,7 @@ void BandInformation() // SSB or CW
     tft.writeTo(L1);
     //================  AFP 10-19-22 =========
   } else {
-     tft.fillRect(OPERATION_STATS_X + 90, FREQUENCY_Y + 30, 70, tft.getFontHeight(), RA8875_BLACK);
+    tft.fillRect(OPERATION_STATS_X + 90, FREQUENCY_Y + 30, 70, tft.getFontHeight(), RA8875_BLACK);
     tft.print("SSB");                                           // Which mode
   }
 
@@ -596,17 +591,11 @@ void BandInformation() // SSB or CW
         }
         break;
       case DEMOD_AM:
-       tft.setTextColor(RA8875_WHITE);
+        tft.setTextColor(RA8875_WHITE);
         tft.print("(AM)");  //AFP 09-22-22
         break;
       case DEMOD_SAM:  //AFP 11-01-22
-      tft.print("(SAM) ");  //AFP 11-01-22
-      
-     // if (SAM_carrier_freq_offset!=SAM_carrier_freq_offsetOld){
-       // tft.fillRect(OPERATION_STATS_X + 160, FREQUENCY_Y + 30, tft.getFontWidth() * 11, tft.getFontHeight(), RA8875_BLUE);
-       // tft.print("(SAM) ");  //AFP 11-01-22
-       // tft.print(SAM_carrier_freq_offset,0); //AFP 11-01-22
-      //}
+        tft.print("(SAM) ");  //AFP 11-01-22
         break;
    
   }
@@ -673,27 +662,27 @@ void ShowFrequency()
 
   if (activeVFO == VFO_A) {
     FormatFrequency(TxRxFreq, freqBuffer);
-    tft.setFont(&FreeMonoBold24pt7b);
-    if ( (unsigned long) TxRxFreq < bands[currentBandA].fBandLow || (unsigned long) TxRxFreq > bands[currentBandA].fBandHigh) {
-      tft.setTextColor(RA8875_RED);
+    tft.setFont(&FreeMonoBold24pt7b);                         // Large font
+    if (TxRxFreq < bands[currentBandA].fBandLow || TxRxFreq > bands[currentBandA].fBandHigh) {
+      tft.setTextColor(RA8875_RED);                           // Out of band
     } else {
-      tft.setTextColor(RA8875_GREEN);
+      tft.setTextColor(RA8875_GREEN);                         // In US band
     }
     tft.fillRect(FREQUENCY_X, FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old freq
     tft.setCursor(FREQUENCY_X, FREQUENCY_Y);
-
     tft.print(freqBuffer);                                    // Show VFO_A
+
     tft.setFont(&FreeMonoBold18pt7b);
     tft.setTextColor(RA8875_LIGHT_GREY);
     tft.setCursor(FREQUENCY_X_SPLIT + 20, FREQUENCY_Y + 6);
     FormatFrequency(currentFreqB, freqBuffer);
-    tft.print(freqBuffer);
+    tft.print(freqBuffer);    
   } else {                                                    // Show VFO_B
     FormatFrequency(TxRxFreq, freqBuffer);
     tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK);
     tft.setCursor(FREQUENCY_X_SPLIT, FREQUENCY_Y);
     tft.setFont(&FreeMonoBold24pt7b);
-    if ((unsigned long) TxRxFreq < bands[currentBandB].fBandLow || (unsigned long)  TxRxFreq > bands[currentBandB].fBandHigh) {
+    if (TxRxFreq < bands[currentBandB].fBandLow || TxRxFreq > bands[currentBandB].fBandHigh) {
       tft.setTextColor(RA8875_RED);
     } else {
       tft.setTextColor(RA8875_GREEN);
@@ -702,11 +691,11 @@ void ShowFrequency()
 
     tft.setFont(&FreeMonoBold18pt7b);
     FormatFrequency(TxRxFreq, freqBuffer);
-    tft.fillRect(FREQUENCY_X, FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old freq
+//    tft.fillRect(FREQUENCY_X, FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old freq
     tft.setTextColor(RA8875_LIGHT_GREY);
     tft.setCursor(FREQUENCY_X, FREQUENCY_Y + 6);
     FormatFrequency(currentFreqA, freqBuffer);
-    tft.print(freqBuffer);                                    // Show VFO_A
+    tft.print(freqBuffer);                                    // Show VFO_A    
   }
 
   tft.setFontDefault();
@@ -828,7 +817,7 @@ void MyDrawFloat(float val, int decimals, int x, int y, char *buff)
   Return value;
     void
 *****/
-void ShowDefaultSettings()
+void UpdateInfoWindow()
 {
   tft.fillRect(INFORMATION_WINDOW_X - 8, INFORMATION_WINDOW_Y, 250, 170, RA8875_BLACK);  // Clear fields
   tft.drawRect(BAND_INDICATOR_X - 10,    BAND_INDICATOR_Y - 2, 260, 200, RA8875_LIGHT_GREY); // Redraw Info Window Box
@@ -1067,10 +1056,10 @@ void UpdateWPMField()
   tft.setTextColor(RA8875_GREEN);
   tft.fillRect(WPM_X + 60, WPM_Y, tft.getFontWidth() * 15, tft.getFontHeight(), RA8875_BLACK);
   tft.setCursor(FIELD_OFFSET_X, WPM_Y);
-  EEPROMWrite();
+  EEPROMData.currentWPM = currentWPM;
   if (EEPROMData.keyType == KEYER) {
     tft.print("Paddles -- ");
-    tft.print(EEPROMData.wordsPerMinute);
+    tft.print(EEPROMData.currentWPM);
   } else {
     tft.print("Straight Key");
   }
@@ -1182,7 +1171,7 @@ void SetFavoriteFrequencies()
 
   tft.fillRect(BAND_INDICATOR_X - 9, BAND_INDICATOR_Y + 1, 180, 178, RA8875_BLACK);  // Clear volume field
   DrawAudioSpectContainer();
-  ShowDefaultSettings();
+  UpdateInfoWindow();
 }
 
 /*****
@@ -1245,20 +1234,14 @@ void DrawInfoWindowFrame()
 void RedrawDisplayScreen()
 {
   tft.fillWindow();
-  DrawSpectrumDisplayContainer();
-  DrawFrequencyBarValue();
-  DrawInfoWindowFrame();
   UpdateIncrementField();
   AGCPrep();
   UpdateAGCField();
   EncoderVolume();
-  ShowDefaultSettings();
   SetBand();
   //ControlFilterF();
   BandInformation();
   //FilterBandwidth();
-  DrawSMeterContainer();
-  DrawAudioSpectContainer();
   ShowFrequency();
   SetFreq();
   SetBandRelay(HIGH);
@@ -1269,6 +1252,13 @@ void RedrawDisplayScreen()
   ShowName();
   ShowSpectrumdBScale();
   ShowTransmitReceiveStatus();
+  DrawSMeterContainer();
+  DrawAudioSpectContainer();
+  DrawSpectrumDisplayContainer();
+  DrawFrequencyBarValue();
+//  DrawInfoWindowFrame();
+  UpdateInfoWindow();
+
 }
 
 /*****
@@ -1310,7 +1300,6 @@ void DrawBandWidthIndicatorBar()  // AFP 10-30-22
       Zoom1Offset = 0;
       break;
   }
-  //Serial.print("zoomMultFactor= "); Serial.println(zoomMultFactor);
   newCursorPosition = (int) (NCOFreq * 0.0053333) * zoomMultFactor - Zoom1Offset; // AFP 10-28-22
 
   tft.writeTo(L2);

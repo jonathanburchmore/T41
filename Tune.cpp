@@ -48,12 +48,10 @@ void SetFreq() {  //AFP 09-22-22
   if (xmtMode == SSB_MODE) {
     Clk2SetFreq = (((centerFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  // AFP 09-27-22
     Clk1SetFreq = (TxRxFreq  * SI5351_FREQ_MULT) * MASTER_CLK_MULT;                                  // AFP 09-27-22
-    //Serial.print("TxRxFreq TuneSSB= "); Serial.println(TxRxFreq);
   } else {
     // =========================  CW Xmit
     if (xmtMode == CW_MODE ) {
       if (bands[currentBand].mode == DEMOD_LSB) {
-        //Serial.print("TxRxFreq TuneCW= "); Serial.println(TxRxFreq);
         Clk2SetFreq = (((centerFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ; // AFP 09-27-22
         Clk1SetFreq = (((TxRxFreq + CWFreqShift + calFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT; // AFP 09-27-22;
       }
@@ -85,8 +83,8 @@ void SetFreq() {  //AFP 09-22-22
   }
   //=====================  AFP 10-03-22 =================
   DrawFrequencyBarValue();
-
 }
+
 
 
 /*****
@@ -148,7 +146,7 @@ int DoSplitVFO()
     MyDelay(150L);
     if (val == MENU_OPTION_SELECT) {                              // Make a choice??
       Clk1SetFreq += splitOffset;                                    // New transmit frequency // AFP 09-27-22
-      ShowDefaultSettings();
+      UpdateInfoWindow();
       filterEncoderMove = 0L;
       break;
     }

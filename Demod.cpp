@@ -16,7 +16,6 @@
   // http://svn.tapr.org/repos_sdr_hpsdr/trunk/W5WC/PowerSDR_HPSDR_mRX_PS/Source/wdsp/
 *****/
 void AMDecodeSAM() {
-  //Serial.println("in SAM");
   // taken from Warren Pratt´s WDSP, 2016
   // http://svn.tapr.org/repos_sdr_hpsdr/trunk/W5WC/PowerSDR_HPSDR_mRX_PS/Source/wdsp/
   // http://svn.tapr.org/repos_sdr_hpsdr/trunk/W5WC/PowerSDR_HPSDR_mRX_PS/Source/wdsp/
@@ -95,16 +94,6 @@ void AMDecodeSAM() {
     tft.print(0.20024*SAM_carrier_freq_offset, 1); //AFP 11-01-22
   }
   SAM_carrier_freq_offsetOld=SAM_carrier_freq_offset;
-  //BandInformation();
- /* if (ms_300000.check() == 1)                                  // For clock updates AFP 10-26-22
-  {
-    Serial.print("minutes= ");Serial.print(millis()/60000);
-   Serial.print("  Sam Carrier= ");Serial.println(SAM_carrier);
-  }*/
-  //Serial.print("Sam Carrier= ");Serial.println(SAM_carrier);
-
-  //show_frequency(bands[current_band].freq, 0);
-  // }
 }
 
 /*****  AFP 11-03-22

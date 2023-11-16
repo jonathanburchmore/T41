@@ -9,10 +9,11 @@
 #include "Fonts/FreeMono9pt7b.h"
 #include <Audio.h>
 //=== Extended Audio Library  https://github.com/chipaudette/OpenAudio_ArduinoLibrary
-#include <OpenAudio_ArduinoLibrary.h> // AFP 11-01-22
+#include <OpenAudio_ArduinoLibrary.h>               // AFP 11-01-22
 #include <TimeLib.h>                                // Part of Teensy Time library
 #include <Wire.h>
 #include <SPI.h>
+//#include <SDFat.h>
 #include <SD.h>
 #include <Metro.h>
 #include <Bounce.h>
@@ -30,7 +31,7 @@
 //======================================== Symbolic Constants for Debugging and Version Control ========================
 #define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
 
-#define VERSION                     "V033"
+#define VERSION                     "V040"
 #define RIGNAME                     "T41-EP SDT"
 #define NUMBER_OF_SWITCHES          18            // Number of push button switches. 16 on older boards
 #define TOP_MENU_COUNT              12            // Menus to process AFP 09-27-22
@@ -44,7 +45,31 @@
 #define OFF                         0
 #define ON                          1
 
+//================================ mapping globals and Symbolic constants ================
+#define MAP_FILE_NAME               "HomeLocationOriginalResizeBy4.bmp"  // Put name of your BMP map here
+#define MY_LON                     -84.42677                             // Put you longitude here
+#define MY_LAT                      39.07466                             //          latitde
+#define CENTER_SCREEN_X             387
+#define CENTER_SCREEN_Y             240
+#define IMAGE_CORNER_X              190 // ImageWidth = 378 Therefore 800 - 378 = 422 / 2 = 211
+#define IMAGE_CORNER_Y              40  // ImageHeight = 302 Therefore 480 - 302 = 178 / 2 = 89
+#define RAY_LENGTH                  190
+#define BUFFPIXEL                   20  // Use buffer to read image rather than 1 pixel at a time
 
+#define DEGREES2RADIANS             0.01745329
+#define RADIANS2DEGREES             57.29578
+#define PI_BY_180                   0.01745329
+#define SD_CARD_PRESENT             1
+#define NO_SD_CARD_PRESENT          0
+#define VALID_EEPROM_DATA           1
+#define INVALID_EEPROM_DATA         0
+
+#define SD_CS                       BUILTIN_SDCARD        // Works on T_3.6 and T_4.1 ...
+
+// ==== Pick one of the following encoder configurations
+#define                             NORM_ENCODER
+//#define                             FOURSQRP
+//
 //#define DEBUG_JACK
 //#define DEBUG1
 //#define DEBUG2
@@ -84,8 +109,8 @@
 #define PRIMARY_MENU_X                0
 #define SECONDARY_MENU_X              250
 #define MENUS_Y                       0
-#define EACH_MENU_WIDTH               250
-#define BOTH_MENU_WIDTHS              (EACH_MENU_WIDTH * 2 + 30)
+#define EACH_MENU_WIDTH               260
+#define BOTH_MENU_WIDTHS             (EACH_MENU_WIDTH * 2 + 30)
 #define MENU_OPTION_SELECT           0     // These are the expected values from the switch ladder
 #define MAIN_MENU_UP                 1
 #define BAND_UP                      2
@@ -245,6 +270,8 @@
 #define  PURPLE      0x780F                     /* 128,   0, 128 */
 #define  OLIVE       0x7BE0                     /* 128, 128,   0 */
 #define  RA8875_LIGHT_GREY   0xC618             /* 192, 192, 192 */
+
+#define  DARK_RED   tft.Color565(64,0,0)
 #define  DARKGREY    0x7BEF                     /* 128, 128, 128 */
 #define  BLUE        0x001F                     /*   0,   0, 255 */
 #define  RA8875_GREEN       0x07E0              /*   0, 255,   0 */
@@ -321,6 +348,7 @@
 #define TFT_SCLK                    13
 #define TFT_RST                     255
 //========================================= Encoder pins
+#ifdef                              NORM_ENCODER
 #define VOLUME_ENCODER_A            2     // Volume encoder  
 #define VOLUME_ENCODER_B            3
 #define ENCODER3_ENCODER_A          4     // Fine Tune encoder 
@@ -329,6 +357,20 @@
 #define FILTER_ENCODER_B            14
 #define TUNE_ENCODER_A              16    // Tune encoder
 #define TUNE_ENCODER_B              17
+#endif
+//  ====================== AFP 11-13-22 =============
+#ifdef                             FOURSQRP
+#define VOLUME_ENCODER_A            5     // Volume encoder  
+#define VOLUME_ENCODER_B            4
+#define ENCODER3_ENCODER_A          17    // Fine Tune encoder 
+#define ENCODER3_ENCODER_B          16
+#define FILTER_ENCODER_A            15    // Filter encoder
+#define FILTER_ENCODER_B            14
+#define TUNE_ENCODER_A              3    // Center Tune encoder
+#define TUNE_ENCODER_B              2
+#endif
+
+              
 //========================================= Filter Board pins
 #define FILTERPIN80M                30    // 80M filter relay
 #define FILTERPIN40M                31    // 40M filter relay
@@ -372,7 +414,7 @@
 #define TMS0_ALARM_VALUE(x)         (((uint32_t)(((uint32_t)(x)) << 20U)) & 0xFFF00000U)
 #define TMS02_LOW_ALARM_VALUE(x)    (((uint32_t)(((uint32_t)(x)) << 0U)) & 0xFFFU)
 #define TMS02_PANIC_ALARM_VALUE(x)  (((uint32_t)(((uint32_t)(x)) << 16U)) & 0xFFF0000U)
-#define MAX_NUMCOEF                 (FFT_LENGTH / 2) + 1           // 
+//#define MAX_NUMCOEF                 (FFT_LENGTH / 2) + 1    // This is alread defined in AudioFilterConvolution_F32.h at line 110     
 
 #undef  round
 #undef  PI
@@ -1072,78 +1114,75 @@ struct secondaryMenuConfiguration {
   byte whichType;                         // 0 = no options, 1 = list, 2 = encoder value
   int numberOfOptions;                     // Number of submenu topions
 };
+extern char versionSettings[];
 
 extern struct config_t {
-  char versionSettings[7];
+  
+  char versionSettings[10];
+  int AGCMode             = 1;     
+  int audioVolume         = 30; // 4 bytes
+  int rfGainAllBands      = 1;
+  int spectrumNoiseFloor  = SPECTRUM_NOISE_FLOOR;    // AFP 09-26-22
+  int tuneIndex           = 5;
+  int powerLevel          = 10;
+  int xmtMode             = 0;                    // AFP 09-26-22
+  int nrOptionSelect      = 0;     // 1 byte
+  int currentScale        = 1;
+  long spectrum_zoom      = 1;
+  float spectrum_display_scale  = 20.0;// 4 bytes
 
-  int8_t AGCMode                        = 1;  // 1 byte
-  uint8_t nrInUse                       = 0;  // 1 byte
+  int CWFilterIndex       = 5;  // Off
+  int paddleDit           = 36;
+  int paddleDah           = 35;
+  int decoderFlag         = 0;
+  int keyType             = 0;  // straight key = 0, keyer = 1
+  int currentWPM          = 15; // 4 bytes
+  float sidetoneVolume    = .001;// 4 bytes
+  long cwTransmitDelay    = 750;   // 4 bytes
 
-  int16_t currentVFO                    = 1;  // 2 bytes
+  int activeVFO           = 0;  // 2 bytes
+  int freqIncrement       = 5;  // 4 bytes
 
-  int audioVolume                       = 0;  // 4 bytes
-  int CWFilterIndex                     = 5;  // Off
-  int currentBand                       = 1;  // 4 bytes
-  int currentBandA                      = 1;
-  int currentBandB                      = 1;
-  int decoderFlag                       = 0;  // Off
-  int equalizerRec[EQUALIZER_CELL_COUNT];
+  int currentBand         = 1; // 4 bytes
+  int currentBandA        = 1;// 4 bytes
+  int currentBandB        = 1;// 4 bytes
+  long currentFreqA       = 7200000;
+  long currentFreqB       = 7030000;
+  long freqCorrectionFactor = 68000;
+
+  int equalizerRec[EQUALIZER_CELL_COUNT];// 4 bytes each
   int equalizerXmt[EQUALIZER_CELL_COUNT];
-  int freqIncrement                     = 0;  // 4 bytes
-  int keyType                           = 0;  // straight key = 0, keyer = 1
-  int currentMicThreshold                    = -18;// 4 bytes      // AFP 09-22-22
-  float currentMicCompRatio                 = 5.0;
-  float currentMicAttack                    = 0.1;
-  float currentMicRelease                   = 2.0;
-  int currentMicGain                        = -10;
-  int paddleDah                         = 0;  // 4 bytes
-  int paddleDit                         = 1;  // 4 bytes
-  int powerLevel                        = 20;  // 4 bytes
-  int rfGainAllBands;
 
-  int spectrumNoiseFloor                = SPECTRUM_NOISE_FLOOR;  // 4 bytes
-  int switchValues[NUMBER_OF_SWITCHES];       // 64 bytes
-  int tuneIndex                         = 4;  // 4 bytes, 500Hz
-  int wordsPerMinute                    = 15; // 4 bytes
-  int xmtMode                           = SSB_MODE;
+  int currentMicThreshold = -10;// 4 bytes      // AFP 09-22-22
+  float currentMicCompRatio = 5.0;
+  float currentMicAttack    = 0.1;
+  float currentMicRelease   = 2.0;
+  int currentMicGain        = -10;
 
-  uint16_t currentScale                 = 1;  // 2 bytes,
+  int switchValues[18];
 
-  int32_t spectrum_zoom                 = 1; // 4 bytes
+  float LPFcoeff             = 0.0;// 4 bytes
+  float NR_PSI               = 0.0;// 4 bytes
+  float NR_alpha             = 0.0;// 4 bytes
+  float NR_beta              = 0.0;// 4 bytes
+  float omegaN               = 0.0;// 4 bytes
+  float pll_fmax             = 4000.0;// 4 bytes
 
-  long centerFreq                       = 7150000L;// 4 bytes
-  long currentFreqA                     = 7150000L;// 4 bytes
-  long currentFreqB                     = 7030000L;// 4 bytes
-  long cwTransmitDelay                  = 1000L;   // 4 bytes
-  long favoriteFreqs[MAX_FAVORITES];               // 40 bytes
+  float powerOutCW[NUMBER_OF_BANDS];
+  float powerOutSSB[NUMBER_OF_BANDS];
+  float CWPowerCalibrationFactor[NUMBER_OF_BANDS];  // 0.019;
+  float SSBPowerCalibrationFactor[NUMBER_OF_BANDS]; // 0.008
+  float IQAmpCorrectionFactor[NUMBER_OF_BANDS];
+  float IQPhaseCorrectionFactor[NUMBER_OF_BANDS];
+  float IQXAmpCorrectionFactor[NUMBER_OF_BANDS];
+  float IQXPhaseCorrectionFactor[NUMBER_OF_BANDS];
+  long favoriteFreqs[13];
   long lastFrequencies[NUMBER_OF_BANDS][2];
-  long  long freqCorrectionFactor             = 68000LL;
- 
 
-  float32_t LPFcoeff                    = 0.0;// 4 bytes
-  float32_t NR_PSI                      = 0.0;// 4 bytes
-  float32_t NR_alpha                    = 0.0;// 4 bytes
-  float32_t NR_beta                     = 0.0;// 4 bytes
-  float32_t omegaN                      = 0.0;// 4 bytes
-  float32_t pll_fmax                    = 4000.0;  // 4 bytes
-  float32_t powerOutSSB[7];     // 4 bytes AFP 10-21-22
-  float32_t powerOutCW[7];   // 4 bytes AFP 10-21-22
-  float32_t CWPowerCalibrationFactor[7] ;   //AFP 10-29-22
-  float32_t SSBPowerCalibrationFactor[7];   //AFP 10-29-22
+  long centerFreq             = 7030000; // 4 bytes
 
-  float32_t spectrum_display_scale      = 0.0;// 4 bytes
-  float32_t sidetoneVolume              = 0.001;
-// ============= AFP 10-28-22 ============
-  float32_t IQAmpCorrectionFactor[7];
-  float32_t IQPhaseCorrectionFactor[7];
-  
-  float32_t IQXAmpCorrectionFactor[7];
-  float32_t IQXPhaseCorrectionFactor[7];
-  
-// ============= AFP 10-28-22 ===========
 } EEPROMData;                                 //  Total:       438 bytes
-
-//extern struct config_t EEPROMData;
+                                //  Total:       438 bytes
 
 typedef struct SR_Descriptor
 {
@@ -1230,7 +1269,7 @@ extern Menu_D Menus[];
 //========================== Some are not in alpha order because of forward references =================================
 
 
-
+extern bool save_last_frequency;
 extern bool gEEPROM_current;            //mdrhere does the data in EEPROM match the current structure contents
 extern bool NR_gain_smooth_enable;
 extern bool NR_long_tone_reset;
@@ -1241,6 +1280,7 @@ extern bool volumeChangeFlag;
 
 extern char *bigMorseCodeTree;
 extern char decodeBuffer[];
+extern char keyboardBuffer[];
 extern const char *labels[];
 extern char letterTable[];
 extern char *morseCodeTree;
@@ -1415,6 +1455,8 @@ extern int bandswitchPins[];
 extern int button9State;
 extern int buttonRead;
 extern int calibrateFlag;
+extern const int chipSelect;
+extern int countryIndex;
 extern int CWFilterIndex;
 extern int currentBand;
 extern int currentBandA;
@@ -1427,6 +1469,7 @@ extern int dcfTheSecond;
 extern int dcfPulseTime;
 extern int decoderFlag;
 extern int demodIndex;
+extern int directFreqFlag;
 extern int EEPROMChoice;
 extern int equalizerRecChoice;
 extern int equalizerXmtChoice;
@@ -1486,13 +1529,16 @@ extern int pos_centre_f;
 extern int pos_x_frequency;
 extern int pos_y_smeter;
 extern int rfGainAllBands;
+
+extern int sdCardPresent;
 extern int secondaryMenuChoiceMade;
 extern int smeterLength;
 extern int spectrumNoiseFloor;
 extern int splitOn;
 extern int stepFTOld;
 extern int switchFilterSideband;    //AFP 1-28-21
-//extern int switchThreshholds[];
+extern int switchThreshholds[];
+extern int syncEEPROM;
 extern int termCursorXpos;
 extern int timerFlag;
 extern float transmitPowerLevel;
@@ -1523,6 +1569,8 @@ extern unsigned tcr2div;
 extern int32_t FFT_shift;
 extern long long freqCorrectionFactor;
 extern long long freqCorrectionFactorOld; //AFP 09-21-22
+extern long favoriteFrequencies[];
+
 extern int32_t IFFreq;     // IF (intermediate) frequency
 extern int32_t IF_FREQ1;
 extern int32_t O_iiSum19;
@@ -1561,6 +1609,8 @@ extern long currentFreq;
 extern long centerFreq;
 extern unsigned long ditLength;
 extern long TxRxFreq;             // = centerFreq+NCOFreq  NCOFreq from FreqShift2()
+extern long TxRxFreqOld;
+extern long TxRxFreqDE;
 extern long recClockFreq;         //  = TxRxFreq+IFFreq  IFFreq from FreqShift1()=48KHz
 extern long CWRecFreq;            //  = TxRxFreq +/- 700Hz
 extern unsigned long cwTimer;
@@ -1568,8 +1618,10 @@ extern long signalTime;
 extern unsigned long ditTimerOn;
 extern long DahTimer;
 extern unsigned long cwTransmitDelay;      // ms to keep relay on after last atom read
-extern long currentFreqA;;
+extern long currentFreqA;
+extern long currentFreqAOld2;
 extern long currentFreqB;
+extern long currentFreqBOld2;
 extern long currentWPM;
 //extern long frequencyCorrection;
 extern long incrementValues[];
@@ -1795,6 +1847,7 @@ extern float32_t *mag_coeffs[];
 extern float32_t max_gain;
 extern float32_t max_input;
 extern int calTypeFlag;
+extern int calOnFlag;
 extern int currentMicThreshold; // AFP 09-22-22
 extern float currentMicCompRatio;
 extern float currentMicAttack;
@@ -1954,12 +2007,17 @@ float32_t AlphaBetaMag(float32_t  inphase, float32_t  quadrature);
 void AltNoiseBlanking(float* insamp, int Nsam, float* E);
 void AMDemodAM();
 void AMDecodeSAM(); // AFP 11-03-22
+void AssignEEPROMObjectToVariable();
+
+int  BandOptions();
+double BearingHeading(char *dxCallPrefix);
+void bmpDraw(const char *filename, int x, int y);
 void ButtonBandDecrease();
 void ButtonBandIncrease();
-int  BandOptions();
 int  ButtonDemod();
 void ButtonDemodMode();
 void ButtonFilter();
+void ButtonFrequencyEntry();
 void ButtonFreqIncrement();
 void ButtonMenuIncrease();
 void ButtonMenuDecrease();
@@ -1974,13 +2032,16 @@ void CalcFIRCoeffs(float * coeffs_I, int numCoeffs, float32_t fc, float32_t Asto
 void CalcCplxFIRCoeffs(float * coeffs_I, float * coeffs_Q, int numCoeffs, float32_t FLoCut, float32_t FHiCut, float SampleRate);
 void CalcNotchBins();
 void Calculatedbm();
-int  Xmit_IQ_Cal(); //AFP 09-21-22
-void CalibrateOptions(); // AFP 10-22-22
+void CaptureKeystrokes();
+
+int  CalibrateOptions(); // AFP 10-22-22
 int  CalibrateFrequency();
 void CenterFastTune();
-void FilterOverlay();
+void ClearEEPROM();
 void Codec_gain();
+uint16_t Color565(uint8_t r, uint8_t g, uint8_t b);
 void ControlFilterF();
+void CopyEEPROM();
 int  CWOptions();
 void CW_DecodeLevelDisplay();
 void CW_ExciterIQData();  // AFP 08-18-22
@@ -2002,9 +2063,12 @@ int  DoSplitVFO();
 void DoPaddleFlip();
 void DoXmitCalibrate();
 void DoReceiveCalibrate();
+void DrawActiveLetter(int row, int horizontalSpacer, int whichLetterIndex, int keyWidth, int keyHeight);
 void DrawBandWidthIndicatorBar(); // AFP 03-27-22 Layers
 void DrawFrequencyBarValue();
 void DrawInfoWindowFrame();
+void DrawKeyboard();
+void DrawNormalLetter(int row, int horizontalSpacer, int whichLetterIndex, int keyWidth, int keyHeight);
 void DrawSMeterContainer();
 void DrawSpectrumBandwidthInfo();
 void DrawSpectrumDisplayContainer();
@@ -2013,8 +2077,11 @@ void DrawAudioSpectContainer();
 int  EEPROMOptions();
 void EEPROMRead();
 void EEPROMSaveDefaults();
+void EEPROMSaveDefaults2();
 void EEPROMShow();
+void EEPROMStartup();
 void EEPROMStuffFavorites(unsigned long current[]);
+void EEPROMSyncIndicator(int inSync);
 void EEPROMWrite();
 void EncoderFineTune();
 void EncoderFilter();
@@ -2027,8 +2094,13 @@ void ErasePrimaryMenu();
 void EraseSecondaryMenu();
 void EraseSpectrumDisplayContainer();
 void ExecuteButtonPress(int val);
+
 void FilterBandwidth();
+void FilterOverlay();
 void FilterSetSSB();
+int  FindCountry(char *prefix);
+int  ValidEEPROMData();
+int  FirstTimeSDCard();
 void FormatFrequency(long f, char *b);
 int  FrequencyOptions();
 void FreqShift1();
@@ -2037,11 +2109,15 @@ float goertzel_mag(int numSamples, int TARGET_FREQUENCY, int SAMPLING_RATE, floa
 int  GetEncoderValue(int minValue, int maxValue, int startValue, int increment, char prompt[]);
 float GetEncoderValueLive(float minValue, float maxValue, float startValue, float increment, char prompt[]);//AFP 10-22-22
 void GetFavoriteFrequency();
+
+double HaversineDistance(double hLat, double hLon, double dxLat, double dxLon);
+
+int  InitializeSDCard();
 void InitializeDataArrays();
 void InitFilterMask();
 void InitLMSNoiseReduction();
 void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp);
-int IQOptions();
+int  IQOptions();
 void IQPhaseCorrection(float32_t *I_buffer, float32_t *Q_buffer, float32_t factor, uint32_t blocksize);
 float32_t Izero(float32_t x);
 
@@ -2073,6 +2149,9 @@ int  ProcessButtonPress(int valPin);
 void ProcessEqualizerChoices(int EQType, char *title);
 void ProcessIQData();
 void ProcessIQData2();
+
+uint16_t read16(File &f);
+uint32_t read32(File &f);
 int  ReadSelectedPushButton();
 void RedrawDisplayScreen();
 void ResetHistograms();
@@ -2081,16 +2160,19 @@ int  RFOptions();
 void ResetZoom(int zoomIndex1); // AFP 11-06-22
 
 int  SampleOptions();
+void SDUpdate();
 void SetCompressionLevel();
 void SetCompressionRatio();
 void SetCompressionAttack();
 void SetCompressionRelease();
-void MicGainSet();
+int  MicGainSet();
 
 void SaveAnalogSwitchValues();
-void ShowDecoderMessage();
-void sineTone(int numCycles);
-int  SpectrumOptions();
+int  SDDataCheck();
+void SDEEPROMDump();
+int  CopySDToEEPROM();
+int  SDEEPROMWriteDefaults();
+int  CopyEEPROMToSD();
 void Send(char myChar);
 void SendCode(char code);
 void SelectCWFilter();  // AFP 10-18-22
@@ -2111,7 +2193,13 @@ void SetupMyCompressors(boolean use_HP_filter, float knee_dBFS, float comp_ratio
 int  SetWPM();
 void ShowAnalogGain();
 void ShowBandwidth();
-void ShowDefaultSettings();
+void ShowDecoderMessage();
+void sineTone(int numCycles);
+int  SpectrumOptions();
+
+void TurnOffInitializingMessage();
+
+void UpdateInfoWindow();
 extern "C"
 {
   void sincosf(float err, float *s, float *c);
@@ -2137,12 +2225,13 @@ int  SubmenuSelect(const char *options[], int numberOfChoices, int defaultStart)
 void T4_rtc_set(unsigned long t);
 float TGetTemp();
 
-int Unused1();                            // Placeholders for array of pointers to function
-int Unused2();
-int Unused3();
+int  Unused1();                            // Placeholders for array of pointers to function
+int  Unused2();
+int  Unused3();
 void UpdateAGCField();
 void UpdateCompressionField();
 void UpdateDecoderField();
+void UpdateEEPROMVersionNumber();
 void UpdateIncrementField();
 void UpdateNoiseField();
 void UpdateNotchField();
@@ -2151,12 +2240,17 @@ void UpdateVolumeField();
 void UpdateWPMField();
 void UpdateZoomField();
 
+int ValidEEPROMData();
 float VolumeToAmplification(int volume);
 int  VFOSelect();
 
+void WaitforWRComplete();
 void WordSpace();
+void writeClippedRect(int x, int y, int cx, int cy, uint16_t *pixels, bool waitForWRC);
+inline void writeRect(int x, int y, int cx, int cy, uint16_t *pixels);
 
 void Xanr();
+int  Xmit_IQ_Cal(); //AFP 09-21-22
 
 void ZoomFFTPrep();
 void ZoomFFTExe(uint32_t blockSize);

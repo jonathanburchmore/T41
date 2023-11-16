@@ -26,7 +26,7 @@ int ProcessButtonPress(int valPin)
   for (switchIndex = 0; switchIndex < NUMBER_OF_SWITCHES; switchIndex++)
   {
     if (abs(valPin - EEPROMData.switchValues[switchIndex]) < WIGGLE_ROOM)    // ...because ADC does return exact values every time
-    {     
+    {
       return switchIndex;
     }
   }
@@ -46,18 +46,18 @@ int ReadSelectedPushButton()
 {
   minPinRead        = 0;
   int buttonReadOld = 1023;
-  
+
   while (abs(minPinRead - buttonReadOld) > 3) {                   // do averaging to smooth out the button response
     minPinRead = analogRead(BUSY_ANALOG_PIN);
     buttonRead = .1 * minPinRead + (1 - .1) * buttonReadOld;      // See expected values in next function.
     buttonReadOld = buttonRead;
   }
-  if (buttonRead > EEPROMData.switchValues[0] + WIGGLE_ROOM) {   //AFP 10-29-22 per Jack Wilson 
+  if (buttonRead > EEPROMData.switchValues[0] + WIGGLE_ROOM) {   //AFP 10-29-22 per Jack Wilson
     return -1;
   }
   minPinRead = buttonRead;
   MyDelay(100L);
-  return minPinRead;  
+  return minPinRead;
 }
 
 /*****
@@ -72,7 +72,7 @@ int ReadSelectedPushButton()
 *****/
 void ExecuteButtonPress(int val)
 {
-  if (val == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {          // Pressed Select with no primary/secondary menu selected  
+  if (val == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {          // Pressed Select with no primary/secondary menu selected
     NoActiveMenu();
     return;
   } else {
@@ -81,12 +81,12 @@ void ExecuteButtonPress(int val)
   switch (val) {
     case MENU_OPTION_SELECT:                                     // 0
       /*                                    Useful comment in understanding how menues align:
-const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",      "NR Set",   "IQ Manual",
+        const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",      "NR Set",   "IQ Manual",
                                "EQ Rec Set", "EQ Xmt Set",   "Mic Comp", "Calibrate Freq", "Noise Floor",
                                "RF Set",     "VFO Select",   "EEPROM",
                               };
 
-int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions, &IQOptions,
+        int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions, &IQOptions,
                                &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &CalibrateFrequency, &ButtonSetNoiseFloor,
                                &RFOptions, &VFOSelect, &EEPROMOptions
                               };      */
@@ -121,8 +121,8 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       NCOFreq = 0L;
       DrawBandWidthIndicatorBar(); // AFP 10-20-22
       //FilterOverlay();   // AFP 10-20-22
-      SetFreq(); 
-      ShowSpectrum(); 
+      SetFreq();
+      ShowSpectrum();
       break;
 
     case ZOOM:                                                    // 3
@@ -146,8 +146,8 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
       NCOFreq = 0L;
-      DrawBandWidthIndicatorBar(); //AFP 10-20-22
-      //FilterOverlay();             // AFP 10-20-22
+      DrawBandWidthIndicatorBar();  //AFP 10-20-22
+      //FilterOverlay();            // AFP 10-20-22
       break;
 
     case FILTER:                                                  // 6
@@ -164,7 +164,7 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       ButtonMode();
       ShowSpectrumdBScale();
       break;
-      
+
     case NOISE_REDUCTION:                                         // 9
       ButtonNR();
       break;
@@ -179,23 +179,23 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       break;
 
     case FINE_TUNE_INCREMENT:                                     // 12
-      if (stepFT == 50) {                                          
+      if (stepFT == 50) {
         stepFT = 500;
       } else {
         stepFT = 50;
       }
       UpdateIncrementField();
-      break;    
+      break;
 
     case DECODER_TOGGLE:                                          // 13
-//      decoderFlag = !decoderFlag;
-      
+      //      decoderFlag = !decoderFlag;
+
       if (decoderFlag == DECODE_OFF) {
-        decoderFlag = DECODE_ON;               
+        decoderFlag = DECODE_ON;
       } else {
         decoderFlag = DECODE_OFF;
       }
-      
+
       UpdateDecoderField();
       break;
 
@@ -207,10 +207,48 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       ResetTuning();                                              // AFP 10-11-22
       break;                                                      // AFP 10-11-22
 
-    case UNUSED_1:                                                // 16    
+    case UNUSED_1:                                                // 16
+      if (calOnFlag == 0) {
+        ButtonFrequencyEntry();
+      }
       break;
 
     case UNUSED_2:                                                // 17  // AFP 10-11-22
+      int buttonIndex, doneViewing, valPin;
+
+      MyDelay(100L);
+      DrawKeyboard();
+      CaptureKeystrokes();
+      BearingHeading(keyboardBuffer);
+//      bmpDraw( (char *) "HomeLocationOriginalResizeBy4.bmp", IMAGE_CORNER_X, IMAGE_CORNER_Y);
+      bmpDraw( (char *) MAP_FILE_NAME, IMAGE_CORNER_X, IMAGE_CORNER_Y);
+      doneViewing = false;
+      while (true) {
+        valPin = ReadSelectedPushButton();                        // Poll UI push buttons
+        MyDelay(100L);
+        if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
+          buttonIndex = ProcessButtonPress(valPin);               // Winner, winner...chicken dinner!
+
+          switch (buttonIndex) {
+            case UNUSED_2:
+              doneViewing = true;
+              break;
+            default:
+              break;
+          }
+        }
+
+        if (doneViewing == true) {
+          //  tft.clearMemory();          // Need to clear overlay too
+          //  tft.writeTo(L2);
+          //  tft.fillWindow();
+          break;
+        }
+      }
+      RedrawDisplayScreen();
+      ShowFrequency();
+      DrawFrequencyBarValue();
+
       break;
 
     default:
@@ -253,7 +291,7 @@ void NoActiveMenu()
   tft.setTextColor(RA8875_RED);
   tft.setCursor(10, 0);
   tft.print("No menu selected");
-  
+
   menuStatus         = NO_MENUS_ACTIVE;
   mainMenuIndex      = 0;
   secondaryMenuIndex = 0;

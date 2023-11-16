@@ -33,7 +33,6 @@ void ProcessIQData()
      **********************************************************************************/
   float32_t audioMaxSquared;
   uint32_t AudioMaxIndex;
-  //int val;
   float rfGainValue;
 
   // are there at least N_BLOCKS buffers in each channel available ?

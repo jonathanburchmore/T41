@@ -28,7 +28,7 @@ void SetupMyCompressors(boolean use_HP_filter1, float knee_dBFS1, float comp_rat
 
 /*****
   Purpose: void noiseblanker
-  Parameter list:
+  Parameter list:Figure 4.
     void
   Return value;
     void

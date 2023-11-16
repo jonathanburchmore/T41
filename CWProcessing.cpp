@@ -70,7 +70,6 @@ void DoCWReceiveProcessing() {  // All New AFP 09-19-22
     //Combine Correlation and Gowetzel Coefficients
     combinedCoeff = 10 * aveCorrResult * 100 * goertzelMagnitude;
     combinedCoeff2 = combinedCoeff;
-    //Serial.print("combinedCoeff= ");Serial.println(combinedCoeff);
     // ==========  Changed CW decode "lock" indicator
     if (combinedCoeff > 50) {   // AFP 10-26-22
       tft.fillRect(745, 448,  15 , 15, RA8875_GREEN);

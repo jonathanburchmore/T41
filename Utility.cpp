@@ -13,17 +13,14 @@ void sineTone(int numCycles)
 {
   float theta;
   float freqSideTone2;
+  float freqSideTone3 = 300;         // Refactored 32 * 24000 / 256;
+  
   freqSideTone2 = numCycles * 24000 / 256;
   for (int kf = 0; kf < 256; kf++) { //Calc: numCycles=8, 750 hz sine wave.
     theta = kf * 2 * PI * freqSideTone2 / 24000;
     sinBuffer2[kf] = sin(theta);
     cosBuffer2[kf] = cos(theta);
-  }
-  float theta3;
-  float freqSideTone3;
-  freqSideTone3 = 32 * 24000 / 256;;
-  for (int kf = 0; kf < 256; kf++) { //Calc 750 hz sine wave.
-    theta = kf * 2 * PI * freqSideTone3 / 24000;
+    theta = kf * 2.0 * PI * freqSideTone3 / 24000;
     sinBuffer3[kf] = sin(theta);
     cosBuffer3[kf] = cos(theta);
   }
@@ -488,7 +485,6 @@ void SaveAnalogSwitchValues()
       value = ReadSelectedPushButton();
       if (value < NOTHING_TO_SEE_HERE && value > 0) {
         MyDelay(100L);
-
         if (value < minVal) {
           minVal = value;
         } else {
@@ -573,25 +569,22 @@ void DisplayClock()
 void SetupMode(int sideBand)
 {
   int temp;
-  // AFP 10-27-22
+                                    // AFP 10-27-22
   if (old_demod_mode != -99)                                    // first time radio is switched on and when changing bands
   {
     switch (sideBand) {
       case DEMOD_LSB :
-        Serial.println("SetupMode(int sideBand) LSB");
         temp = bands[currentBand].FHiCut;
         bands[currentBand].FHiCut = - bands[currentBand].FLoCut;
         bands[currentBand].FLoCut = - temp;
         break;
 
       case DEMOD_USB :
-        Serial.println("SetupMode(int sideBand)USB ");
         temp = bands[currentBand].FHiCut;
         bands[currentBand].FHiCut = - bands[currentBand].FLoCut;
         bands[currentBand].FLoCut = - temp;
         break;
       case DEMOD_AM :
-        Serial.println("SetupMode(int sideBand) AM ");
         bands[currentBand].FHiCut =  -bands[currentBand].FLoCut;
         break;
     }

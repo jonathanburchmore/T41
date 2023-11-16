@@ -14,19 +14,19 @@
    void
 *****/
 
-void CalibrateOptions()
+int CalibrateOptions()
 {
-  //Serial.println(" CalibrateOptions");
-  // Serial.print("IQChoice= "); Serial.println(IQChoice);
   int val;
   int32_t increment = 100L;
   tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 30, CHAR_HEIGHT, RA8875_BLACK);
   switch (IQChoice) {
     case 0:  // IQ Receive Gain Cal
+    calOnFlag = 1;
       calTypeFlag = 0;
       zoomIndex = 0;
       ResetZoom(zoomIndex);
       //if (xmtMode == SSB_MODE) ButtonMode();
+      digitalWrite(RXTX, HIGH);
       DoReceiveCalibrate();
       IQChoice = 5;
       calFreqShift = 0;
@@ -35,16 +35,21 @@ void CalibrateOptions()
       ResetZoom(zoomIndex);
       //RedrawDisplayScreen();
       //lastFrequencies[currentBandA][1]=currentFreqA;
-
+        EEPROMData.IQAmpCorrectionFactor[currentBandA]             = IQAmpCorrectionFactor[currentBandA] ;
+        EEPROMData.IQPhaseCorrectionFactor[currentBandA]           = IQPhaseCorrectionFactor[currentBandA];
       EEPROMWrite();
-      EEPROMRead;
+//      EEPROMRead;
+      calOnFlag=0;
+      digitalWrite(RXTX, LOW);
       break;
 
     case 1:
       calTypeFlag = 1;
+      calOnFlag = 1;
       zoomIndex = 2;
       ResetZoom(zoomIndex);
       //if (xmtMode == SSB_MODE) ButtonMode();
+      digitalWrite(RXTX, HIGH);
       DoXmitCalibrate();
       EEPROMWrite();
       IQChoice = 5;
@@ -53,6 +58,8 @@ void CalibrateOptions()
       zoomIndex = 1;
       ResetZoom(zoomIndex);
       RedrawDisplayScreen();
+      calOnFlag=0;
+      digitalWrite(RXTX, LOW);
       break;
     case 2: // Calibrate Frequency
       freqCorrectionFactor = GetEncoderValueLive(-200000, 200000, freqCorrectionFactor, increment, (char *)"Freq Cal: ");
@@ -73,7 +80,7 @@ void CalibrateOptions()
           EEPROMWrite();
           calibrateFlag = 0;
           IQChoice = 5;
-          return;
+          return IQChoice;
         }
       }
       break;
@@ -81,8 +88,6 @@ void CalibrateOptions()
     case 3 :   // SSB PA Cal
       SSBPowerCalibrationFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, SSBPowerCalibrationFactor[currentBandA], 0.001, (char *)"SSB PA Cal: ");
       powerOutSSB[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  SSBPowerCalibrationFactor[currentBandA]; // AFP 10-21-22
-      // Serial.print("SSBPowerCalibrationFactor[currentBandA]= "); Serial.println(SSBPowerCalibrationFactor[currentBandA], 6);
-      // Serial.print("powerOutSSB[currentBandA]= "); Serial.println(powerOutSSB[currentBandA], 6);
       val = ReadSelectedPushButton();
       if (val != BOGUS_PIN_READ) {                        // Any button press??
         val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
@@ -91,26 +96,23 @@ void CalibrateOptions()
           EEPROMWrite();
           calibrateFlag = 0;
           IQChoice = 5;
-
-          return;
+          return IQChoice;
         }
       }
       break;
     case 4 :   // CW PA Cal
       CWPowerCalibrationFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, CWPowerCalibrationFactor[currentBandA], 0.001, (char *)"CW PA Cal: ");
       powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  CWPowerCalibrationFactor[currentBandA]; // AFP 10-21-22
-      //Serial.print("CWPowerCalibrationFactor[currentBandA]= ");Serial.println(CWPowerCalibrationFactor[currentBandA],6);
-      // Serial.print("powerOutCW[currentBandA]= ");Serial.println(powerOutCW[currentBandA],6);
       val = ReadSelectedPushButton();
       if (val != BOGUS_PIN_READ) {                        // Any button press??
         val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
         if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
           tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-
+EEPROMData.CWPowerCalibrationFactor[currentBandA]= CWPowerCalibrationFactor[currentBandA];
           EEPROMWrite();
           calibrateFlag = 0;
           IQChoice = 5;
-          return;
+          return IQChoice;
         }
       }
       break;
@@ -130,7 +132,7 @@ void CalibrateOptions()
       micChoice = -1;
       break;
   }
-  return ;
+  return 1;
 }
 // ==============  AFP 10-22-22 ==================
 
@@ -505,7 +507,7 @@ int EqualizerXmtOptions()
   Return value
     int           an index into the band array
 *****/
-void MicGainSet() {
+int MicGainSet() {
   //=====
   const char *micGainChoices[] = {"Set Mic Gain", "Cancel"};
   micGainChoice = SubmenuSelect(micGainChoices, 2, micGainChoice);
@@ -544,8 +546,8 @@ void MicGainSet() {
     case 1:
       break;
   }
-  return;
-  EraseMenus();
+  return micGainChoice;
+//  EraseMenus();
 }
 /*****
   Purpose: Turn mic compression on and set the level
@@ -612,15 +614,16 @@ int RFOptions()
       transmitPowerLevel = (float)GetEncoderValue(1,   20,  transmitPowerLevel, 1, (char *) "Power: ");
       if (xmtMode == CW_MODE) {  //AFP 10-13-22
         powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA]; //  afp 10-21-22
-        EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-21-22
+        
         EEPROMData.powerOutCW[currentBandA]   = powerOutCW[currentBandA];//AFP 10-21-22
         //EEPROMWrite();//AFP 10-21-22
       } else {//AFP 10-13-22
         if (xmtMode == SSB_MODE) {
           powerOutSSB[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  SSBPowerCalibrationFactor[currentBandA];   // afp 10-21-22
+        EEPROMData.powerOutSSB[currentBandA]   = powerOutSSB[currentBandA];//AFP 10-21-22
         }
       }
-      EEPROMData.powerOutSSB[currentBandA]   = powerOutSSB[currentBandA];//AFP 10-21-22
+      EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-21-22
       EEPROMWrite();//AFP 10-21-22
 
       BandInformation();
@@ -750,7 +753,7 @@ int VFOSelect()
   BandInformation();
   ShowBandwidth();
   FilterBandwidth();
-  EEPROMData.currentVFO = activeVFO;
+  EEPROMData.activeVFO = activeVFO;
 
   tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit
   tft.fillRect(FREQUENCY_X,       FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit  tft.setFontScale( (enum RA8875tsize) 0);
@@ -770,10 +773,11 @@ int VFOSelect()
 *****/
 int EEPROMOptions()
 {
-  const char *EEPROMOpts[] = {"Save Current", "Set Defaults", "Get Favorite", "Set Favorite", "Cancel"};
+  const char *EEPROMOpts[] = {"Save Current", "Set Defaults", "Get Favorite", "Set Favorite", 
+                        "Copy EEPROM-->SD", "Copy SD-->EEPROM", "SD EEPROM Dump", "Cancel"};
   int defaultOpt = 0;
 
-  defaultOpt = SubmenuSelect(EEPROMOpts, 5, defaultOpt);
+  defaultOpt = SubmenuSelect(EEPROMOpts, 7, defaultOpt);
   switch (defaultOpt) {
     case 0:                                   // Save current values
       EEPROMWrite();
@@ -788,7 +792,15 @@ int EEPROMOptions()
       break;
 
     case 3:
-      SetFavoriteFrequency();               // Save current frequency to EEPROM
+      SetFavoriteFrequency();               // Set favorites
+      break;
+
+    case 4:
+      CopyEEPROMToSD();                     // Save current EEPROM value to SD
+      break;
+      
+    case 5:
+      SDEEPROMDump();                       // Show SD data
       break;
 
     default:
