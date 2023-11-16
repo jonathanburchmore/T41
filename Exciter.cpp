@@ -39,15 +39,15 @@ void ExciterIQData()
     // get audio samples from the audio  buffers and convert them to float
     // read in 32 blocks á 128 samples in I and Q
     for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
-      sp_L = Q_in_L_Ex.readBuffer();
-      sp_R = Q_in_R_Ex.readBuffer();
+      sp_L2 = Q_in_L_Ex.readBuffer();
+      sp_R2 = Q_in_R_Ex.readBuffer();
 
       /**********************************************************************************  AFP 12-31-20
           Using arm_Math library, convert to float one buffer_size.
           Float_buffer samples are now standardized from > -1.0 to < 1.0
       **********************************************************************************/
-      arm_q15_to_float (sp_L, &float_buffer_L_EX[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
-      arm_q15_to_float (sp_R, &float_buffer_R_EX[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
+      arm_q15_to_float (sp_L2, &float_buffer_L_EX[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
+      arm_q15_to_float (sp_R2, &float_buffer_R_EX[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
       Q_in_L_Ex.freeBuffer();
       Q_in_R_Ex.freeBuffer();
     }
@@ -96,12 +96,12 @@ void ExciterIQData()
      **********************************************************************************/
 
     if (bands[currentBand].mode == DEMOD_LSB) { //AFP 12-27-21
-      arm_scale_f32 (float_buffer_L_EX, 1.015, float_buffer_L_EX, 256);
-      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, .013, 256);
+      arm_scale_f32 (float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);
+      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
     }
     else if (bands[currentBand].mode == DEMOD_USB) { //AFP 12-27-21
-      arm_scale_f32 (float_buffer_L_EX, -.965, float_buffer_L_EX, 256);
-      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, -0.12, 256);
+      arm_scale_f32 (float_buffer_L_EX, IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);
+      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
     }
     arm_scale_f32 (float_buffer_R_EX, 1.00, float_buffer_R_EX, 256);
 
@@ -132,10 +132,10 @@ void ExciterIQData()
     **********************************************************************************/
 
     for (unsigned  i = 0; i < N_BLOCKS_EX; i++) {  //N_BLOCKS_EX=16  BUFFER_SIZE=128 16x128=2048
-      sp_L = Q_out_L_Ex.getBuffer();
-      sp_R = Q_out_R_Ex.getBuffer();
-      arm_float_to_q15 (&float_buffer_L_EX[BUFFER_SIZE * i], sp_L, BUFFER_SIZE);
-      arm_float_to_q15 (&float_buffer_R_EX[BUFFER_SIZE * i], sp_R, BUFFER_SIZE);
+      sp_L2 = Q_out_L_Ex.getBuffer();
+      sp_R2 = Q_out_R_Ex.getBuffer();
+      arm_float_to_q15 (&float_buffer_L_EX[BUFFER_SIZE * i], sp_L2, BUFFER_SIZE);
+      arm_float_to_q15 (&float_buffer_R_EX[BUFFER_SIZE * i], sp_R2, BUFFER_SIZE);
       Q_out_L_Ex.playBuffer(); // play it !
       Q_out_R_Ex.playBuffer(); // play it !
     }

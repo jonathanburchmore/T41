@@ -52,7 +52,7 @@ int ReadSelectedPushButton()
     buttonRead = .1 * minPinRead + (1 - .1) * buttonReadOld;      // See expected values in next function.
     buttonReadOld = buttonRead;
   }
-  if (buttonRead > 1023 - WIGGLE_ROOM) {
+  if (buttonRead > EEPROMData.switchValues[0] + WIGGLE_ROOM) {   //AFP 10-29-22 per Jack Wilson 
     return -1;
   }
   minPinRead = buttonRead;

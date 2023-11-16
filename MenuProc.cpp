@@ -1,6 +1,141 @@
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
+
+
+// ==============  AFP 10-22-22 ==================
+/*****
+  Purpose: Present the Calibrate options available and return the selection
+
+  Parameter list:
+    void
+
+  Return value
+   void
+*****/
+
+void CalibrateOptions()
+{
+  //Serial.println(" CalibrateOptions");
+  // Serial.print("IQChoice= "); Serial.println(IQChoice);
+  int val;
+  int32_t increment = 100L;
+  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 30, CHAR_HEIGHT, RA8875_BLACK);
+  switch (IQChoice) {
+    case 0:  // IQ Receive Gain Cal
+      calTypeFlag = 0;
+      zoomIndex = 0;
+      ResetZoom(zoomIndex);
+      //if (xmtMode == SSB_MODE) ButtonMode();
+      DoReceiveCalibrate();
+      IQChoice = 5;
+      calFreqShift = 0;
+      centerTuneFlag = 1;
+      zoomIndex = 1;
+      ResetZoom(zoomIndex);
+      //RedrawDisplayScreen();
+      //lastFrequencies[currentBandA][1]=currentFreqA;
+
+      EEPROMWrite();
+      EEPROMRead;
+      break;
+
+    case 1:
+      calTypeFlag = 1;
+      zoomIndex = 2;
+      ResetZoom(zoomIndex);
+      //if (xmtMode == SSB_MODE) ButtonMode();
+      DoXmitCalibrate();
+      EEPROMWrite();
+      IQChoice = 5;
+      calFreqShift = 0;
+      centerTuneFlag = 1;
+      zoomIndex = 1;
+      ResetZoom(zoomIndex);
+      RedrawDisplayScreen();
+      break;
+    case 2: // Calibrate Frequency
+      freqCorrectionFactor = GetEncoderValueLive(-200000, 200000, freqCorrectionFactor, increment, (char *)"Freq Cal: ");
+
+      if (freqCorrectionFactor != freqCorrectionFactorOld) {
+        si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, freqCorrectionFactor);
+        SetFreq();
+        MyDelay(10L);
+        freqCorrectionFactorOld = freqCorrectionFactor;
+        //EEPROMWrite();
+      }
+      val = ReadSelectedPushButton();
+      if (val != BOGUS_PIN_READ) {                        // Any button press??
+        val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+        if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+          tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
+
+          EEPROMWrite();
+          calibrateFlag = 0;
+          IQChoice = 5;
+          return;
+        }
+      }
+      break;
+
+    case 3 :   // SSB PA Cal
+      SSBPowerCalibrationFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, SSBPowerCalibrationFactor[currentBandA], 0.001, (char *)"SSB PA Cal: ");
+      powerOutSSB[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  SSBPowerCalibrationFactor[currentBandA]; // AFP 10-21-22
+      // Serial.print("SSBPowerCalibrationFactor[currentBandA]= "); Serial.println(SSBPowerCalibrationFactor[currentBandA], 6);
+      // Serial.print("powerOutSSB[currentBandA]= "); Serial.println(powerOutSSB[currentBandA], 6);
+      val = ReadSelectedPushButton();
+      if (val != BOGUS_PIN_READ) {                        // Any button press??
+        val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+        if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+          tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
+          EEPROMWrite();
+          calibrateFlag = 0;
+          IQChoice = 5;
+
+          return;
+        }
+      }
+      break;
+    case 4 :   // CW PA Cal
+      CWPowerCalibrationFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, CWPowerCalibrationFactor[currentBandA], 0.001, (char *)"CW PA Cal: ");
+      powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  CWPowerCalibrationFactor[currentBandA]; // AFP 10-21-22
+      //Serial.print("CWPowerCalibrationFactor[currentBandA]= ");Serial.println(CWPowerCalibrationFactor[currentBandA],6);
+      // Serial.print("powerOutCW[currentBandA]= ");Serial.println(powerOutCW[currentBandA],6);
+      val = ReadSelectedPushButton();
+      if (val != BOGUS_PIN_READ) {                        // Any button press??
+        val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+        if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+          tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
+
+          EEPROMWrite();
+          calibrateFlag = 0;
+          IQChoice = 5;
+          return;
+        }
+      }
+      break;
+    case 5:
+      RedrawDisplayScreen();
+      currentFreqA = TxRxFreq = centerFreq + NCOFreq;
+      DrawBandWidthIndicatorBar(); // AFP 10-20-22
+      ShowFrequency();
+      BandInformation();
+      calibrateFlag = 0;
+      centerTuneFlag = 1;
+      modeSelectOutExL.gain(0, 0);
+      modeSelectOutExR.gain(0, 0);
+      ShowSpectrum();
+      break;
+    default:                          // Cancelled choice
+      micChoice = -1;
+      break;
+  }
+  return ;
+}
+// ==============  AFP 10-22-22 ==================
+
+
+
 //  ====AFP 10-18-22 =====
 /*****
   Purpose: Present the CW options available and return the selection
@@ -20,8 +155,7 @@ int CWOptions()                              // new option for Sidetone and Dela
 
   switch (CWChoice) {
     case 0:                                 // WPM
-      EEPROMData.wordsPerMinute = SetWPM();
-      EEPROMWrite();
+      SetWPM();
       SetDitLength(currentWPM);  //Afp 09-22-22
       break;
 
@@ -116,7 +250,7 @@ int AGCOptions()
   const char *AGCChoices[]  = {"Off", "Slow", "Medium", "Fast", "Cancel"};
 
   AGCMode = SubmenuSelect(AGCChoices, 5, AGCMode);
-  if (AGCMode == 0 || AGCMode == 4) {
+  if (AGCMode == 4) {
     return AGCMode;                                        // Nope.
   }
   EEPROMData.AGCMode = AGCMode;                               // Store in EEPROM and...
@@ -132,10 +266,11 @@ int AGCOptions()
 
   Return value
 *****/
-int IQOptions()     //============================== AFP 10-21-22  All new
+int IQOptions()     //============================== AFP 10-22-22  All new
 {
-  const char *IQOptions[] = {"Volume", "Rec Gain Cal", "Rec Phase Cal", "Xmit Gain Cal", "Xmit Phase Cal", "Freq Cal", "SSB PA Cal", "CW PA Cal",}; //AFP 10-21-22
-  IQChoice = SubmenuSelect(IQOptions, 8, 0); //AFP 10-21-22
+  calibrateFlag = 1;
+  const char *IQOptions[] = {"Rec Cal", "Xmit Cal", "Freq Cal", "SSB PA Cal", "CW PA Cal", "Cancel"}; //AFP 10-21-22
+  IQChoice = SubmenuSelect(IQOptions, 6, 0); //AFP 10-21-22
   return IQChoice;
 }
 /*****
@@ -147,9 +282,10 @@ int IQOptions()     //============================== AFP 10-21-22  All new
   Return value
     void
 *****/
-void ProcessEqualizerChoices(int array[], char *title)
+void ProcessEqualizerChoices( int EQType, char *title)
 {
-
+  for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+  }
   const char *eqFreq[] = {" 200", " 250", " 315", " 400", " 500", " 630", " 800",
                           "1000", "1250", "1600", "2000", "2500", "3150", "4000"
                          };
@@ -169,7 +305,13 @@ void ProcessEqualizerChoices(int array[], char *title)
   int val;
 
   for (iFreq = 0; iFreq < EQUALIZER_CELL_COUNT; iFreq++) {
-    yLevel[iFreq] = array[iFreq];                           // Could be Rec or Xmt.
+    if (EQType == 0) {
+      yLevel[iFreq] = EEPROMData.equalizerRec[iFreq];
+    } else {
+      if (EQType == 1) {
+        yLevel[iFreq] = EEPROMData.equalizerXmt[iFreq];
+      }
+    }
   }
   tft.writeTo(L2);
   tft.clearMemory();
@@ -259,17 +401,28 @@ void ProcessEqualizerChoices(int array[], char *title)
                      barWidth,                     // Set bar width
                      newValue,                     // Draw new bar
                      RA8875_GREEN);
-        array[columnIndex] = newValue;
+
+        if (EQType == 0) {
+          recEQ_Level[columnIndex] = newValue;
+          EEPROMData.equalizerRec[columnIndex] = recEQ_Level[columnIndex];
+        } else {
+          if (EQType == 1) {
+            xmtEQ_Level[columnIndex] = newValue; ;
+            EEPROMData.equalizerXmt[columnIndex] = xmtEQ_Level[columnIndex];
+          }
+        }
+
         filterEncoderMove = 0;
         columnIndex++;
         break;
       }
-      recEQ_Level[columnIndex] = (float)array[columnIndex] / 100.0;  //AFP 08-09-22
+      //recEQ_Level[columnIndex] = (float)array[columnIndex];  //AFP 08-09-22
+      //EEPROMData.equalizerRec[columnIndex] = recEQ_Level[columnIndex];
     }
-    recEQ_Level[columnIndex] = (float)array[columnIndex] / 100.0; // ======================================Interpolation  ================
   }
-}
 
+  EEPROMWrite();
+}
 
 /*****
   Purpose: Receive EQ set
@@ -295,7 +448,9 @@ int EqualizerRecOptions()
       receiveEQFlag = OFF;
       break;
     case 2:
-      ProcessEqualizerChoices(EEPROMData.equalizerRec, (char *)"Receive Equalizer");
+      for (int iFreq = 0; iFreq < EQUALIZER_CELL_COUNT; iFreq++) {
+      }
+      ProcessEqualizerChoices( 0, (char *)"Receive Equalizer");
       EEPROMWrite();
       RedrawDisplayScreen();
       break;
@@ -330,15 +485,68 @@ int EqualizerXmtOptions()
       xmitEQFlag = OFF;
       break;
     case 2:
-      ProcessEqualizerChoices(EEPROMData.equalizerXmt, (char *) "Transmit Equalizer");
+      ProcessEqualizerChoices( 1, (char *)"Transmit Equalizer");
       EEPROMWrite();
       RedrawDisplayScreen();
+      break;
     case 3:
       break;
   }
   return 0;
 }
 
+
+/*****
+  Purpose: Set Mic level
+
+  Parameter list:
+    void
+
+  Return value
+    int           an index into the band array
+*****/
+void MicGainSet() {
+  //=====
+  const char *micGainChoices[] = {"Set Mic Gain", "Cancel"};
+  micGainChoice = SubmenuSelect(micGainChoices, 2, micGainChoice);
+  switch (micGainChoice) {
+    case 0:
+      int val;
+      currentMicGain = EEPROMData.currentMicGain; // AFP 09-22-22
+      tft.setFontScale( (enum RA8875tsize) 1);
+      tft.fillRect(SECONDARY_MENU_X - 50, MENUS_Y, EACH_MENU_WIDTH + 50, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setTextColor(RA8875_WHITE);
+      tft.setCursor(SECONDARY_MENU_X  - 48, MENUS_Y + 1);
+      tft.print("Mic Gain:");
+      tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+      tft.print(currentMicGain);
+      while (true) {
+        if (filterEncoderMove != 0) {
+          currentMicGain += ((float) filterEncoderMove);
+          if (currentMicGain < -40)
+            currentMicGain = -40;
+          else if (currentMicGain > 30)                 // 100% max
+            currentMicGain = 30;
+          tft.fillRect(SECONDARY_MENU_X + 180, MENUS_Y, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+          tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+          tft.print(currentMicGain);
+          filterEncoderMove = 0;
+        }
+        val = ReadSelectedPushButton();                                  // Read pin that controls all switches
+        val = ProcessButtonPress(val);
+        //MyDelay(150L);
+        if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+          EEPROMData.currentMicGain = currentMicGain;
+          EEPROMWrite();
+          break;
+        }
+      }
+    case 1:
+      break;
+  }
+  return;
+  EraseMenus();
+}
 /*****
   Purpose: Turn mic compression on and set the level
 
@@ -350,20 +558,30 @@ int EqualizerXmtOptions()
 *****/
 int MicOptions() // AFP 09-22-22 All new
 {
-  const char *micChoices[] = {"On", "Off", "Cancel"};
+  const char *micChoices[] = {"On", "Off", "Set Threshold", "Set Comp_Ratio", "Set Attack", "Set Decay", "Cancel"};
 
-  micChoice = SubmenuSelect(micChoices, 3, micChoice);
+  micChoice = SubmenuSelect(micChoices, 7, micChoice);
   switch (micChoice) {
     case 0:                           // On
-      SetCompressionLevel();
-      sgtl5000_1.autoVolumeControl(0, 1, 0, micCompression, 5, 8);// AFP 09-22-22
-      sgtl5000_1.autoVolumeEnable();                              // AFP 09-22-22
+      compressorFlag = 1;                            // AFP 09-22-22
       break;
-
     case 1:                           // Off
-      sgtl5000_1.autoVolumeDisable();   // AFP 09-22-22
+      compressorFlag = 0;
       break;
-
+    case 2:
+      SetCompressionLevel();
+      break;
+    case 3:
+      SetCompressionRatio();
+      break;
+    case 4:
+      SetCompressionAttack();
+      break;
+    case 5:
+      SetCompressionRelease();
+      break;
+    case 6:
+      break;
     default:                          // Cancelled choice
       micChoice = -1;
       break;
@@ -393,19 +611,18 @@ int RFOptions()
     case 0:                                 // AFP 10-21-22
       transmitPowerLevel = (float)GetEncoderValue(1,   20,  transmitPowerLevel, 1, (char *) "Power: ");
       if (xmtMode == CW_MODE) {  //AFP 10-13-22
-        powerOutCW = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor; //  afp 10-21-22
-            EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-21-22
-      EEPROMData.powerOutCW   = powerOutCW;//AFP 10-21-22
-      EEPROMWrite();//AFP 10-21-22
+        powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA]; //  afp 10-21-22
+        EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-21-22
+        EEPROMData.powerOutCW[currentBandA]   = powerOutCW[currentBandA];//AFP 10-21-22
+        //EEPROMWrite();//AFP 10-21-22
       } else {//AFP 10-13-22
         if (xmtMode == SSB_MODE) {
-          powerOutSSB = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  SSBPowerCalibrationFactor;   // afp 10-21-22
+          powerOutSSB[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  SSBPowerCalibrationFactor[currentBandA];   // afp 10-21-22
         }
       }
-      //EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-13-22
-      //EEPROMData.powerOutSSB   = powerOutSSB;//AFP 10-21-22
-      //EEPROMWrite();//AFP 10-21-22
-      // returnValue = transmitPowerLevel;//AFP 10-21-22
+      EEPROMData.powerOutSSB[currentBandA]   = powerOutSSB[currentBandA];//AFP 10-21-22
+      EEPROMWrite();//AFP 10-21-22
+
       BandInformation();
       break;
 

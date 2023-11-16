@@ -11,22 +11,64 @@
   from Jack Purdum, W8TEE, and Al Peter, AC8GY.
 
   Any and all other commercial uses, written or implied, are forbidden without written permission from
+  V033  Nov, 06, 2022  Al Peter (AC8GY)
+    Revised Receive Cal and Transmit Cal to utilize T41 Excite to provide reference signal - no Sig Gen or Freq Analyzer required.
+    Fixed problem with startup parameter setting of bands and last frequencies
+    Reorganized EEPROM and formatted printout of EEPROM data
+    Added Synchronous AM detection  - SAM
+    Set Demod mode and set Receive filters for Favorite frequencies.
+    Extended favorite frequecies to add WWV and set proper Receive filter
+    Fixed CW mode display of sidetone & audio out
+    Changed High Pass filter around DC for 1x spectrum display
+    Revised Xmit Cal routine - added real time on-screen spectrum display of cal process
+    Added new Mic Compressor with full parameter selection.
+    Added Mic Gain Menu option 
+    Fixed : Print center freq correctly in zoom = 1X
+  V031d Oct, 30, 2022  Al Peter (AC8GY)
+    Recalibrated Main Spectrum display
+    Recalibrated Audio Spectrum display
+    Fixed: a couple of zoom anomolies
+    Fixed: AM demod window width issue
+    Added additional Cal parameter for xmit Power calibration
+    Fixed: vol value over-writes AGC display
+    Fixed: favorite frequency sets frequency and freq display
+    Added Auto band selection when new favorite frequency is in a different band
+  V031b Oct, 27, 2022  Al Peter (AC8GY)
+    Added PA power output by band for CW and SSB separately.  Added to EEPROM
+    Added IQ calibration variables by band.  Each band is separately calibrated.
+    Fixed: Filter/demod window tracks Zoom
+    Fixed: Set Spectrum Scale display
+    Changed AGC indicator
+    Added: Fine Tune demod window resets to center at band ends
+    Fixed Zoom Fine tune action
+  V031a Oct, 27, 2022  Al Peter (AC8GY)
+    Fixed: Tuning "jumps" when using Fine Tune
+    Reset CW Decode Detection Level
+    Revised CW Decode Narrow band filter
+    Implimented Power-on reset with button hold per KD0RC
+    Fixed AM demodulation
+    Adjusted Audio spectrum display height
+    Fixed Zoom Display
+    Adjusted NR levels
+    Moved Clock update to Process
+    Refactored several if else to switch case
+    Removed unused AM demod code
 
-  V029 Oct, 19, 2022  Jack Purdum (W8TEE), and Al Peter (AC8GY).
-    Added: New CW filters and save choice in EEPROM
+  V029 Oct, 19, 2022  Al Peter (AC8GY), and Jack Purdum (W8TEE) .
+    Added: 5 New CW filters and save choice in EEPROM
     Fixed: VFO jumps
     Fixed: power output
     Fixed: Spectrum scale disappeared after band change
-    Fixed: Touch-up on Zoom feature
+    Fixed: Touch-up on Zoom feature - fixed scale markings
     Fixed: Notch filter
-    Added: Power output calicration for both CW and SSB
+    Added: Power output calibration for both CW and SSB
     Added: Power variables for CW and SSB and calibration variables
   FLASH: code:188404, data:98128, headers:8372   free for files:7831560
    RAM1: variables:200864, code:185128, padding:11480   free for local variables:126816
    RAM2: variables:325920  free for malloc/new:198368
 
   V027e Oct, 17, 2022  Jack Purdum (W8TEE):
-    Fixed: height of filter plots for USB/AM2 too high by 3 pixels
+    Fixed: height of filter plots for USB/AM too high by 3 pixels
     Fixed: removed all dead variables from the EEPROM code which affect read(), write(), and show().
     Fixed: only shows red for out of band conditions for both VFOs
 
@@ -137,22 +179,22 @@
 struct band bands[NUMBER_OF_BANDS] = {  //AFP Changed 1-30-21
   //freq    band low   band hi   mode   LSB/USB   Low    Hi    Gain  type    gain  AGC   pixel
   //                                             filter filter             correct     offset
-  3700000,   3500000,  4000000, "80M", DEMOD_LSB, -100, -4000,  1, HAM_BAND, 1, 30,   20,
-  7150000,   7000000,  7300000, "40M", DEMOD_LSB, -100, -4000,  1, HAM_BAND, 1, 30,   20,
-  14200000, 14000000, 14350000, "20M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
-  18100000, 18068000, 18168000, "17M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
-  21200000, 21000000, 21450000, "15M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
-  24920000, 24890000, 24990000, "12M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
-  28350000, 28000000, 29700000, "10M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20
+  3700000,   3500000,  4000000, "80M", DEMOD_LSB, -200, -3000,  1, HAM_BAND, 1, 30,   20,
+  7150000,   7000000,  7300000, "40M", DEMOD_LSB, -200, -3000,  1, HAM_BAND, 1, 30,   20,
+  14200000, 14000000, 14350000, "20M", DEMOD_USB, 3000,   200,  1, HAM_BAND, 1, 30,   20,
+  18100000, 18068000, 18168000, "17M", DEMOD_USB, 3000,   200,  1, HAM_BAND, 1, 30,   20,
+  21200000, 21000000, 21450000, "15M", DEMOD_USB, 3000,   200,  1, HAM_BAND, 1, 30,   20,
+  24920000, 24890000, 24990000, "12M", DEMOD_USB, 3000,   200,  1, HAM_BAND, 1, 30,   20,
+  28350000, 28000000, 29700000, "10M", DEMOD_USB, 3000,   200,  1, HAM_BAND, 1, 30,   20
 };
 
 const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",    "Calibrate",
-                               "EQ Rec Set", "EQ Xmt Set",   "Mic Comp",  "Noise Floor",
+                               "EQ Rec Set", "EQ Xmt Set", "Mic Gain",  "Mic Comp",  "Noise Floor",
                                "RF Set",     "VFO Select",   "EEPROM",
                               };
 const char *CWFilter[] = {"0.8kHz", "1.0kHz", "1.3kHz", "1.8kHz", "2.0kHz", " Off "};
 int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions,  &IQOptions,
-                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions,  &ButtonSetNoiseFloor,
+                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicGainSet, &MicOptions,  &ButtonSetNoiseFloor,
                                &RFOptions, &VFOSelect, &EEPROMOptions
                               };
 const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
@@ -175,6 +217,13 @@ uint32_t T4_CPU_FREQUENCY  =  500000000UL;                             //AFP 2-1
 
 //======================================== Global object definitions ==================================================
 // ===========================  AFP 08-22-22
+
+AudioControlSGTL5000_Extended    sgtl5000_1;    //controller for the Teensy Audio Board
+AudioConvert_I16toF32     int2Float1, int2Float2;    //Converts Int16 to Float.  See class in AudioStream_F32.h
+AudioEffectGain_F32     gain1, gain2;  //Applies digital gain to audio data.  Expected Float data.
+AudioEffectCompressor_F32 comp1, comp2;
+AudioConvert_F32toI16     float2Int1, float2Int2;    //Converts Float to Int16.  See class in AudioStream_F32.h
+
 AudioInputI2SQuad     i2s_quadIn;
 AudioOutputI2SQuad    i2s_quadOut;
 
@@ -206,35 +255,50 @@ AudioPlayQueue        Q_out_R;
 AudioPlayQueue        Q_out_L_Ex;
 AudioPlayQueue        Q_out_R_Ex;
 
-AudioConnection       patchCord1(i2s_quadIn, 0, modeSelectInExL, 0); //Input Ex
-AudioConnection       patchCord2(i2s_quadIn, 1, modeSelectInExR, 0);
+// ===============
+AudioConnection         patchCord1(i2s_quadIn, 0, int2Float1, 0);   //connect the Left input to the Left Int->Float converter
+AudioConnection         patchCord2(i2s_quadIn, 1, int2Float2, 0);   //connect the Right input to the Right Int->Float converter
 
-AudioConnection       patchCord3(i2s_quadIn, 2, modeSelectInL, 0); //Input Rec
-AudioConnection       patchCord4(i2s_quadIn, 3, modeSelectInR, 0);
+AudioConnection_F32     patchCord3(int2Float1, 0, comp1, 0); //Left.  makes Float connections between objects
+AudioConnection_F32     patchCord4(int2Float2, 0, comp2, 0); //Right.  makes Float connections between objects
+AudioConnection_F32     patchCord5(comp1, 0, float2Int1, 0); //Left.  makes Float connections between objects
+AudioConnection_F32     patchCord6(comp2, 0, float2Int2, 0); //Right.  makes Float connections between objects
+//AudioConnection_F32     patchCord3(int2Float1, 0, float2Int1, 0); //Left.  makes Float connections between objects
+//AudioConnection_F32     patchCord4(int2Float2, 0, float2Int2, 0); //Right.  makes Float connections between objects
 
-AudioConnection       patchCord5(modeSelectInExR, 0, Q_in_R_Ex, 0); //Ex in Queue
-AudioConnection       patchCord6(modeSelectInExL, 0, Q_in_L_Ex, 0);
+// ===============
 
-AudioConnection       patchCord7(modeSelectInR, 0,   Q_in_R, 0);    //Rec in Queue
-AudioConnection       patchCord8(modeSelectInL, 0,   Q_in_L, 0);
+AudioConnection       patchCord7(float2Int1, 0, modeSelectInExL, 0); //Input Ex
+AudioConnection       patchCord8(float2Int2, 0, modeSelectInExR, 0);
 
-AudioConnection       patchCord9(Q_out_L_Ex,    0, modeSelectOutExL,  0); //Ex out Queue
-AudioConnection       patchCord10(Q_out_R_Ex,    0, modeSelectOutExR, 0);
+AudioConnection       patchCord9(i2s_quadIn, 2, modeSelectInL, 0); //Input Rec
+AudioConnection       patchCord10(i2s_quadIn, 3, modeSelectInR, 0);
 
-AudioConnection       patchCord11(Q_out_L,       0, modeSelectOutL,  0);   //Rec out Queue
-AudioConnection       patchCord12(Q_out_R,        0, modeSelectOutR, 0);
+AudioConnection       patchCord11(modeSelectInExR, 0, Q_in_R_Ex, 0); //Ex in Queue
+AudioConnection       patchCord12(modeSelectInExL, 0, Q_in_L_Ex, 0);
 
-AudioConnection       patchCord13(modeSelectOutExL,    0, i2s_quadOut, 0); //Ex out
-AudioConnection       patchCord14(modeSelectOutExR,    0, i2s_quadOut, 1);
-AudioConnection       patchCord15(modeSelectOutL,      0, i2s_quadOut, 2); //Rec out
-AudioConnection       patchCord16(modeSelectOutR,      0, i2s_quadOut, 3);
+AudioConnection       patchCord13(modeSelectInR, 0,   Q_in_R, 0);    //Rec in Queue
+AudioConnection       patchCord14(modeSelectInL, 0,   Q_in_L, 0);
 
-AudioConnection       patchCord17(Q_out_L_Ex,       0, modeSelectOutL,  1);   //Rec out Queue for sidetone
-AudioConnection       patchCord18(Q_out_R_Ex,       0, modeSelectOutR,  1);
+AudioConnection       patchCord15(Q_out_L_Ex,    0, modeSelectOutExL,  0); //Ex out Queue
+AudioConnection       patchCord16(Q_out_R_Ex,    0, modeSelectOutExR, 0);
 
-// ================================== AFP 09-01-22
+AudioConnection       patchCord17(Q_out_L,       0, modeSelectOutL,  0);   //Rec out Queue
+AudioConnection       patchCord18(Q_out_R,        0, modeSelectOutR, 0);
 
-AudioControlSGTL5000  sgtl5000_1;
+AudioConnection       patchCord19(modeSelectOutExL,    0, i2s_quadOut, 0); //Ex out
+AudioConnection       patchCord20(modeSelectOutExR,    0, i2s_quadOut, 1);
+AudioConnection       patchCord21(modeSelectOutL,      0, i2s_quadOut, 2); //Rec out
+AudioConnection       patchCord22(modeSelectOutR,      0, i2s_quadOut, 3);
+
+AudioConnection       patchCord23(Q_out_L_Ex,       0, modeSelectOutL,  1);   //Rec out Queue for sidetone
+AudioConnection       patchCord24(Q_out_R_Ex,       0, modeSelectOutR,  1);
+
+// ================================== AFP 11-01-22
+
+// ===================
+
+//AudioControlSGTL5000  sgtl5000_1;
 AudioControlSGTL5000  sgtl5000_2;
 // ===========================  AFP 08-22-22 end
 
@@ -258,7 +322,8 @@ Rotary tuneEncoder        = Rotary(TUNE_ENCODER_A,     TUNE_ENCODER_B);     //(1
 Rotary filterEncoder      = Rotary(FILTER_ENCODER_A,   FILTER_ENCODER_B);   //(15, 14)
 Rotary fineTuneEncoder    = Rotary(ENCODER3_ENCODER_A, ENCODER3_ENCODER_B); //( 4,  5)
 
-Metro ms_500              = Metro(500);                                     // Set up a Metro
+Metro ms_500              = Metro(500);// Set up a Metro
+Metro ms_300000           = Metro(300000);
 Metro encoder_check       = Metro(100);                                     // Set up a Metro
 
 Si5351 si5351;
@@ -276,6 +341,7 @@ SPISettings settingsA(70000000UL, MSBFIRST, SPI_MODE1);
 const uint32_t N_B_EX             = 16;
 //================== Receive EQ Variables================= AFP 08-08-22
 float32_t recEQ_Level[14];
+float32_t recEQ_LevelScale[14];
 //Setup for EQ filters
 float32_t rec_EQ1_float_buffer_L[256];
 float32_t rec_EQ2_float_buffer_L[256];
@@ -376,13 +442,21 @@ arm_biquad_cascade_df2T_instance_f32 S14_Xmt = {IIR_NUMSTAGES, xmt_EQ_Band14_sta
 
 // HP BiQuad IIR DC filter
 float32_t HP_DC_Butter_state[6] = {0, 0, 0, 0, 0, 0};
+float32_t HP_DC_Butter_state2[2] = {0, 0}; // AFP 11-04-11
 arm_biquad_cascade_df2T_instance_f32  s1_Receive = {3, HP_DC_Butter_state, HP_DC_Filter_Coeffs}; //AFP 09-23-22
-
+arm_biquad_cascade_df2T_instance_f32  s1_Receive2 = {1, HP_DC_Butter_state2, HP_DC_Filter_Coeffs2}; //AFP 11-04-22
 //Hilbert FIR Filters
 float32_t FIR_Hilbert_state_L [100 + 256 - 1];
 float32_t FIR_Hilbert_state_R [100 + 256 - 1];
 arm_fir_instance_f32 FIR_Hilbert_L;
 arm_fir_instance_f32 FIR_Hilbert_R;
+
+// CW decode Filters
+arm_fir_instance_f32 FIR_CW_DecodeL;  //AFP 10-25-22
+arm_fir_instance_f32 FIR_CW_DecodeR;  //AFP 10-25-22
+float32_t FIR_CW_DecodeL_state [64 + 256 - 1];
+float32_t FIR_CW_DecodeR_state [64 + 256 - 1];
+
 //Decimation and Interpolation Filters
 arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
 arm_fir_decimate_instance_f32 FIR_dec1_EX_Q;
@@ -484,12 +558,12 @@ arm_lms_instance_f32      LMS_instance;
 
 
 
-const DEMOD_Descriptor DEMOD[4] =
+const DEMOD_Descriptor DEMOD[3] =
 { //   DEMOD_n, name
   {  DEMOD_USB, "(USB)"},
   {  DEMOD_LSB, "(LSB)"},
-  {  DEMOD_AM2, "(AM2)"}, //AFP09-22-22
-  {  DEMOD_SAM, "(SAM)"},
+  {  DEMOD_AM, "(AM)"}, //AFP09-22-22
+
 };
 
 dispSc displayScale[] =  //r *dbText,dBScale, pixelsPerDB, baseOffset, offsetIncrement
@@ -527,8 +601,10 @@ float32_t q_temp   = 0.0;
 float32_t corrResult;
 uint32_t corrResultIndex;
 float32_t cosBuffer2[256];
+float32_t cosBuffer3[256];
 float32_t sinBuffer[256];
 float32_t sinBuffer2[256];
+float32_t sinBuffer3[256];
 float32_t aveCorrResult;
 float32_t aveCorrResultR;
 float32_t aveCorrResultL;
@@ -546,7 +622,12 @@ float CWLevelTimer            = 0.0;
 float CWLevelTimerOld         = 0.0;
 float ticMarkTimer            = 0.0;
 float ticMarkTimerOld         = 0.0;
-
+// === Compressor patameters AFP 11-01-22
+float min_gain_dB = -20.0, max_gain_dB = 40.0; //set desired gain range
+float gain_dB = 0.0; //computed desired gain value in dB
+boolean use_HP_filter = true; //enable the software HP filter to get rid of DC?
+float knee_dBFS, comp_ratio, attack_sec, release_sec;
+// ===========
 float32_t float_Corr_BufferR[511];
 float32_t float_Corr_BufferL[511];
 long tempSigTime = 0;
@@ -654,6 +735,8 @@ int filterWidthY;                                           // The current filte
 float32_t pixel_per_khz = ((1 << spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate) ;
 int pos_left            = centerLine - (int)(bands[currentBand].FLoCut / 1000.0 * pixel_per_khz);
 int centerLine          = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+int fLoCutOld;
+int fHiCutOld;
 int filterWidth         = (int)((bands[currentBand].FHiCut - bands[currentBand].FLoCut) / 1000.0 * pixel_per_khz);
 int h                   = SPECTRUM_HEIGHT + 3;
 int8_t first_block      = 1;
@@ -677,8 +760,6 @@ uint8_t ANR_notchOn                       = 0;
 uint8_t atan2_approx                      = 1;
 uint8_t auto_codec_gain                   = 1;
 uint8_t audio_flag                        = 1;
-uint8_t autotune_flag                     = 0;
-uint8_t autotune_wait                     = 10;
 uint8_t bitnumber                         = 16;      // test, how restriction to twelve bit alters sound quality
 uint8_t codec_restarts                    = 0;
 uint8_t dbm_state                         = 0;
@@ -693,7 +774,6 @@ uint8_t display_S_meter_or_spectrum_state = 0;
 uint8_t eeprom_saved                      = 0;
 uint8_t eeprom_loaded                     = 0;
 uint8_t erase_flag                        = 0;
-uint8_t fade_leveler                      = 1;
 uint8_t FIR_filter_window                 = 1;
 uint8_t flagg                             = 0;
 uint8_t half_clip                         = 0;
@@ -733,7 +813,6 @@ uint8_t state                             = 0;
 uint8_t twinpeaks_tested                  = 2;                      // initial value --> 2 !!
 uint8_t T41State                          = 1;
 uint8_t wait_flag;
-uint8_t WDSP_SAM                          = 1;
 uint8_t which_menu                        = 1;
 uint8_t write_analog_gain                 = 0;
 uint8_t zoom_display                      = 1;
@@ -762,8 +841,10 @@ int16_t pos_y_frequency                   = 48;
 int16_t pos_x_time                        = 390;         // 14;
 int16_t pos_y_time                        = 5; //114;
 int16_t s_w                               = 10;
-int16_t *sp_L;
-int16_t *sp_R;
+int16_t *sp_L1;
+int16_t *sp_R1;
+int16_t *sp_L2;
+int16_t *sp_R2;
 int16_t spectrum_brightness               = 255;
 int16_t spectrum_height                   = 96;
 int16_t spectrum_pos_centre_f             = 64 * xExpand;
@@ -772,7 +853,6 @@ int16_t spectrum_x                        = SPECTRUM_LEFT_X;
 int16_t spectrum_y                        = SPECTRUM_TOP_Y;
 
 uint16_t adcMaxLevel, dacMaxLevel;
-uint16_t autotune_counter;
 uint16_t barGraphUpdate                   = 0;
 uint16_t currentScale                     = 1;        // 20 dB/division
 
@@ -826,13 +906,13 @@ float aveAtomGapLength        = 40;
 float thresholdGapGeometricMean;
 float thresholdGapArithmeticMean;
 long CWFreqShift;
+long calFreqShift;
 long filter_pos               = 0;
 long last_filter_pos          = 0;
 // ============ end new stuff =======
 
 
 uint16_t notches_BW[2]          = {4, 4}; // no. of bins --> notch BW = no. of bins * bin_BW
-uint16_t SAM_display_count;
 uint16_t temp_check_frequency;
 uint16_t uAfter;
 uint16_t uB4;
@@ -897,6 +977,8 @@ int bandswitchPins[]                      = {30,   // 80M
                                             };
 int button9State;
 int buttonRead                            = 0;
+int calibrateFlag                         = 0;
+int calTypeFlag = 0;
 int currentBand                           = BAND_40M;
 int currentBandA                          = BAND_40M;
 int currentBandB                          = BAND_40M;
@@ -939,6 +1021,7 @@ int LMS_nr_strength;
 int LP_F_help                             = 3500;
 int mainTuneEncoder;
 int micChoice;
+int micGainChoice;
 int minPinRead = 1024;
 int NR_Index = 0;
 int n_L;
@@ -964,13 +1047,10 @@ int pos_centre_f                          = 64;
 int pos_x_frequency                       = 12;
 int pos_y_smeter                          = (spectrum_y - 12);
 int rfGainAllBands = 1;
-int SAM_AM_Choice;
 int secondaryMenuChoiceMade;
 int smeterLength;
 int spectrumNoiseFloor                    = SPECTRUM_NOISE_FLOOR;
 int splitOn;
-
-int SSB_AUTOTUNE_counter;
 int switchFilterSideband                  = 0;
 
 int switchThreshholds[]                   = {888, 827, 772, 730,
@@ -981,7 +1061,7 @@ int switchThreshholds[]                   = {888, 827, 772, 730,
 int termCursorXpos                        = 0;
 float transmitPowerLevel;
 int x2                                    = 0;                          //AFP
-int zeta_help                             = 65;
+
 int zoom_sample_ptr                       = 0;
 int zoomIndex                             = 1; //AFP 9-26-22
 int tuneIndex                             = DEFAULTFREQINDEX;           //AFP 2-10-21
@@ -1005,8 +1085,8 @@ unsigned tcr5;
 unsigned tcr2div;
 
 int32_t FFT_shift                         = 2048;
-int32_t frequencyCorrectionFactor         = 230000L;
-int32_t frequencyCorrectionFactorOld      = 230000L;
+long long freqCorrectionFactor         = 68000LL;
+long long freqCorrectionFactorOld      = 68000LL;
 int32_t IFFreq                            = SR[SampleRate].rate / 4;      // IF (intermediate) frequency
 int32_t IF_FREQ1 = 0;
 int32_t mainMenuIndex                     = START_MENU;                   // Done so we show menu[0] at startup
@@ -1046,7 +1126,7 @@ long CWRecFreq;                                         //  = TxRxFreq +/- 750Hz
 long currentFreqA                         = 7150000L;   //Initial VFOA center freq
 long currentFreqB                         = 7030000;    //Initial VFOB center freq
 long currentWPM                           = 15L;
-long frequencyCorrection;
+//long frequencyCorrection;
 long incrementValues[]                    = {10, 50, 100, 250, 1000, 10000};
 long int n_clear;
 long lastFrequencies[NUMBER_OF_BANDS][2];
@@ -1070,7 +1150,6 @@ ulong samp_ptr;
 
 uint64_t output12khz;
 
-unsigned long long calibrationFactor     = 1000000000ULL;
 unsigned long long Clk2SetFreq;                             // AFP 09-27-22
 unsigned long long Clk1SetFreq           = 1000000000ULL;   // AFP 09-27-22
 unsigned long ditLength;
@@ -1085,8 +1164,14 @@ float lastQQ                               = 0;
 float RXbit                                = 0;
 float bitSampleTimer                       = 0;
 float Tsample                              = 1.0 / 12000.0;
-
+//====== SAM stuff AFP 11-02-22
 float32_t a[3 * SAM_PLL_HILBERT_STAGES + 3];
+float32_t b[3 * SAM_PLL_HILBERT_STAGES + 3];
+float32_t c[3 * SAM_PLL_HILBERT_STAGES + 3];     // Filter c variables
+float32_t c0[SAM_PLL_HILBERT_STAGES];
+float32_t c1[SAM_PLL_HILBERT_STAGES];
+float32_t d[3 * SAM_PLL_HILBERT_STAGES + 3];
+
 float32_t abs_ring[RB_SIZE];
 float32_t abs_out_sample;
 float32_t ai, bi, aq, bq;
@@ -1107,10 +1192,14 @@ float32_t audio;
 float32_t audiotmp                        = 0.0f;
 float32_t audiou;
 float32_t audioSpectBuffer[1024];
-float32_t b[3 * SAM_PLL_HILBERT_STAGES + 3];
 float32_t bass                            = 0.0;
 float32_t farnsworthValue;
-int micCompression                        = -18;
+int currentMicThreshold                   = -18;
+float currentMicCompRatio                 = 5.0;
+float currentMicAttack                    = 0.1;
+float currentMicRelease                   = 2.0;
+int currentMicGain                        = -10;
+int compressorFlag                        = 0;
 float32_t midbass                         = 0.0;
 float32_t mid                             = 0.0;
 float32_t midtreble                       = 0.0;
@@ -1120,19 +1209,12 @@ float32_t bin                             = 2000.0 / bin_BW;
 float32_t biquad_lowpass1_state[N_stages_biquad_lowpass1 * 4];
 float32_t biquad_lowpass1_coeffs[5 * N_stages_biquad_lowpass1] = {0, 0, 0, 0, 0};
 float32_t DMAMEM buffer_spec_FFT[1024] __attribute__ ((aligned (4)));
-float32_t c[3 * SAM_PLL_HILBERT_STAGES + 3];     // Filter c variables
-float32_t c0[SAM_PLL_HILBERT_STAGES];
-float32_t c1[SAM_PLL_HILBERT_STAGES];
 float32_t coefficient_set[5]              = {0, 0, 0, 0, 0};
 float32_t corr[2];
 float32_t Cos                             = 0.0;
 float32_t cursorIncrementFraction;
 //float32_t CPU_temperature               = 0.0;
-float32_t d[3 * SAM_PLL_HILBERT_STAGES + 3];
-float32_t dc                              = 0.0;
-float32_t dc_insert                       = 0.0;
-float32_t dcu                             = 0.0;
-float32_t dc_insertu;
+
 float32_t dbm                             = -145.0;;
 float32_t dbm_calibration                 = 22.0;
 float32_t dbm_old                         = -145.0;;
@@ -1147,9 +1229,8 @@ float32_t dsQ;
 float32_t fast_backaverage;
 float32_t fast_backmult;
 float32_t fast_decay_mult;
-float32_t det = 0.0;
-float32_t del_out = 0.0;
-float32_t fil_out = 0.0;
+
+
 float32_t DMAMEM FIR_Coef_I[(FFT_LENGTH / 2) + 1];
 float32_t DMAMEM FIR_Coef_Q[(FFT_LENGTH / 2) + 1];
 float32_t DMAMEM FIR_dec1_I_state[n_dec1_taps + (uint16_t) BUFFER_SIZE * (uint32_t) N_B - 1];
@@ -1180,9 +1261,7 @@ float32_t DMAMEM float_buffer_L_CW[256];//AFP 09-01-22
 float32_t DMAMEM float_buffer_R_CW[256];//AFP 09-01-22
 float32_t DMAMEM float_buffer_R_AudioCW[256];//AFP 10-18-22
 float32_t DMAMEM float_buffer_L_AudioCW[256];//AFP 10-18-22
-float32_t g1                                = 1.0 - exp(-2.0 * omegaN * zeta * DF / SR[SampleRate].rate);
-float32_t g2                                = - g1 + 2.0 * (1 - exp(- omegaN * zeta * DF / SR[SampleRate].rate) * cosf(omegaN * DF / SR[SampleRate].rate * sqrtf(1.0 - zeta * zeta)));
-float32_t hang_backaverage                  = 0.0;
+float32_t hang_backaverage;
 float32_t hang_backmult;
 float32_t hang_decay_mult;
 float32_t hang_thresh;
@@ -1197,10 +1276,17 @@ float32_t IIR_biquad_Zoom_FFT_I_state[IIR_biquad_Zoom_FFT_N_stages * 4];
 float32_t IIR_biquad_Zoom_FFT_Q_state[IIR_biquad_Zoom_FFT_N_stages * 4];
 float32_t inv_max_input;
 float32_t inv_out_target;
-float32_t IQ_amplitude_correction_factor     = 1.0;
-float32_t IQ_phase_correction_factor         = 0.0;
-float32_t IQ_Xamplitude_correction_factor    = 1.0;
-float32_t IQ_Xphase_correction_factor        = 0.0;
+
+float32_t IQAmpCorrectionFactor[7]        = {1, 1.024, 1, 1, 1, 1, 1};
+float32_t IQPhaseCorrectionFactor[7]      = {0, 0.007, 0, 0, 0, 0, 0};
+float32_t IQXAmpCorrectionFactor[7]       = {1, 1.097, 1, 1, 1, 1, 1};
+float32_t IQXPhaseCorrectionFactor[7]     = {0, 0.193, 0, 0, 0, 0, 0};
+
+/*float32_t IQAmpCorrectionFactorUSB[7]        = {1,1.057,1,1,1,1,1};
+  float32_t IQPhaseCorrectionFactorUSB[7]      = {0,-0.02,0,0,0,0,0};
+  float32_t IQXAmpCorrectionFactorUSB[7]       = {1,1.097,1,1,1,1,1};
+  float32_t IQXPhaseCorrectionFactor[7]     = {0,0.193,0,0,0,0,0};*/
+
 float32_t IQ_sum                             = 0.0;
 float32_t K_dirty                            = 0.868;
 float32_t K_est                              = 1.0;
@@ -1232,8 +1318,7 @@ float32_t m_AverageMagdbmhz                  = -103.0;
 float32_t max_gain;
 float32_t max_input                          = -0.1;
 float32_t min_volts;
-float32_t mtauI                              = exp(- DF / (SR[SampleRate].rate * tauI));
-float32_t mtauR                              = exp(- DF / (SR[SampleRate].rate * tauR));
+
 float32_t noiseThreshhold;
 float32_t notches[10]                        = {500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0, 4000.0, 4500.0, 5000.0};
 float32_t DMAMEM NR_FFT_buffer[512] __attribute__ ((aligned (4)));
@@ -1274,12 +1359,41 @@ float32_t NR_gain_smooth_alpha            = 0.25;
 float32_t NR_temp_sum = 0.0;
 float32_t NB_thresh                       = 2.5;
 float32_t offsetDisplayDB                 = 10.0;
+
+
+// new synchronous AM PLL & PHASE detector
+// wdsp Warren Pratt, 2016
+//float32_t Sin = 0.0;
+//float32_t Cos = 0.0;
+float32_t pll_fmax = +4000.0;
+int zeta_help = 65;
+float32_t zeta = (float32_t)zeta_help / 100.0; // PLL step response: smaller, slower response 1.0 - 0.1
+float32_t omegaN = 200.0;                      // PLL bandwidth 50.0 - 1000.0
+
+//pll  AFP 11-03-22
+float32_t omega_min = TPI * - pll_fmax * 1 / 24000;
+float32_t omega_max = TPI * pll_fmax * 1 / 24000;
+float32_t g1 = 1.0 - exp(-2.0 * omegaN * zeta * 1 / 24000);
+float32_t g2 = - g1 + 2.0 * (1 - exp(- omegaN * zeta * 1 / 24000) * cosf(omegaN * 1 / 24000 * sqrtf(1.0 - zeta * zeta)));
+float32_t phzerror = 0.0;
+float32_t det = 0.0;
+float32_t fil_out = 0.0;
+float32_t del_out = 0.0;
 float32_t omega2 = 0.0;
-float32_t omegaN                          = 200.0;
-float32_t omega_max                       = TPI * pll_fmax * DF / SR[SampleRate].rate;
-float32_t omega_min                       = TPI * - pll_fmax * DF / SR[SampleRate].rate;
-float32_t onem_mtauI                      = 1.0 - mtauI;
-float32_t onem_mtauR                      = 1.0 - mtauR;
+
+//fade leveler  // AFP 11-03-22
+float32_t tauR = 0.02; // original 0.02;
+float32_t tauI = 1.4; // original 1.4;
+float32_t dc = 0.0;
+float32_t dc_insert = 0.0;
+float32_t dcu = 0.0;
+float32_t dc_insertu = 0.0;
+float32_t mtauR = exp(- 1 / 24000 * tauR);
+float32_t onem_mtauR = 1.0 - mtauR;
+float32_t mtauI = exp(- 1 / 24000 * tauI);
+float32_t onem_mtauI = 1.0 - mtauI;
+uint8_t fade_leveler = 1;
+
 float32_t onemfast_backmult;
 float32_t onemhang_backmult;
 float32_t out_sample[2];
@@ -1289,22 +1403,18 @@ float32_t P_dirty                         = 1.0;
 float32_t P_est;
 float32_t P_est_old;
 float32_t P_est_mult                      = 1.0 / (sqrtf(1.0 - P_est * P_est));
-float32_t pll_fmax                        = 4000.0;
+
 float32_t phaseLO                         = 0.0;
-float32_t phzerror                        = 0.0;
 float32_t pop_ratio;
-float32_t powerOutSSB                     = 0.03;       // AFP 10-21-22
-float32_t powerOutCW                      = 0.2;       // AFP 10-21-22
-float32_t CWPowerCalibrationFactor        = 0.019; //AFP 10-21-22
-float32_t SSBPowerCalibrationFactor       = 0.008;  //AFP 10-21-22
+float32_t powerOutSSB[7]                     = {0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03}; // AFP 10-28-22
+float32_t powerOutCW[7]                      = {0.017, 0.02, 0.025, 0.03, 0.03, 0.039, 0.02}; // AFP 10-28-22
+float32_t CWPowerCalibrationFactor[7]        = { 0.019, 0.0190, .0190, .0190, .0190, .0190, .019}; //AFP 10-29-22
+float32_t SSBPowerCalibrationFactor[7]       = { 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008}; //AFP 10-29-22       = 0.008;  //AFP 10-21-22
 float32_t Q_old                           = 0.2;
 float32_t Q_sum;
 float32_t DMAMEM R_BufferOffset[BUFFER_SIZE * N_B];
 float32_t ring[RB_SIZE * 2];
 float32_t ring_max                        = 0.0;
-float32_t SAM_carrier                     = 0.0;
-float32_t SAM_lowpass                     = 2700.0;
-float32_t SAM_carrier_freq_offset         = 0.0;
 float32_t sidetoneVolume                  = 0.001;
 float32_t Sin                             = 0.0;
 float32_t sample_meanL                    = 0.0;
@@ -1313,7 +1423,10 @@ float32_t sample_meanLNew                 = 0.0;//AFP 10-11-22
 float32_t sample_meanRNew                 = 0.0;
 float32_t save_volts                      = 0.0;
 float32_t slope_constant;
-
+float32_t SAM_carrier                     = 0.0;  //AFP 11-02-22
+float32_t SAM_lowpass                     = 2700.0;//AFP 11-02-22
+float32_t SAM_carrier_freq_offset         = 0.0;//AFP 11-02-22
+float32_t SAM_carrier_freq_offsetOld         = 0.0;//AFP 11-02-22
 float32_t spectrum_display_scale          = 20.0;          // 30.0
 float32_t stereo_factor                   = 100.0;
 float32_t tau_attack;
@@ -1322,8 +1435,7 @@ float32_t tau_fast_backaverage            = 0.0;
 float32_t tau_fast_decay;
 float32_t tau_hang_backmult;
 float32_t tau_hang_decay;
-float32_t tauI                            = 1.4;
-float32_t tauR                            = 0.02;
+
 float32_t teta1                           = 0.0;
 float32_t teta2                           = 0.0;
 float32_t teta3                           = 0.0;
@@ -1335,7 +1447,7 @@ float32_t var_gain;
 float32_t volts = 0.0;
 float32_t w;
 float32_t wold = 0.0f;
-float32_t zeta                            = (float32_t)zeta_help / 100.0;
+
 
 float angl;
 float bitSamplePeriod                     = 1.0 / 500.0;
@@ -1833,7 +1945,7 @@ void InitializeDataArrays()
   /****************************************************************************************
      start local oscillator Si5351
   ****************************************************************************************/
-  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 55000);
+  //si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 68000);
   si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA);  //AFP 10-13-22
   si5351.drive_strength(SI5351_CLK2, SI5351_DRIVE_8MA);  //CWP AFP 10-13-22
 
@@ -1914,14 +2026,13 @@ void setup()
   sgtl5000_1.setAddress(LOW);
   sgtl5000_1.enable();
   AudioMemory(400);
+  AudioMemory_F32(10);
   sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
   //sgtl5000_1.inputSelect(AUDIO_INPUT_LINEIN);
-  sgtl5000_1.micGain(50);
+  sgtl5000_1.micGain(20);
   sgtl5000_1.lineInLevel(0);
   sgtl5000_1.lineOutLevel(20);
-  sgtl5000_1.audioPreProcessorEnable();        // AFP 09-22-22
-  sgtl5000_1.autoVolumeControl(0, 1, 0, -18, 5, 8); // AFP 09-22-22
-  sgtl5000_1.autoVolumeDisable();              // AFP 09-22-22
+  sgtl5000_1.adcHighPassFilterDisable(); //reduces noise.  https://forum.pjrc.com/threads/27215-24-bit-audio-boards?p=78831&viewfull=1#post78831
 
   sgtl5000_2.setAddress(HIGH);
   sgtl5000_2.enable();
@@ -1957,8 +2068,13 @@ void setup()
   arm_fir_init_f32(&FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, FIR_Hilbert_state_L, 256);  //AFP01-16-22
   arm_fir_init_f32(&FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg45, FIR_Hilbert_state_R, 256);
 
+  arm_fir_init_f32(&FIR_CW_DecodeL, 64, CW_Filter_Coeffs2, FIR_CW_DecodeL_state, 256);  //AFP 10-25-22
+  arm_fir_init_f32(&FIR_CW_DecodeR, 64, CW_Filter_Coeffs2, FIR_CW_DecodeR_state, 256);
+
   arm_fir_decimate_init_f32(&FIR_dec1_EX_I, 48, 4 , coeffs192K_10K_LPF_FIR, FIR_dec1_EX_I_state, 2048);
   arm_fir_decimate_init_f32(&FIR_dec1_EX_Q, 48, 4, coeffs192K_10K_LPF_FIR, FIR_dec1_EX_Q_state, 2048) ;
+
+
 
   arm_fir_decimate_init_f32(&FIR_dec2_EX_I, 24, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_I_state, 512);
   arm_fir_decimate_init_f32(&FIR_dec2_EX_Q, 24, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_Q_state, 512);
@@ -2004,7 +2120,27 @@ void setup()
   tft.writeTo(L1);
 
   Splash();
-
+    EEPROMRead();
+ if (strcmp(EEPROMData.versionSettings, VERSION) != 0) {   // EEPROM has not been set, save defaults and do switch matrix
+    EEPROMSaveDefaults();                                       // Use default values so things will work
+    SaveAnalogSwitchValues();                                   // Call to reset switch matrix values
+    EEPROMRead();                                               // Read again to set values
+ } else {  // KD0RC
+    minPinRead = analogRead(BUSY_ANALOG_PIN);
+    if (minPinRead < NOTHING_TO_SEE_HERE)
+    {
+      tft.fillWindow(RA8875_BLACK);
+      tft.setFontScale(1);
+      tft.setTextColor(RA8875_GREEN);
+      tft.setCursor(10, 10);
+      tft.print("Release button to start calibration.");
+      MyDelay(2000);
+      EEPROMSaveDefaults();                                       // Use default values so things will work
+      SaveAnalogSwitchValues();                                   // Call to reset switch matrix values
+      EEPROMRead();                                 // Call to reset switch matrix values
+    }
+  }
+  // KD0RC end
   spectrum_x        = 10;
   spectrum_y        = 150;
   xExpand           = 1.4;
@@ -2018,13 +2154,8 @@ void setup()
   //powerOut = 0.20; // AFP 10-21-22
 
   // ========================  Initial set up of EEPROM data ===============
-  EEPROMRead();                                                 // Read what's stored in EEPROM...junk or not?
-
-  if (strcmp(EEPROMData.versionSettings, VERSION) != 0) {   // EEPROM has not been set, save defaults and do switch matrix
-    EEPROMSaveDefaults();                                       // Use default values so things will work
-    SaveAnalogSwitchValues();                                   // Call to reset switch matrix values
-    EEPROMRead();                                               // Read again to set values
-  }
+  // Read what's stored in EEPROM...junk or not?
+  
 
   freqIncrement = incrementValues[tuneIndex];
   NR_Index      = nrOptionSelect;
@@ -2033,30 +2164,48 @@ void setup()
 #ifdef DEBUG //AFP 09-26-22
   EEPROMShow();
 #endif
-  // ========================  End set up of EEPROM data ===============
 
+  activeVFO                             = EEPROMData.currentVFO;  // 2 bytes
+  audioVolume                           = EEPROMData.audioVolume; // 4 bytes
+  currentBand                           = EEPROMData.currentBand; // 4 bytes
+  currentBandA                          = EEPROMData.currentBandA;// 4 bytes
+  currentBandB                          = EEPROMData.currentBandB;
+
+  // ========================  End set up of paramters from EEPROM data ===============
+  NCOFreq = 0;
+  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, freqCorrectionFactor);
   if (xmtMode == CW_MODE && decoderFlag == DECODE_OFF ) {
     decoderFlag = DECODE_OFF;                 // AFP 09-27-22
   } else {
     decoderFlag = DECODE_ON;                     // Turns decoder off // AFP 09-27-22
   }
+
   if (activeVFO == VFO_A) {                                                    // VFO A
     if (xmtMode == SSB_MODE) {
-      TxRxFreq = currentFreqA = lastFrequencies[currentBandA][0];    // SSB
+      centerFreq = currentFreqA= lastFrequencies[currentBandA][0];     // SSB
     } else {
-      TxRxFreq = currentFreqA = lastFrequencies[currentBandA][1];    // CW
+      if (xmtMode == CW_MODE) {
+        //Serial.print("currentBand= ");Serial.println(currentBand);
+       // Serial.print("currentBandA= ");Serial.println(currentBandA);
+        //Serial.print("lastFrequencies[currentBandA][1]= ");Serial.println(lastFrequencies[currentBandA][1]);
+        centerFreq = currentFreqA = lastFrequencies[currentBandA][1];    // CW
+      }
     }
     currentBand = currentBandA;
-  } else {                                                                     // VFO B
-    if (xmtMode == SSB_MODE) {
-      TxRxFreq = currentFreqB = lastFrequencies[currentBandB][0];    // SSB
-    } else {
-      TxRxFreq = currentFreqB = lastFrequencies[currentBandB][1];    // CW
+  } else {
+    if (activeVFO == VFO_B) { // VFO B
+      if (xmtMode == SSB_MODE) {
+        centerFreq = currentFreqB = lastFrequencies[currentBandB][0];    // SSB
+      } else {
+        if (activeVFO == VFO_B) {
+          centerFreq = currentFreqB = lastFrequencies[currentBandB][1];    // CW
+        }
+        currentBand = currentBandB;
+      }
     }
-    currentBand = currentBandB;
   }
-
-  centerFreq = TxRxFreq;
+  
+  TxRxFreq = centerFreq + NCOFreq;
 
   InitializeDataArrays();
   splitOn = 0;                                        // Split VFO not active
@@ -2069,17 +2218,19 @@ void setup()
 
   jackStart = millis();
 
-  float32_t theta = 0.0;                      //AFP 02-02-22
+  float32_t theta = 0.0;                      //AFP 10-25-22
   for (int kf = 0; kf < 255; kf++) {          //Calc sine wave
-    //    theta = kf * 2*PI * 1600/ 24000;
-    //    theta = kf * 2 * PI * 11 / 256;           // 2 * PI * 11 = 69.115038377 / 256 = 0.2699806186601563
-    theta = kf * 0.2699806186601563;          // Simplify terms from above
+    //    theta = kf * 2*PI * 750/ 24000;
+    theta = kf * 0.19634950849362;          // Simplify terms from above
+    //theta = kf * 2 * PI * freqSideTone / 24000;
     sinBuffer[kf] = sin(theta);
   }
   currentWPM          = EEPROMData.wordsPerMinute;
   SetDitLength(currentWPM);
-  CWFreqShift         = 650;                  //AFP 10-01-22
-  sineTone(BUFFER_SINE_COUNT);                // Set t0 7 from above
+  CWFreqShift         = 750;
+  calFreqShift        = 0;
+  //AFP 10-25-22
+  sineTone(BUFFER_SINE_COUNT);                // Set to 8
   filterEncoderMove   = 0;
   fineTuneEncoderMove = 0L;
   ShowDefaultSettings();
@@ -2100,13 +2251,22 @@ void setup()
   //                   attack - rate of gain change in dBPS over threshold
   //                   decay - rate rate of gain decrease below threshold in dBPS
 
-  sgtl5000_1.audioPreProcessorEnable(); // AFP 09-22-22
-  sgtl5000_1.autoVolumeControl(0, 1, 0, -18, 6, 100); //  AFP 09-01-22 parameters (maxGain dB,response,hardLimit,threshold, attack, decay)
-  //===================  End Compressor setup ===========
+  //sgtl5000_1.audioPreProcessorEnable(); // AFP 09-22-22
+  //sgtl5000_1.autoVolumeControl(0, 1, 0, -18, 6, 100); //  AFP 09-01-22 parameters (maxGain dB,response,hardLimit,threshold, attack, decay)
+  //===================  End Compressor setup ==========
+  //Serial.print("setup currentBandA= ");Serial.println(currentBandA);
+  CWPowerCalibrationFactor[currentBandA]           = EEPROMData.CWPowerCalibrationFactor[currentBandA];  //   //AFP 10-29-22
+  SSBPowerCalibrationFactor[currentBandA]          = EEPROMData.SSBPowerCalibrationFactor[currentBandA]; //    //AFP 10-29-22
+  powerOutCW[currentBandA]                         = EEPROMData.powerOutCW[currentBandA];// 4 bytes  //AFP 10-28-22
+  powerOutSSB[currentBandA]                        = EEPROMData.powerOutSSB[currentBandA];     //  AFP 10-28-22
+  //Serial.print("CWPowerCalibrationFactor[currentBandA]= ");Serial.println(CWPowerCalibrationFactor[currentBandA]);
+  //Serial.print("SSBPowerCalibrationFactor[currentBandA] = ");Serial.println(SSBPowerCalibrationFactor[currentBandA] );
+  //Serial.print(" powerOutCW[currentBandA]= ");Serial.println( powerOutCW[currentBandA]);
+  //Serial.print(" powerOutSSB[currentBandA]A= ");Serial.println( powerOutSSB[currentBandA]);
+  zoomIndex = 1;
+  spectrum_zoom = 1;
   xrState = RECEIVE_STATE;
-
-  SetFreq();
-  BandInformation();
+  //BandInformation();
   ShowBandwidth();
   FilterBandwidth();
   tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit
@@ -2115,7 +2275,12 @@ void setup()
   RedrawDisplayScreen();
   DrawFrequencyBarValue();
   xrState = RECEIVE_STATE;
-  SetFreq(); 
+  SetFreq();
+  knee_dBFS = -15.0; comp_ratio = 5.0;  attack_sec = .1;  release_sec = 2.0;
+  comp1.setPreGain_dB(-10);  //set the gain of the Left-channel gain processor
+  comp2.setPreGain_dB(-10);  //set the gain of the Right-channel gain processor
+
+
 }
 //============================================================== END setup() =================================================================
 //===============================================================================================================================
@@ -2147,6 +2312,8 @@ void loop()
     pushButtonSwitchIndex = ProcessButtonPress(valPin);     // Winner, winner...chicken dinner!
     ExecuteButtonPress(pushButtonSwitchIndex);
   }
+
+
   if ( xmtMode == SSB_MODE ) {                      //SSB Mode
     if (digitalRead(PTT) == HIGH) {
       digitalWrite(MUTE, LOW);  // Audio Mute off
@@ -2178,8 +2345,18 @@ void loop()
         Q_in_R.end();
         Q_in_L_Ex.begin();
         Q_in_R_Ex.begin();
+        comp1.setPreGain_dB(currentMicGain);
+        comp2.setPreGain_dB(currentMicGain);
+        if (compressorFlag == 1) {
+          SetupMyCompressors(use_HP_filter, currentMicThreshold, comp_ratio, attack_sec, release_sec);
+        } else {
+          if (compressorFlag == 0) {
+            SetupMyCompressors(use_HP_filter, 0.0, comp_ratio, 0.01, 0.01);
+          }
+        }
         xrState = TRANSMIT_STATE;
         SetFreq();
+        centerTuneFlag = 1;
       }
       digitalWrite(MUTE, HIGH);               //  Mute Audio  (HIGH=Mute)
       digitalWrite(RXTX, HIGH);               //xmit on
@@ -2191,8 +2368,8 @@ void loop()
 
       modeSelectOutL.gain(0, 0);
       modeSelectOutR.gain(0, 0);
-      modeSelectOutExL.gain(0, powerOutSSB);  //AFP 10-21-22
-      modeSelectOutExR.gain(0, powerOutSSB ); //AFP 10-21-22
+      modeSelectOutExL.gain(0, powerOutSSB[currentBandA]);  //AFP 10-21-22
+      modeSelectOutExR.gain(0, powerOutSSB[currentBandA] ); //AFP 10-21-22
       ShowTransmitReceiveStatus();
 
       while (digitalRead(PTT) == LOW) {
@@ -2244,7 +2421,6 @@ void loop()
             modeSelectInR.gain(0, 0);
             modeSelectInL.gain(0, 0);
             modeSelectInExR.gain(0, 0);
-            modeSelectInExL.gain(0, 0);
             modeSelectOutL.gain(0, 0);
             modeSelectOutR.gain(0, 0);
             modeSelectOutExL.gain(0, 0);
@@ -2254,8 +2430,8 @@ void loop()
               digitalWrite(RXTX, HIGH);
               if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW  && keyType == 0) { // AFP 09-25-22  Turn on CW signal
                 cwTimer = millis();                                           //Reset timer
-                modeSelectOutExL.gain(0, powerOutCW);  //AFP 10-21-22
-                modeSelectOutExR.gain(0, powerOutCW);  //AFP 10-21-22
+                modeSelectOutExL.gain(0, powerOutCW[currentBandA]);  //AFP 10-21-22
+                modeSelectOutExR.gain(0, powerOutCW[currentBandA]);  //AFP 10-21-22
                 digitalWrite(MUTE, LOW);                // unmutes audio
                 modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone  AFP 10-01-22
                 modeSelectOutR.gain(1, sidetoneVolume);          // Sidetone  AFP 10-01-22
@@ -2304,8 +2480,8 @@ void loop()
                   cwTimer = millis();
                   ditTimerOn = millis();
                   while (millis() - ditTimerOn <= ditLength) {
-                    modeSelectOutExL.gain(0, powerOutCW); //AFP 10-21-22
-                    modeSelectOutExR.gain(0, powerOutCW);//AFP 10-21-22
+                    modeSelectOutExL.gain(0, powerOutCW[currentBandA]); //AFP 10-21-22
+                    modeSelectOutExR.gain(0, powerOutCW[currentBandA]);//AFP 10-21-22
 
                     digitalWrite(MUTE, LOW);                // unmutes audio
                     modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone
@@ -2327,8 +2503,8 @@ void loop()
                     cwTimer = millis();
                     dahTimerOn = millis();
                     while (millis() - dahTimerOn <= 3UL * ditLength) {
-                      modeSelectOutExL.gain(0, powerOutCW); //AFP 10-21-22
-                      modeSelectOutExR.gain(0, powerOutCW); //AFP 10-21-22
+                      modeSelectOutExL.gain(0, powerOutCW[currentBandA]); //AFP 10-21-22
+                      modeSelectOutExR.gain(0, powerOutCW[currentBandA]); //AFP 10-21-22
                       digitalWrite(MUTE, LOW);                // unmutes audio
                       modeSelectOutL.gain(1, 0.002);          // Sidetone
                       modeSelectOutR.gain(1, 0.002);
@@ -2371,10 +2547,12 @@ void loop()
   }
   ShowTransmitReceiveStatus();
 
+
 #ifdef DEBUG1
   if (elapsed_micros_idx_t > (SR[SampleRate].rate / 960) )
   {
-    ShowTempAndLoad();                                      // Used to monitor CPU temp and load factors
+    ShowTempAndLoad();
+    // Used to monitor CPU temp and load factors
   }
 #endif
 
@@ -2382,9 +2560,9 @@ void loop()
     volumeChangeFlag = false;
     UpdateVolumeField();
   }
-  if (ms_500.check() == 1)                                  // For clock updates
-  {
-    wait_flag = 0;
-    DisplayClock();
-  }
+  /* if (ms_500.check() == 1)                                  // For clock updates AFP 10-26-22
+    {
+     //wait_flag = 0;
+     DisplayClock();
+    }*/
 }

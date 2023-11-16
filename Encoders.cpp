@@ -31,31 +31,53 @@ void FilterSetSSB()
         filterWidth = 50;
     }
     last_filter_pos = filter_pos;
-    if (bands[currentBand].mode == DEMOD_LSB) {
-      if (switchFilterSideband == 0)      // "0" = normal, "1" means change opposite filter
-      {
-        bands[currentBand].FLoCut = bands[currentBand].FLoCut + filter_change * 50 * ENCODER_FACTOR;
-        FilterBandwidth();
-      } else if (switchFilterSideband == 1) {
-        //if (abs(bands[currentBand].FHiCut) < 500) {
-        bands[currentBand].FHiCut = bands[currentBand].FHiCut + filter_change * 50 * ENCODER_FACTOR;
-      }
-    } else if (bands[currentBand].mode == DEMOD_USB) {
-      if (switchFilterSideband == 0) {
+    // =============  AFP 10-27-22
+    switch (bands[currentBand].mode) {
+      case DEMOD_LSB :
+        if (switchFilterSideband == 0)      // "0" = normal, "1" means change opposite filter
+        {
+          bands[currentBand].FLoCut = bands[currentBand].FLoCut + filter_change * 50 * ENCODER_FACTOR;
+          //fHiCutOld= bands[currentBand].FHiCut;
+          FilterBandwidth();
+        } else if (switchFilterSideband == 1) {
+          //if (abs(bands[currentBand].FHiCut) < 500) {
+          bands[currentBand].FHiCut = bands[currentBand].FHiCut + filter_change * 50 * ENCODER_FACTOR;
+          fLoCutOld = bands[currentBand].FLoCut;
+        }
+        break;
+      case DEMOD_USB :
+        if (switchFilterSideband == 0) {
+          bands[currentBand].FHiCut = bands[currentBand].FHiCut - filter_change * 50 * ENCODER_FACTOR;
+          //bands[currentBand].FLoCut= fLoCutOld;
+          FilterBandwidth();
+        } else if (switchFilterSideband == 1) {
+          bands[currentBand].FLoCut = bands[currentBand].FLoCut - filter_change * 50 * ENCODER_FACTOR;
+          // bands[currentBand].FHiCut= fHiCutOld;
+        }
+        break;
+      case DEMOD_AM :
         bands[currentBand].FHiCut = bands[currentBand].FHiCut - filter_change * 50 * ENCODER_FACTOR;
+        bands[currentBand].FLoCut = -bands[currentBand].FHiCut;
         FilterBandwidth();
-      } else if (switchFilterSideband == 1) {
-        bands[currentBand].FLoCut = bands[currentBand].FLoCut - filter_change * 50 * ENCODER_FACTOR;
-      }
+        InitFilterMask();
+        break;
+      case DEMOD_SAM : // AFP 11-03-22
+        bands[currentBand].FHiCut = bands[currentBand].FHiCut - filter_change * 50 * ENCODER_FACTOR;
+        bands[currentBand].FLoCut = -bands[currentBand].FHiCut;
+        FilterBandwidth();
+        InitFilterMask();
+        break;
     }
-    ControlFilterF();
+    // =============  AFP 10-27-22
+
+    //ControlFilterF();
     Menu2 = MENU_F_LO_CUT;      // set Menu2 to MENU_F_LO_CUT
     FilterBandwidth();
-//    centerTuneFlag = 1; //AFP 10-03-22
+    //    centerTuneFlag = 1; //AFP 10-03-22
     //SetFreq();               //  AFP 10-04-22
     ShowFrequency();
   }
-  notchPosOld = filter_pos;
+  //notchPosOld = filter_pos;
 
 }
 
@@ -70,8 +92,8 @@ void FilterSetSSB()
 void EncoderCenterTune()
 {
   long tuneChange = 0L;
-//  long oldFreq    = centerFreq;
-  
+  //  long oldFreq    = centerFreq;
+
   unsigned char result  = tuneEncoder.process();   // Read the encoder
 
   if (result == 0)                                // Nothing read
@@ -92,27 +114,22 @@ void EncoderCenterTune()
       tuneChange = -1L;
       break;
   }
-//  newFreq = (long)freqIncrement * tuneChange;
+  //  newFreq = (long)freqIncrement * tuneChange;
 
   centerFreq += ((long)freqIncrement * tuneChange);                    // tune the master vfo
 
 
-//  if (centerFreq != oldFreq) {           // If the frequency has changed...
-//=== AFP 10-19-22
+  //  if (centerFreq != oldFreq) {           // If the frequency has changed...
+  //=== AFP 10-19-22
+
   TxRxFreq = centerFreq + NCOFreq;
+  //currentFreqA= centerFreq + NCOFreq;
   DrawBandWidthIndicatorBar(); // AFP 10-20-22
   //FilterOverlay(); // AFP 10-20-22
   ShowFrequency();
   BandInformation();
-//=== AFP 10-19-22
-/*
-  TxRxFreq = centerFreq + NCOFreq;
-  DrawBandWidthIndicatorBar();
-  BandInformation();
-  FilterOverlay();
-  ShowFrequency();
-*/  
-//  }
+
+  //  }
 }
 
 /*****
@@ -124,10 +141,9 @@ void EncoderCenterTune()
   Return value;
     int               0 means encoder didn't move; otherwise it moved
 *****/
-void EncoderVolume()      //============================== AFP 10-21-22  Begin new
+void EncoderVolume()      //============================== AFP 10-22-22  Begin new
 {
   char result;
-  int32_t increment = 5000L;
   result = volumeEncoder.process();    // Read the encoder
 
   if (result == 0) {                                    // Nothing read
@@ -142,48 +158,68 @@ void EncoderVolume()      //============================== AFP 10-21-22  Begin n
       adjustVolEncoder = -1;
       break;
   }
-  switch (IQChoice) {
-    case 0:                //Volume control
-      audioVolume += adjustVolEncoder;
+  audioVolume += adjustVolEncoder;
 
-      if (audioVolume > 100) {                // In range?
-        audioVolume = 100;
-      } else {
-        if (audioVolume < 0) {
-          audioVolume = 0;
-        }
-      }
-      //set flags for IC calibration
+  if (audioVolume > 100) {                // In range?
+    audioVolume = 100;
+  } else {
+    if (audioVolume < 0) {
+      audioVolume = 0;
+    }
+  }
+  //set flags for IC calibration
 
-      volumeChangeFlag = true;        // Need this because of unknown timing in display updating.
-      break;
-    case 1:     // IQ Receive Gain Cal
-      IQ_amplitude_correction_factor += adjustVolEncoder * 0.001;
-      break;
-    case 2:     // IQ Receive Phase Cal
-      IQ_phase_correction_factor += adjustVolEncoder * 0.001;
-      break;
+  volumeChangeFlag = true;        // Need this because of unknown timing in display updating.
 
-    case 3:     // Xmit Gain Calibrate
-      IQ_Xamplitude_correction_factor += adjustVolEncoder * 0.001;
-      break;
-    case 4:     // Xmit Phase Calibrate
-      IQ_Xphase_correction_factor += adjustVolEncoder * 0.001;
-      break;
-    case 5:     // Frequency Calibrate
-      frequencyCorrectionFactor += adjustVolEncoder * increment;
-      break;
-      //=========== AFP 10-21-22 ==========
-    case 6:     // SSB Power Calibrate
-      SSBPowerCalibrationFactor += adjustVolEncoder * 0.001;
-      break;
-    case 7:     // CW Power Calibrate
-      CWPowerCalibrationFactor += adjustVolEncoder * 0.001;
-      break;
-//=========== AFP 10-21-22 =========
-  } // End switch(IQChoice)
+}     //============================== AFP 10-22-22  End new
 
-}     //============================== AFP 09-21-22  End new
+/*****
+  Purpose: Use the encoder to change the value of a number in some other function
+
+  Parameter list:
+    int minValue                the lowest value allowed
+    int maxValue                the largest value allowed
+    int startValue              the numeric value to begin the count
+    int increment               the amount by which each increment changes the value
+    char prompt[]               the input prompt
+  Return value;
+    int                         the new value
+*****/
+float GetEncoderValueLive(float minValue, float maxValue, float startValue, float increment, char prompt[]) //AFP 10-22-22
+{
+  float currentValue = startValue;
+  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setTextColor(RA8875_WHITE);
+  tft.fillRect(250, 0, 280, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.setCursor(257, 1);
+  tft.print(prompt);
+  tft.setCursor(440, 1);
+  if (abs(startValue) > 2) {
+    tft.print(startValue, 0);
+  } else {
+    tft.print(startValue, 3);
+  }
+  //while (true) {
+  if (filterEncoderMove != 0) {
+    currentValue += filterEncoderMove * increment;    // Bump up or down...
+    if (currentValue < minValue)
+      currentValue = minValue;
+    else if (currentValue > maxValue)
+      currentValue = maxValue;
+
+    tft.fillRect(449, 0, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+    tft.setCursor(440, 1);
+    if (abs(startValue) > 2) {
+      tft.print(startValue, 0);
+    } else {
+      tft.print(startValue, 3);
+    }
+    filterEncoderMove = 0;
+  }
+  return currentValue;
+}
+
+
 
 /*****
   Purpose: Use the encoder to change the value of a number in some other function
@@ -364,12 +400,32 @@ void EncoderFineTune()
       fineTuneEncoderMove = -1L;
     }
   }
-  NCOFreq += stepFT * fineTuneEncoderMove;
-//  centerTuneFlag = 1; //AFP 10-12-22
+  //if (spectrum_zoom == 0) {
+  NCOFreq += stepFT * fineTuneEncoderMove; //AFP 11-01-22
+  //} else {
+  // NCOFreq += stepFT * fineTuneEncoderMove * (1 << (spectrum_zoom - 1));
+  //}
+  currentFreqA = centerFreq + NCOFreq;
+  centerTuneFlag = 1;
+
+  // ============  AFP 10-28-22
   if (activeVFO == VFO_A) {
     currentFreqA = centerFreq + NCOFreq;   //AFP 10-05-22
   } else {
     currentFreqB = centerFreq + NCOFreq;  //AFP 10-05-22
+  }
+  // ===============  Recentering at band edges ==========
+  if (spectrum_zoom != 0) {
+    if (NCOFreq > (95000 / (1 << spectrum_zoom)) || NCOFreq < (-93000 / (1 << spectrum_zoom))) {
+      NCOFreq = 0L;
+      centerFreq = TxRxFreq = currentFreqA ;
+    }
+  } else {
+    if (NCOFreq > (142000) || NCOFreq < (-43000)) {  // Offset tuning window in zoom 1x
+      NCOFreq = 0L;
+      centerFreq = TxRxFreq = currentFreqA ;  //AFP 10-28-22
+    }
+    centerTuneFlag = 1;
   }
   fineTuneEncoderMove = 0L;
 }
@@ -392,12 +448,15 @@ void EncoderFilter()
   switch (result) {
     case DIR_CW:                          // Turned it clockwise, 16
       filterEncoderMove = 1;
-      filter_pos = last_filter_pos - 5 * filterEncoderMove;
+      //filter_pos = last_filter_pos - 5 * filterEncoderMove;  // AFP 10-22-22
       break;
 
     case DIR_CCW:                         // Turned it counter-clockwise
       filterEncoderMove = -1;
-      filter_pos = last_filter_pos - 5 * filterEncoderMove;
+      // filter_pos = last_filter_pos - 5 * filterEncoderMove;   // AFP 10-22-22
       break;
   }
+  if (calibrateFlag == 0) {// AFP 10-22-22
+    filter_pos = last_filter_pos - 5 * filterEncoderMove;// AFP 10-22-22
+  }// AFP 10-22-22
 }

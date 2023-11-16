@@ -14,10 +14,18 @@ void sineTone(int numCycles)
   float theta;
   float freqSideTone2;
   freqSideTone2 = numCycles * 24000 / 256;
-  for (int kf = 0; kf < 256; kf++) { //Calc 750 hz sine wave.
+  for (int kf = 0; kf < 256; kf++) { //Calc: numCycles=8, 750 hz sine wave.
     theta = kf * 2 * PI * freqSideTone2 / 24000;
     sinBuffer2[kf] = sin(theta);
     cosBuffer2[kf] = cos(theta);
+  }
+  float theta3;
+  float freqSideTone3;
+  freqSideTone3 = 32 * 24000 / 256;;
+  for (int kf = 0; kf < 256; kf++) { //Calc 750 hz sine wave.
+    theta = kf * 2 * PI * freqSideTone3 / 24000;
+    sinBuffer3[kf] = sin(theta);
+    cosBuffer3[kf] = cos(theta);
   }
 }
 
@@ -100,13 +108,13 @@ const float32_t atanTable[68] = {
   Return value;
     void
 *****/
-void SinTone(long freqSideTone) {
+/*void SinTone(long freqSideTone) { // AFP 10-25-22
   float theta;
-  for (int kf = 0; kf < 255; kf++) { //Calc 750 hz sine wave.  use 768 because it is 8 whole cycles in 256 buffer.
+  for (int kf = 0; kf < 255; kf++) { //Calc 750 hz sine wave.  use 750 because it is 8 whole cycles in 256 buffer.
     theta = kf * 2 * PI * freqSideTone / 24000;
     sinBuffer2[kf] = sin(theta);
   }
-}
+  }*/
 
 /*****
   Purpose: Correct Phase angle between I andQ channels
@@ -125,7 +133,8 @@ void IQPhaseCorrection(float32_t *I_buffer, float32_t *Q_buffer, float32_t facto
     arm_scale_f32 (Q_buffer, factor, temp_buffer, blocksize);
     arm_add_f32 (I_buffer, temp_buffer, I_buffer, blocksize);
   }
-} // end IQ_phase_correction
+} // end IQphase_correction
+
 /*****
   Purpose: Calculate sinc function
 
@@ -201,46 +210,6 @@ float32_t log10f_fast(float32_t X) {
 }
 
 
-/*****
-  Purpose: SetAttenuator(int value)
-  Parameter list:
-    void
-  Return value;
-    void
-*****/
-void SetAttenuator(int value)
-{
-#if defined(ATT_LE)
-  // bit-banging of the digital step attenuator chip PE4306
-  // allows 0 to 31dB RF attenuation in 1dB steps
-  // inspired by https://github.com/jefftranter/Arduino/blob/master/pe4306/pe4306.ino
-  int level; // Holds level of DATA line when shifting
-
-  if (value < 0)
-    value = 0;
-  if (value > 31)
-    value = 31;
-
-  digitalWrite(ATT_LE, LOW);
-  digitalWrite(ATT_CLOCK, LOW);
-
-  for (int bit = 5; bit >= 0; bit--) {
-    if (bit == 0) {
-      level = 0;                    // B0 has to be set to zero
-    } else {                        // left shift of 1, because B0 has to be zero and value starts at B1
-      // then right shift by the "bit"-variable value to write the specific bit
-      // what does &0x01 do? --> sets the specific bit to a binary 1
-      level = ((value << 1) >> bit) & 0x01; // Level is value of bit
-    }
-
-    digitalWrite(ATT_DATA, level); // Write data value
-    digitalWrite(ATT_CLOCK, HIGH); // Toggle clock high and then low
-    digitalWrite(ATT_CLOCK, LOW);
-  }
-  digitalWrite(ATT_LE, HIGH); // Toggle LE high to enable latch
-  digitalWrite(ATT_LE, LOW);  // and then low again to hold it.
-#endif
-}
 
 /*****
   Purpose: void Calculatedbm()
@@ -287,24 +256,7 @@ void Calculatedbm()
 
   //  determine Lbin and Ubin from ts.dmod_mode and FilterInfo.width
   //  = determine bandwith separately for lower and upper sideband
-#if 0
-  switch (bands[currentBand].mode)
-  {
-    case DEMOD_LSB:
-    case DEMOD_SAM_LSB:
-      bw_USB = 0.0;
-      bw_LSB = (float32_t)bands[currentBand].bandwidthL;
-      break;
-    case DEMOD_USB:
-    case DEMOD_SAM_USB:
-      bw_LSB = 0.0;
-      bw_USB = (float32_t)bands[currentBand].bandwidthU;
-      break;
-    default:
-      bw_LSB = (float32_t)bands[currentBand].bandwidthL;
-      bw_USB = (float32_t)bands[currentBand].bandwidthU;
-  }
-#endif
+
 
   bw_LSB = bands[currentBand].FLoCut;
   bw_USB = bands[currentBand].FHiCut;
@@ -489,119 +441,6 @@ float ApproxAtan(float z)
 }
 
 
-/*****
-  Purpose: void AM Autotune()
-  Parameter list:
-    void
-  Return value;
-    void
-*****/
-void Autotune() {
-  // Lyons (2011): chapter 13.15 page 702
-  // this uses the FFT_buffer DIRECTLY after the 1024 point FFT
-  // and calculates the magnitudes
-  // after that, for finetuning, a quadratic interpolation is performed
-  // 1.) determine bins that are inside the filterbandwidth,
-  //     depending on filter bandwidth AND bands[currentBand].mode
-  // 2.) calculate magnitudes from the real & imaginary values in the FFT buffer
-  //     and bring them in the right order and put them into
-  //     iFFT_buffer [that is recycled for this function and filled with other values afterwards]
-  // 3.) perform carrier frequency estimation
-  // 4.) tune to the estimated carrier frequency with an accuracy of 0.01Hz ;-)
-  // --> in reality, we achieve about 0.2Hz accuracy, not bad
-
-  const int posbin         = FFT_length / 2;
-  const float32_t buff_len = FFT_length * 2.0;
-  const float32_t bin_BW   = (float32_t) (SR[SampleRate].rate * 2.0 / DF / (buff_len));
-  float32_t bw_LSB         = 0.0;
-  float32_t bw_USB         = 0.0;
-
-  //  determine posbin (where we receive at the moment)
-  // FFT_lengh is 1024
-  // FFT_buffer is already frequency-translated !
-  // so we do not need to worry about that IF stuff
-  bw_LSB = -(float32_t)bands[currentBand].FLoCut;
-  bw_USB = (float32_t)bands[currentBand].FHiCut;
-  // include 500Hz of the other sideband into the search bandwidth
-  if (bw_LSB < 1.0)
-    bw_LSB = 500.0;
-  if (bw_USB < 1.0)
-    bw_USB = 500.0;
-  // calculate upper and lower limit for determination of maximum magnitude
-  const float32_t Lbin     = (float32_t)posbin - round(bw_LSB / bin_BW);
-  const float32_t Ubin     = (float32_t)posbin + round(bw_USB / bin_BW); // the bin on the upper sideband side
-
-  // put into second half of iFFT_buffer
-  arm_cmplx_mag_f32(FFT_buffer, &iFFT_buffer[FFT_length], FFT_length);  // calculates sqrt(I*I + Q*Q) for each frequency bin of the FFT
-
-  ////////////////////////////////////////////////////////////////////////
-  // now bring into right order and copy in first half of iFFT_buffer
-  ////////////////////////////////////////////////////////////////////////
-
-  for (unsigned i = 0; i < FFT_length / 2; i++) {
-    iFFT_buffer[i] = iFFT_buffer[i + FFT_length + FFT_length / 2];
-  }
-  for (unsigned i = FFT_length / 2; i < FFT_length; i++) {
-    iFFT_buffer[i] = iFFT_buffer[i + FFT_length / 2];
-  }
-
-  if (autotune_flag == 1) {
-    float32_t maximum = 0.0;                      // look for maximum value and save the bin # for frequency delta calculation
-    float32_t maxbin = 1.0;
-    float32_t delta = 0.0;
-
-    for (int c = (int)Lbin; c <= (int)Ubin; c++) { // search for FFT bin with highest value = carrier and save the no. of the bin in maxbin
-      if (maximum < iFFT_buffer[c]) {
-        maximum = iFFT_buffer[c];
-        maxbin = c;
-      }
-    }
-
-    // ok, we have found the maximum, now save first delta frequency
-    delta = (maxbin - (float32_t)posbin) * bin_BW;
-
-    bands[currentBand].freq = bands[currentBand].freq  + (long long)(delta * NEW_SI5351_FREQ_MULT);
-    SetFreq();
-    ShowFrequency();
-    autotune_flag = 2;
-  } else {                                            // and now: fine-tuning:
-    float32_t bin1 = iFFT_buffer[posbin - 1];         //  get amplitude values of the three bins around the carrier
-    float32_t bin2 = iFFT_buffer[posbin];
-    float32_t bin3 = iFFT_buffer[posbin + 1];
-
-    if (bin1 + bin2 + bin3 == 0.0)
-      bin1 = 0.00000001; // prevent divide by 0
-
-    // estimate frequency of carrier by three-point-interpolation of bins around maxbin
-    // formula by (Jacobsen & Kootsookos 2007) equation (4) P=1.36 for Hanning window FFT function
-    // but we have unwindowed data here !
-    // float32_t delta = (bin_BW * (1.75 * (bin3 - bin1)) / (bin1 + bin2 + bin3));
-    // maybe this is the right equation for unwindowed magnitude data ?
-    // performance is not too bad ;-)
-
-    float32_t delta = (bin_BW * ((bin3 - bin1)) / (2 * bin2 - bin1 - bin3));
-    if (delta > bin_BW)
-      delta = 0.0; // just in case something went wrong
-
-    bands[currentBand].freq = bands[currentBand].freq  + (long long)(delta * NEW_SI5351_FREQ_MULT);
-    SetFreq();
-    //    ShowFrequency(bands[currentBand].freq, 1);
-    ShowFrequency();
-    if (bands[currentBand].mode == DEMOD_AUTOTUNE) {
-      autotune_flag = 0;
-    } else {                    // empirically derived: it seems good to perform the whole tuning some 5 to 10 times
-      if (autotune_flag < 6) {   // in order to be perfect on the carrier frequency
-        autotune_flag++;
-      } else {
-        autotune_flag = 0;
-        AudioNoInterrupts();
-        Q_in_L.clear();
-        Q_in_R.clear();
-        AudioInterrupts();
-      }
-    }
-  }
-}
 
 /*****
   Purpose: function reads the analog value for each matrix switch and stores that value in EEPROM.
@@ -616,7 +455,7 @@ void Autotune() {
 void SaveAnalogSwitchValues()
 {
   /*                                                                        This list is new with V017
-  const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
+    const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
                                  "Zoom",         "Menu Dn",  "Band Dn",
                                  "Filter",       "DeMod",    "Mode",
                                  "NR",           "Notch",    "Noise Floor",
@@ -734,46 +573,38 @@ void DisplayClock()
 void SetupMode(int sideBand)
 {
   int temp;
-
+  // AFP 10-27-22
   if (old_demod_mode != -99)                                    // first time radio is switched on and when changing bands
   {
-    if (sideBand == DEMOD_LSB) {                                       // switch from USB to LSB
-      temp = bands[currentBand].FHiCut;
-      bands[currentBand].FHiCut = - bands[currentBand].FLoCut;
-      bands[currentBand].FLoCut = - temp;
-    } else {
-      if (sideBand == DEMOD_AM2) {                               // switch from LSB to AM
+    switch (sideBand) {
+      case DEMOD_LSB :
+        Serial.println("SetupMode(int sideBand) LSB");
+        temp = bands[currentBand].FHiCut;
         bands[currentBand].FHiCut = - bands[currentBand].FLoCut;
-      }
+        bands[currentBand].FLoCut = - temp;
+        break;
+
+      case DEMOD_USB :
+        Serial.println("SetupMode(int sideBand)USB ");
+        temp = bands[currentBand].FHiCut;
+        bands[currentBand].FHiCut = - bands[currentBand].FLoCut;
+        bands[currentBand].FLoCut = - temp;
+        break;
+      case DEMOD_AM :
+        Serial.println("SetupMode(int sideBand) AM ");
+        bands[currentBand].FHiCut =  -bands[currentBand].FLoCut;
+        break;
     }
   }
+
   ShowBandwidth();
 
- // tft.fillRect(pos_x_frequency + 10, pos_y_frequency + 24, 210, 16, RA8875_BLACK);
-  tft.fillRect(OPERATION_STATS_X + 170, FREQUENCY_Y + 30, tft.getFontWidth() * 5, tft.getFontHeight(), RA8875_BLACK);        // Clear top-left menu area
+  // tft.fillRect(pos_x_frequency + 10, pos_y_frequency + 24, 210, 16, RA8875_BLACK);
+  //tft.fillRect(OPERATION_STATS_X + 170, FREQUENCY_Y + 30, tft.getFontWidth() * 5, tft.getFontHeight(), RA8875_BLACK);        // Clear top-left menu area
   old_demod_mode = bands[currentBand].mode; // set old_mode flag for next time, at the moment only used for first time radio is switched on . . .
 } // end void setup_mode
 
-/*****
-  Purpose: This function is used to calibrate the frequency.
 
-  Parameter list:
-    void
-
-  Return value;
-    int                   0 failed, 1 successful
-
-    In small increments, change the number in Line 921 and up-load again to observe the change.
-    Start with increments of 1000000, so the next number should be:
-
-    unsigned long long calibrationFactor     = 1006101000ULL
-
-    Write down the new displayed frequency and slowly change the number, again write down the
-    new displayed frequency.
-    If the change goes too far, reduce the amount of change.
-    As you get closer to 7.150MHz, the incremental change should get smaller until you are at
-    7.150MHz.  This may take several steps to achieve.
-*****/
 int Xmit_IQ_Cal() //AFP 09-21-22
 {
 

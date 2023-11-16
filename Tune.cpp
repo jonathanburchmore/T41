@@ -14,13 +14,17 @@
 *****/
 void ResetTuning()
 {
-  centerTuneFlag = 1;
-  centerFreq = TxRxFreq;
+
+  //centerFreq = TxRxFreq;
+
+  currentFreqA = centerFreq + NCOFreq;
   NCOFreq = 0L;
+  centerFreq = TxRxFreq = currentFreqA ;  //AFP 10-28-22
+
   DrawBandWidthIndicatorBar();
   BandInformation();
-  //FilterOverlay(); // AFP 10-20-22
   ShowFrequency();
+  centerTuneFlag = 1;
 }
 // ===== End AFP 10-11-22
 
@@ -42,19 +46,21 @@ void SetFreq() {  //AFP 09-22-22
 
 
   if (xmtMode == SSB_MODE) {
-    Clk2SetFreq = (((TxRxFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  // AFP 09-27-22
+    Clk2SetFreq = (((centerFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  // AFP 09-27-22
     Clk1SetFreq = (TxRxFreq  * SI5351_FREQ_MULT) * MASTER_CLK_MULT;                                  // AFP 09-27-22
+    //Serial.print("TxRxFreq TuneSSB= "); Serial.println(TxRxFreq);
   } else {
     // =========================  CW Xmit
     if (xmtMode == CW_MODE ) {
       if (bands[currentBand].mode == DEMOD_LSB) {
-        Clk2SetFreq = (((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ; // AFP 09-27-22
-        Clk1SetFreq = (((TxRxFreq + CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 09-27-22;
+        //Serial.print("TxRxFreq TuneCW= "); Serial.println(TxRxFreq);
+        Clk2SetFreq = (((centerFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ; // AFP 09-27-22
+        Clk1SetFreq = (((TxRxFreq + CWFreqShift + calFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT; // AFP 09-27-22;
       }
       else {
         if (bands[currentBand].mode == DEMOD_USB) {
-          Clk2SetFreq = (((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;// AFP 09-27-22
-          Clk1SetFreq = (((TxRxFreq + CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 10-01-22;
+          Clk2SetFreq = (((centerFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;// AFP 09-27-22
+          Clk1SetFreq = (((TxRxFreq - CWFreqShift + calFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT; // AFP 10-01-22;
         }
       }
     }
@@ -65,20 +71,22 @@ void SetFreq() {  //AFP 09-22-22
     //Clk2SetFreq = (((7000000) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  //AFP 08-22-22
     Clk2SetFreq = (((7000000) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  //AFP 08-22-22
   } else {
-    Clk2SetFreq = (((TxRxFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;
+    Clk2SetFreq = (((centerFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;
   }
   //=====================  AFP 10-03-22 =================
   si5351.set_freq(Clk2SetFreq, SI5351_CLK2);
 
   if (xrState == RECEIVE_STATE) {             // Turn CLK1 off during Receive and on for Transmit  AFP 10-02-22
     si5351.set_freq(0, SI5351_CLK1);         // CLK1 off during receive to prevent birdies
-  } else {                                     // TRANSMIT_STATE
-    si5351.set_freq(Clk1SetFreq, SI5351_CLK1);
+  } else {
+    if (xrState == TRANSMIT_STATE) {// TRANSMIT_STATE
+      si5351.set_freq(Clk1SetFreq, SI5351_CLK1);
+    }
   }
   //=====================  AFP 10-03-22 =================
   DrawFrequencyBarValue();
-}
 
+}
 
 
 /*****

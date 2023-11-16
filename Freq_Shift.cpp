@@ -75,33 +75,47 @@ void FreqShift2()
 {
   uint i;
   long currentFreqAOld;
+  int sideToneShift = 0;
 
   if (fineTuneEncoderMove != 0L) {
-    //SetFreq();           //AFP 10-04-22
+    SetFreq();           //AFP 10-04-22
     ShowFrequency();
     DrawBandWidthIndicatorBar();
 
-   // ); //AFP 10-04-22
-   // EncoderFineTune();      //AFP 10-04-22
+    // ); //AFP 10-04-22
+    // EncoderFineTune();      //AFP 10-04-22
 
     if (NCOFreq > 40000L) {
       NCOFreq = 40000L;
     }
-    centerFreq += freqIncrement;
+    // centerFreq += freqIncrement;
     currentFreqA = centerFreq + NCOFreq;
     //SetFreq(); //AFP 10-04-22
     ShowFrequency();
   }
 
   encoderStepOld = fineTuneEncoderMove;
-
-  currentFreqAOld = TxRxFreq;       
+  currentFreqAOld = TxRxFreq;
   TxRxFreq = centerFreq + NCOFreq;
-  if (abs(currentFreqAOld - TxRxFreq) < 3 * stepFT && currentFreqAOld != TxRxFreq) {  
+  if (abs(currentFreqAOld - TxRxFreq) < 9 * stepFT && currentFreqAOld != TxRxFreq) {  // AFP 10-30-22
     ShowFrequency();
     DrawBandWidthIndicatorBar();
+   
   }
-  NCO_INC = 2.0 * PI * NCOFreq / 192000.0; //192000 SPS is the actual sample rate used in the Receive ADC
+  if (xmtMode == SSB_MODE ) {
+    sideToneShift = 0;
+  } else {
+    if (xmtMode == CW_MODE ) {
+      if (bands[currentBand].mode == 1) {
+        sideToneShift = CWFreqShift;
+      } else {
+        if (bands[currentBand].mode == 0) {
+          sideToneShift = -CWFreqShift;
+        }
+      }
+    }
+  }
+  NCO_INC = 2.0 * PI * (NCOFreq + sideToneShift) / 192000.0; //192000 SPS is the actual sample rate used in the Receive ADC
 
   OSC_COS = cos (NCO_INC);
   OSC_SIN = sin (NCO_INC);

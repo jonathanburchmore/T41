@@ -77,21 +77,23 @@ void ButtonBandIncrease()
   NCOFreq = 0L;
   switch (activeVFO) {
     case VFO_A:
+    lastFrequencies[tempIndex][VFO_A] = currentFreqA;
       currentBandA++;
       if (currentBandA == NUMBER_OF_BANDS) {                         // Incremented too far?
         currentBandA = 0;                                            // Yep. Roll to list front.
       }
-      lastFrequencies[tempIndex][VFO_A] = currentFreqA;         // Save pre-increment frequency for VFO A
+               // Save pre-increment frequency for VFO A
       currentBand = currentBandA;
       centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;   
       break;
 
     case VFO_B:
+    lastFrequencies[tempIndex][VFO_B] = currentFreqB;
       currentBandB++;
       if (currentBandB == NUMBER_OF_BANDS) {                         // Incremented too far?
        currentBandB = 0;                                            // Yep. Roll to list front.
       }
-      lastFrequencies[tempIndex][VFO_B] = currentFreqB;         // Same for VFO B
+               // Same for VFO B
       currentBand = currentBandB;    
       centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;    
       break;
@@ -110,6 +112,7 @@ void ButtonBandIncrease()
   ShowSpectrumdBScale();
   MyDelay(1L);
   AudioInterrupts();
+  EEPROMWrite();
 }
 
 /*****
@@ -133,22 +136,24 @@ void ButtonBandDecrease()
   }
 
   switch (activeVFO) {
-    case VFO_A:                                                 // 0
+    case VFO_A:  
+    lastFrequencies[tempIndex][VFO_A] = currentFreqA;// Save pre-increment frequency for VFO A
       currentBandA--;
       if (currentBandA < 0) {                         // Incremented too far?
         currentBandA = NUMBER_OF_BANDS - 1;                                            // Yep. Roll to list front.
       }
-      lastFrequencies[tempIndex][VFO_A] = currentFreqA;         // Save pre-increment frequency for VFO A
+             
       currentBand = currentBandA;
       centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
       break;
 
-    case VFO_B:                                                 // 1
+    case VFO_B:   
+    lastFrequencies[tempIndex][VFO_B] = currentFreqB;// 
       currentBandB--;
       if (currentBandB < 0) {                         // Incremented too far?
         currentBandB = NUMBER_OF_BANDS - 1;                                            // Yep. Roll to list front.
       }
-      lastFrequencies[tempIndex][VFO_B] = currentFreqB;         // Same for VFO B
+               // Same for VFO B
       currentBand = currentBandB;
       centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
       break;
@@ -166,6 +171,7 @@ void ButtonBandDecrease()
   MyDelay(1L);
   ShowSpectrumdBScale();
   AudioInterrupts();
+  EEPROMWrite();
 }
 
 
@@ -195,7 +201,9 @@ void ButtonZoom()
   ZoomFFTPrep();
   UpdateZoomField();
   DrawBandWidthIndicatorBar();
+  ShowSpectrumdBScale();
   DrawFrequencyBarValue();
+  ShowFrequency();
   ShowBandwidth();
   ResetTuning();                                              // AFP 10-11-22
 }
@@ -234,6 +242,8 @@ void ButtonDemodMode()
     bands[currentBand].mode = DEMOD_MIN;            // cycle thru demod modes
   }
   //AudioNoInterrupts();
+   DrawBandWidthIndicatorBar();
+  BandInformation();
   SetupMode(bands[currentBand].mode);
   ShowFrequency();
   ControlFilterF();
@@ -255,13 +265,14 @@ void ButtonDemodMode()
 *****/
 void ButtonMode()        //====== Changed AFP 10-05-22  =================
 {
+  //Serial.print("in ButtonMode()= ");Serial.println(xmtMode);
   if (xmtMode == CW_MODE) {                     // Toggle the current mode
     xmtMode = SSB_MODE;
   } else {
     xmtMode = CW_MODE;
   }
-  FLoCutOld = bands[currentBand].FLoCut;
-  FHiCutOld = bands[currentBand].FHiCut;
+  //fLoCutOld = bands[currentBand].FLoCut;
+  //fHiCutOld = bands[currentBand].FHiCut;
 
   tft.fillWindow();
   DrawSpectrumDisplayContainer();
@@ -408,4 +419,32 @@ int Unused2()
 int Unused3()
 {
   return -1;
+}
+/*****
+  Purpose: Reset Zoom to zoomIndex
+
+  Parameter list:
+    void
+
+  Return value;
+    int           the current noise floor value
+*****/
+void ResetZoom(int zoomIndex1){
+ if (zoomIndex1 == MAX_ZOOM_ENTRIES) {
+    zoomIndex1 = 0;
+  }
+  if (zoomIndex1 <= 0)
+    spectrum_zoom = 0;
+  else
+    spectrum_zoom = zoomIndex1;
+
+  ZoomFFTPrep();
+  UpdateZoomField();
+  DrawBandWidthIndicatorBar();
+  //ShowSpectrumdBScale();
+  DrawFrequencyBarValue();
+  ShowFrequency();
+  ShowBandwidth();
+  //ResetTuning(); 
+  RedrawDisplayScreen();   
 }

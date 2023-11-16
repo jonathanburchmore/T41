@@ -11,7 +11,7 @@
            3 = 1.8kHz
            4 = 2kHz
            5 = Off
-  
+
   Parameter list:
     void
 
@@ -37,8 +37,14 @@ void SelectCWFilter()
 void DoCWReceiveProcessing() {  // All New AFP 09-19-22
   float goertzelMagnitude1;
   float goertzelMagnitude2;
-  arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_R, float_buffer_R_CW, 256);//AFP 09-01-22
-  arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_L, float_buffer_L_CW, 256);//AFP 09-01-22
+  //arm_copy_f32(float_buffer_L, float_buffer_L_CW, 256);
+  //arm_copy_f32(float_buffer_R, float_buffer_R_CW, 256);
+  //arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_R, float_buffer_R_CW, 256);//AFP 09-01-22
+  //arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_L, float_buffer_L_CW, 256);//AFP 09-01-22
+
+  arm_fir_f32(&FIR_CW_DecodeL, float_buffer_L, float_buffer_L_CW, 256); // AFP 10-25-22  Park McClellan FIR filter const Group delay
+ arm_fir_f32(&FIR_CW_DecodeR, float_buffer_R, float_buffer_R_CW, 256);  // AFP 10-25-22
+
   if (decoderFlag == DECODE_ON) {                  // AFP 09-27-22
 
     //=== end CW Filter ===
@@ -58,17 +64,18 @@ void DoCWReceiveProcessing() {  // All New AFP 09-19-22
     aveCorrResultL = .7 * corrResultL + .3 * aveCorrResultL;
     aveCorrResult = (corrResultR + corrResultL) / 2;
     // Calculate Goertzel Mahnitude of incomming signal
-    goertzelMagnitude1 = goertzel_mag(256, 768, 24000, float_buffer_L_CW);
-    goertzelMagnitude2 = goertzel_mag(256, 768, 24000, float_buffer_R_CW);
+    goertzelMagnitude1 = goertzel_mag(256, 750, 24000, float_buffer_L_CW); //AFP 10-25-22
+    goertzelMagnitude2 = goertzel_mag(256, 750, 24000, float_buffer_R_CW); //AFP 10-25-22
     goertzelMagnitude = (goertzelMagnitude1 + goertzelMagnitude2) / 2;
     //Combine Correlation and Gowetzel Coefficients
     combinedCoeff = 10 * aveCorrResult * 100 * goertzelMagnitude;
     combinedCoeff2 = combinedCoeff;
+    //Serial.print("combinedCoeff= ");Serial.println(combinedCoeff);
     // ==========  Changed CW decode "lock" indicator
-    if (combinedCoeff > 2) {
+    if (combinedCoeff > 50) {   // AFP 10-26-22
       tft.fillRect(745, 448,  15 , 15, RA8875_GREEN);
     }
-    else if (combinedCoeff < 2) {
+    else if (combinedCoeff < 50) {   // AFP 10-26-22
       CWLevelTimer = millis();
       if (CWLevelTimer - CWLevelTimerOld > 2000) {
         CWLevelTimerOld = millis();
@@ -76,9 +83,9 @@ void DoCWReceiveProcessing() {  // All New AFP 09-19-22
       }
     }
     combinedCoeff2Old = combinedCoeff2;
-    tft.drawFastVLine(BAND_INDICATOR_X - 8 + 26, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW lower freq indicator
-    tft.drawFastVLine(BAND_INDICATOR_X - 8 + 33, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW upper freq indicator
-    if (combinedCoeff > 2) { // if  have a reasonable corr coeff, >.15, then we have a keeper.
+    tft.drawFastVLine(BAND_INDICATOR_X - 8 + 25, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW lower freq indicator
+    tft.drawFastVLine(BAND_INDICATOR_X - 8 + 35, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW upper freq indicator
+    if (combinedCoeff > 50) { // if  have a reasonable corr coeff, >50, then we have a keeper. // AFP 10-26-22
       audioTemp = 1;
     } else {
       audioTemp = 0;

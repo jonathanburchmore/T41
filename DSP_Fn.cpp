@@ -8,6 +8,23 @@
 #define impulse_length NB_impulse_samples           // 7 // has to be odd!!!! 7 / 3 should be enough
 #define PL             (impulse_length - 1) / 2     // 6 // 3 has to be (impulse_length-1)/2 !!!!
 
+/*****
+  Purpose: Setup Teensy Mic Compressor
+  Parameter list:
+    void
+  Return value;
+    void
+*****/
+void SetupMyCompressors(boolean use_HP_filter1, float knee_dBFS1, float comp_ratio1, float attack_sec1, float release_sec1) {
+  comp1.enableHPFilter(use_HP_filter1);   comp2.enableHPFilter(use_HP_filter1);
+  comp1.setThresh_dBFS(knee_dBFS1);       comp2.setThresh_dBFS(knee_dBFS1);
+  comp1.setCompressionRatio(comp_ratio1); comp2.setCompressionRatio(comp_ratio1);
+
+  float fs_Hz = AUDIO_SAMPLE_RATE;
+  comp1.setAttack_sec(attack_sec1, fs_Hz);       comp2.setAttack_sec(attack_sec1, fs_Hz);
+  comp1.setRelease_sec(release_sec1, fs_Hz);     comp2.setRelease_sec(release_sec1, fs_Hz);
+}
+
 
 /*****
   Purpose: void noiseblanker
@@ -36,18 +53,18 @@ void NoiseBlanker(float32_t* inputsamples, float32_t* outputsamples)
   Return value;
     void
 
-alt noise blanking is trying to localize some impulse noise within the samples and after that
-trying to replace corrupted samples by linear predicted samples.
-therefore, first we calculate the lpc coefficients which represent the actual status of the
-speech or sound generating "instrument" (in case of speech this is an estimation of the current
-filter-function of the voice generating tract behind our lips :-) )
-after finding this function we inverse filter the actual samples by this function
-so we are eliminating the speech, but not the noise. Then we do a matched filtering an thereby detecting impulses
-After that we threshold the remaining samples by some
-level and so detecting impulse noise's positions within the current frame - if one (or more) impulses are there.
-finally some area around the impulse position will be replaced by predicted samples from both sides (forward and
-backward prediction)
-hopefully we have enough processor power left....
+  alt noise blanking is trying to localize some impulse noise within the samples and after that
+  trying to replace corrupted samples by linear predicted samples.
+  therefore, first we calculate the lpc coefficients which represent the actual status of the
+  speech or sound generating "instrument" (in case of speech this is an estimation of the current
+  filter-function of the voice generating tract behind our lips :-) )
+  after finding this function we inverse filter the actual samples by this function
+  so we are eliminating the speech, but not the noise. Then we do a matched filtering an thereby detecting impulses
+  After that we threshold the remaining samples by some
+  level and so detecting impulse noise's positions within the current frame - if one (or more) impulses are there.
+  finally some area around the impulse position will be replaced by predicted samples from both sides (forward and
+  backward prediction)
+  hopefully we have enough processor power left....
 *****/
 void AltNoiseBlanking(float* insamp, int Nsam, float* E )
 {
@@ -65,7 +82,7 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   float32_t sigma2;                               //taking the variance of the inpo
   float32_t lpc_power;
   float32_t impulse_threshold;
-  
+
 #ifdef debug_alternate_NR
   static int frame_count = 0; //only used for the distortion insertion - can alter be deleted
   int dist_level         = 0; //only used for the distortion insertion - can alter be deleted
@@ -74,7 +91,7 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   int nr_setting = 0;
   float32_t R[11];            // takes the autocorrelation results
   float32_t k, alfa;
-  
+
   float32_t any[order + 1];   //some internal buffers for the levinson durben algorithm
 
   float32_t Rfw[impulse_length + order]; // takes the forward predicted audio restauration
@@ -103,7 +120,7 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   // 20 ..50   noise blanker active on orig. audio; threshold factor varying between 3 and 0.26
 
   nr_setting = NB_test; //(int)ts.dsp_nr_strength;
-  
+
   //*********************************from here just debug impulse / signal generation
   if ((nr_setting > 0) && (nr_setting < 10)) // we use the vocal "a" frame
   {
@@ -135,11 +152,11 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
       }
   }
   frame_count++;
-  if (frame_count > 20) 
+  if (frame_count > 20)
     frame_count = 0;
 
 #endif
-      //*****************************end of debug impulse generation
+  //*****************************end of debug impulse generation
 
   //  start of test timing zone
 
@@ -276,8 +293,8 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
 
 void CalcNotchBins()
 {
-  bin_BW =  SR[SampleRate].rate/16; // sample rate/2/8 
-                                                // calculate notch centre bin for FFT512
+  bin_BW =  SR[SampleRate].rate / 16; // sample rate/2/8
+  // calculate notch centre bin for FFT512
   notchCenterBin = roundf(notchFreq / bin_BW);
   // calculate bins  for deletion of bins in the iFFT_buffer
   // set iFFT_buffer[notch_L] to iFFT_buffer[notch_R] to zero
@@ -296,15 +313,15 @@ void AGCPrep()
 {
   float32_t tmp;
   float32_t sample_rate = (float32_t)SR[SampleRate].rate / DF;
-                                                                  // Start variables taken from wdsp
+  // Start variables taken from wdsp
 
   tau_attack      = 0.001;                // tau_attack
   //    tau_decay = 0.250;                // tau_decay
   n_tau           = 1;                    // n_tau
 
-                                                                  // max_gain = 1000.0 to be applied??? or is this AGC threshold = knee level?
+  // max_gain = 1000.0 to be applied??? or is this AGC threshold = knee level?
   fixed_gain            = 0.7;            // if AGC == OFF
-  max_input             = 2.0; 
+  max_input             = 2.0;
   out_targ              = 0.3;            // target value of audio after AGC
   //    var_gain = 32.0;  // slope of the AGC --> this is 10 * 10^(slope / 20) --> for 10dB slope, this is 30
   var_gain              = powf (10.0, (float32_t)agc_slope / 200.0); // 10 * 10^(slope / 20)
@@ -318,14 +335,14 @@ void AGCPrep()
   hang_thresh           = 0.250;      // hang_thresh
   tau_hang_decay        = 0.100;      // tau_hang_decay
 
-                                      //calculate internal parameters
+  //calculate internal parameters
   if (agc_switch_mode)
   {
     switch (AGCMode)
     {
       case 0:                                           //agcOFF
         break;
-        
+
       case 1: //agcFrank
         hang_enable = 0;
         hang_thresh = 0.100;                            // from which level on should hang be enabled
@@ -334,33 +351,33 @@ void AGCPrep()
         agc_decay = 4000;                               // time constant decay long
         tau_fast_decay = 0.05;                          // tau_fast_decay
         tau_fast_backaverage = 0.250;                   // time constant exponential averager
-        break;      
-        
+        break;
+
       case 2:                                           //agcLONG     {"Off", "Frank", "Long", "Slow", "Medium", "Fast"};
-       // hangtime = 2.000;
+        // hangtime = 2.000;
         hangtime = 4.000;
         agc_decay = 4000;
         break;
-        
+
       case 3:                                           //agcSLOW
         //hangtime = 1.000;
-         hangtime = 4.000;
+        hangtime = 4.000;
         //agc_decay = 500;
-       agc_decay = 4000;
+        agc_decay = 4000;
         break;
-        
+
       case 4:                                           //agcMED
         hang_thresh = 1.0;
         //hangtime = 0.000;
-       // agc_decay = 250;
-         hangtime = 4.000;
+        // agc_decay = 250;
+        hangtime = 4.000;
         agc_decay = 4000;
         break;
-        
+
       case 5:                                           //agcFAST
-       // hang_thresh = 1.0;
+        // hang_thresh = 1.0;
         //hangtime = 0.000;
-         hangtime = 4.000;
+        hangtime = 4.000;
         agc_decay = 4000;
         //agc_decay = 50;
         break;
@@ -466,81 +483,81 @@ void AGC()
     switch (state)
     {
       case 0:
-          if (ring_max >= volts) {
-            volts += (ring_max - volts) * attack_mult;
+        if (ring_max >= volts) {
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          if (volts > pop_ratio * fast_backaverage) {
+            state = 1;
+            volts += (ring_max - volts) * fast_decay_mult;
           } else {
-            if (volts > pop_ratio * fast_backaverage) {
-              state = 1;
-              volts += (ring_max - volts) * fast_decay_mult;
+            if (hang_enable && (hang_backaverage > hang_level)) {
+              state = 2;
+              hang_counter = (int)(hangtime * SR[SampleRate].rate / DF);
+              decay_type = 1;
             } else {
-              if (hang_enable && (hang_backaverage > hang_level)) {
-                state = 2;
-                hang_counter = (int)(hangtime * SR[SampleRate].rate / DF);
-                decay_type = 1;
-              } else {
-                state = 3;
-                volts += (ring_max - volts) * decay_mult;
-                decay_type = 0;
-              }
+              state = 3;
+              volts += (ring_max - volts) * decay_mult;
+              decay_type = 0;
             }
           }
-          break;
+        }
+        break;
 
       case 1:
-          if (ring_max >= volts) {
-            state = 0;
-            volts += (ring_max - volts) * attack_mult;
+        if (ring_max >= volts) {
+          state = 0;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          if (volts > save_volts) {
+            volts += (ring_max - volts) * fast_decay_mult;
           } else {
-            if (volts > save_volts) {
-              volts += (ring_max - volts) * fast_decay_mult;
+            if (hang_counter > 0) {
+              state = 2;
             } else {
-              if (hang_counter > 0) {
-                state = 2;
+              if (decay_type == 0) {
+                state = 3;
+                volts += (ring_max - volts) * decay_mult;
               } else {
-                if (decay_type == 0) {
-                  state = 3;
-                  volts += (ring_max - volts) * decay_mult;
-                } else {
-                  state = 4;
-                  volts += (ring_max - volts) * hang_decay_mult;
-                }
+                state = 4;
+                volts += (ring_max - volts) * hang_decay_mult;
               }
             }
           }
-          break;
+        }
+        break;
 
       case 2:
-          if (ring_max >= volts) {
-            state = 0;
-            save_volts = volts;
-            volts += (ring_max - volts) * attack_mult;
-          } else {
-            if (hang_counter == 0) {
-              state = 4;
-              volts += (ring_max - volts) * hang_decay_mult;
-            }
-          }
-          break;
-
-      case 3:
-          if (ring_max >= volts) {
-            state = 0;
-            save_volts = volts;
-            volts += (ring_max - volts) * attack_mult;
-          } else {
-            volts += (ring_max - volts) * decay_mult*.05;
-          }
-          break;
-     
-      case 4:
-          if (ring_max >= volts) {
-            state = 0;
-            save_volts = volts;
-            volts += (ring_max - volts) * attack_mult;
-          } else {
+        if (ring_max >= volts) {
+          state = 0;
+          save_volts = volts;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          if (hang_counter == 0) {
+            state = 4;
             volts += (ring_max - volts) * hang_decay_mult;
           }
-          break;  
+        }
+        break;
+
+      case 3:
+        if (ring_max >= volts) {
+          state = 0;
+          save_volts = volts;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          volts += (ring_max - volts) * decay_mult * .05;
+        }
+        break;
+
+      case 4:
+        if (ring_max >= volts) {
+          state = 0;
+          save_volts = volts;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          volts += (ring_max - volts) * hang_decay_mult;
+        }
+        break;
     }
     if (volts < min_volts) {
       volts = min_volts; // no AGC action is taking place
@@ -548,12 +565,12 @@ void AGC()
     } else {
       agc_action = 1;                           // LED indicator for AGC action
     }
-   
-//#ifdef USE_LOG10FAST
+
+    //#ifdef USE_LOG10FAST
     mult = (out_target - slope_constant * min (0.0, log10f_fast(inv_max_input * volts))) / volts;
-//#else
-  //  mult = (out_target - slope_constant * min (0.0, log10f(inv_max_input * volts))) / volts;
-//#endif
+    //#else
+    //  mult = (out_target - slope_constant * min (0.0, log10f(inv_max_input * volts))) / volts;
+    //#endif
     iFFT_buffer[FFT_length + 2 * i + 0] = out_sample[0] * mult;
     iFFT_buffer[FFT_length + 2 * i + 1] = out_sample[1] * mult;
   }
@@ -562,126 +579,6 @@ void AGC()
 // ========== AM-Decode stuff
 
 
-
-/*****
-  Purpose: AMDecodeSAM()
-  Parameter list:
-    void
-  Return value;
-    void
-  Notes:  Synchronous AM detection.  Determines the carrier frequency, adjusts freq and replaces the received carrier with a steady signal to prevent fading.
-  This alogorithm works best of those implimented
-      // taken from Warren Pratt´s WDSP, 2016
-  // http://svn.tapr.org/repos_sdr_hpsdr/trunk/W5WC/PowerSDR_HPSDR_mRX_PS/Source/wdsp/
-*****/
-void AMDecodeSAM() {
-  // taken from Warren Pratt´s WDSP, 2016
-  // http://svn.tapr.org/repos_sdr_hpsdr/trunk/W5WC/PowerSDR_HPSDR_mRX_PS/Source/wdsp/
-
-  int k;
-
-  for (unsigned i = 0; i < FFT_length / 2; i++)
-  {
-    float32_t Sin, Cos;
-    if (atan2_approx) {
-      Sin = arm_sin_f32(phzerror);
-      Cos = arm_cos_f32(phzerror);
-    } else {
-      Sin = sin(phzerror);
-      Cos = cos(phzerror);
-    }
-    ai = Cos * iFFT_buffer[FFT_length + i * 2];
-    bi = Sin * iFFT_buffer[FFT_length + i * 2];
-    aq = Cos * iFFT_buffer[FFT_length + i * 2 + 1];
-    bq = Sin * iFFT_buffer[FFT_length + i * 2 + 1];
-
-    if (bands[currentBand].mode != DEMOD_SAM) {
-      a[0] = dsI;
-      b[0] = bi;
-      c[0] = dsQ;
-      d[0] = aq;
-      dsI = ai;
-      dsQ = bq;
-
-      for (int j = 0; j < SAM_PLL_HILBERT_STAGES; j++) {
-        k = 3 * j;
-        a[k + 3] = c0[j] * (a[k] - a[k + 5]) + a[k + 2];
-        b[k + 3] = c1[j] * (b[k] - b[k + 5]) + b[k + 2];
-        c[k + 3] = c0[j] * (c[k] - c[k + 5]) + c[k + 2];
-        d[k + 3] = c1[j] * (d[k] - d[k + 5]) + d[k + 2];
-      }
-      ai_ps = a[OUT_IDX];
-      bi_ps = b[OUT_IDX];
-      bq_ps = c[OUT_IDX];
-      aq_ps = d[OUT_IDX];
-
-      for (int j = OUT_IDX + 2; j > 0; j--) {
-        a[j] = a[j - 1];
-        b[j] = b[j - 1];
-        c[j] = c[j - 1];
-        d[j] = d[j - 1];
-      }
-    }
-    corr[0] = +ai + bq;
-    corr[1] = -bi + aq;
-    switch (bands[currentBand].mode) {
-      case DEMOD_SAM:
-        audio = corr[0];
-        break;
-
-    }
-    if (fade_leveler) {
-      dc = mtauR * dc + onem_mtauR * audio;
-      dc_insert = mtauI * dc_insert + onem_mtauI * corr[0];
-      audio = audio + dc_insert - dc;
-    }
-    float_buffer_L[i] = audio;
-    if (bands[currentBand].mode == DEMOD_SAM_STEREO) {
-      if (fade_leveler) {
-        dcu = mtauR * dcu + onem_mtauR * audiou;
-        dc_insertu = mtauI * dc_insertu + onem_mtauI * corr[0];
-        audiou = audiou + dc_insertu - dcu;
-      }
-      float_buffer_R[i] = audiou;
-    }
-    if (atan2_approx) {
-      det = arm_atan2_f32(corr[1], corr[0]);
-    } else {
-      // Why??
-    }
-    del_out = fil_out;
-    omega2 = omega2 + g2 * det;
-    if (omega2 < omega_min)
-      omega2 = omega_min;
-    else if (omega2 > omega_max)
-      omega2 = omega_max;
-    fil_out = g1 * det + omega2;
-    phzerror = phzerror + del_out;
-    // wrap round 2PI, modulus
-    while (phzerror >= TPI)
-      phzerror -= TPI;
-    while (phzerror < 0.0)
-      phzerror += TPI;
-  }
-  if (bands[currentBand].mode != DEMOD_SAM_STEREO) {
-    arm_copy_f32(float_buffer_L, float_buffer_R, FFT_length / 2);
-  }
-  //        SAM_display_count++;
-  //        if(SAM_display_count > 50) // to display the exact carrier frequency that the PLL is tuned to
-  //        if(0)
-  // in the small frequency display
-  // we calculate carrier offset here and the display function is
-  // then called in main loop every 100ms
-  // to make this smoother, a simple lowpass/exponential averager here . . .
-  
-  SAM_carrier             = 0.08 * (omega2 * SR[SampleRate].rate) / (DF * TPI);
-  SAM_carrier             = SAM_carrier + 0.92 * SAM_lowpass;
-  SAM_carrier_freq_offset = (int)SAM_carrier;
-  SAM_lowpass             = SAM_carrier;
-  
-//  ShowFrequency(bands[currentBand].freq, 0);
-  ShowFrequency();
-}
 
 /*****
   Purpose: Demod IQ
@@ -697,49 +594,21 @@ void DecodeIQ() {
   }
 }
 
-/*****
-  Purpose: AM_Demod_AM2
-  
-  Parameter list:
-    void
-    
-  Return value;
-    void
-    
-  Notes:   // // E(t) = sqrtf(I*I + Q*Q) --> highpass IIR 1st order for DC removal --> lowpass IIR 2nd order
-    Calc. magnitude of Signals and applies DC and low freq filtering using IIR filter.  Works well
-*****/
-void AMDemodAM2() {
-  // // E(t) = sqrtf(I*I + Q*Q) --> highpass IIR 1st order for DC removal --> lowpass IIR 2nd order
-  for (unsigned i = 0; i < FFT_length / 2; i++) { //
-    audiotmp = sqrtf(iFFT_buffer[FFT_length + (i * 2)] * iFFT_buffer[FFT_length + (i * 2)]
-                     + iFFT_buffer[FFT_length + (i * 2) + 1] * iFFT_buffer[FFT_length + (i * 2) + 1]);
-                                                                                                        // DC removal filter -------
-    w = audiotmp + wold * 0.9999f; // yes, I want a superb bass response ;-)
-    float_buffer_L[i] = w - wold;
 
-    wold = w;
-  }
-  arm_biquad_cascade_df1_f32 (&biquad_lowpass1, float_buffer_L, float_buffer_R, FFT_length / 2);
-  arm_copy_f32(float_buffer_R, float_buffer_L, FFT_length / 2);
-}
 
 /*****
-  Purpose: Allow user to set the mic compression level between 0.0 and 1.0
-  
+  Purpose: Allow user to set the mic compression level
+
   Parameter list:
     void
-    
+
   Return value;
     void
-    
-  Notes:   // // E(t) = sqrtf(I*I + Q*Q) --> highpass IIR 1st order for DC removal --> lowpass IIR 2nd order
-    Calc. magnitude of Signals and applies DC and low freq filtering using IIR filter.  Works well
 *****/
 void SetCompressionLevel()
 {
   int val;
-  int currentCompression = micCompression; // AFP 09-22-22
+  currentMicThreshold = knee_dBFS; // AFP 09-22-22
 
   tft.setFontScale( (enum RA8875tsize) 1);
 
@@ -748,19 +617,68 @@ void SetCompressionLevel()
   tft.setCursor(SECONDARY_MENU_X  - 48, MENUS_Y + 1);
   tft.print("Compression:");
   tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
-  tft.print(micCompression);
+  tft.print(currentMicThreshold);
 
   while (true) {
     if (filterEncoderMove != 0) {
-      currentCompression += ((float) filterEncoderMove);
-      if (currentCompression < -96)
-        currentCompression = -96;
-      else if (currentCompression > 0)                 // 100% max
-        currentCompression = 0;
+      currentMicThreshold += ((float) filterEncoderMove);
+      if (currentMicThreshold < -60)
+        currentMicThreshold = -60;
+      else if (currentMicThreshold > 0)                 // 100% max
+        currentMicThreshold = 0;
 
       tft.fillRect(SECONDARY_MENU_X + 180, MENUS_Y, 80, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
-      tft.print(currentCompression);
+      tft.print(currentMicThreshold);
+      filterEncoderMove = 0;
+    }
+    val = ReadSelectedPushButton();                                  // Read pin that controls all switches
+    val = ProcessButtonPress(val);
+    MyDelay(150L);
+    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+      // micCompression = currentMicThreshold;
+      EEPROMData.currentMicThreshold = currentMicThreshold;
+      EEPROMWrite();
+      UpdateCompressionField();
+      break;
+    }
+  }
+  EraseMenus();
+}
+
+/*****
+  Purpose: Allow user to set the mic compression ratio
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+void SetCompressionRatio()
+{
+  int val;
+
+  tft.setFontScale( (enum RA8875tsize) 1);
+
+  tft.fillRect(SECONDARY_MENU_X - 50, MENUS_Y, EACH_MENU_WIDTH + 50, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.setTextColor(RA8875_WHITE);
+  tft.setCursor(SECONDARY_MENU_X  - 48, MENUS_Y + 1);
+  tft.print("Comp Ratio:");
+  tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+  tft.print(currentMicCompRatio, 1);
+
+  while (true) {
+    if (filterEncoderMove != 0) {
+      currentMicCompRatio += ((float) filterEncoderMove * .1);
+      if (currentMicCompRatio > 10)
+        currentMicCompRatio = 10;
+      else if (currentMicCompRatio < 1)                 // 100% max
+        currentMicCompRatio = 1;
+
+      tft.fillRect(SECONDARY_MENU_X + 180, MENUS_Y, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+      tft.print(currentMicCompRatio, 1);
       filterEncoderMove = 0;
     }
 
@@ -769,10 +687,108 @@ void SetCompressionLevel()
     MyDelay(150L);
 
     if (val == MENU_OPTION_SELECT) {                             // Make a choice??
-      micCompression = currentCompression;
-      EEPROMData.micCompression = micCompression;
+      EEPROMData.currentMicCompRatio = currentMicCompRatio;
       EEPROMWrite();
-      UpdateCompressionField();   
+
+      break;
+    }
+  }
+  EraseMenus();
+}
+/*****
+  Purpose: Allow user to set the mic Attack in sec
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+void SetCompressionAttack()
+{
+  int val;
+
+  tft.setFontScale( (enum RA8875tsize) 1);
+
+  tft.fillRect(SECONDARY_MENU_X - 50, MENUS_Y, EACH_MENU_WIDTH + 50, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.setTextColor(RA8875_WHITE);
+  tft.setCursor(SECONDARY_MENU_X  - 48, MENUS_Y + 1);
+  tft.print("Attack Sec:");
+  tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+  tft.print(currentMicAttack, 1);
+
+  while (true) {
+    if (filterEncoderMove != 0) {
+      currentMicAttack += ((float) filterEncoderMove * 0.1);
+      if (currentMicAttack > 10)
+        currentMicAttack = 10;
+      else if (currentMicAttack < .1)                 // 100% max
+        currentMicAttack = .1;
+
+      tft.fillRect(SECONDARY_MENU_X + 180, MENUS_Y, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+      tft.print(currentMicAttack, 1);
+      filterEncoderMove = 0;
+    }
+
+    val = ReadSelectedPushButton();                                  // Read pin that controls all switches
+    val = ProcessButtonPress(val);
+    MyDelay(150L);
+
+    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+      EEPROMData.currentMicAttack = currentMicAttack;
+      EEPROMWrite();
+
+      break;
+    }
+  }
+  EraseMenus();
+}
+
+/*****
+  Purpose: Allow user to set the mic compression ratio
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+void SetCompressionRelease()
+{
+  int val;
+
+  tft.setFontScale( (enum RA8875tsize) 1);
+
+  tft.fillRect(SECONDARY_MENU_X - 50, MENUS_Y, EACH_MENU_WIDTH + 50, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.setTextColor(RA8875_WHITE);
+  tft.setCursor(SECONDARY_MENU_X  - 48, MENUS_Y + 1);
+  tft.print("Decay Sec:");
+  tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+  tft.print(currentMicRelease, 1);
+
+  while (true) {
+    if (filterEncoderMove != 0) {
+      currentMicRelease += ((float) filterEncoderMove * 0.1);
+      if (currentMicRelease > 10)
+        currentMicRelease = 10;
+      else if (currentMicRelease < 0.1)                 // 100% max
+        currentMicRelease = 0.1;
+
+      tft.fillRect(SECONDARY_MENU_X + 180, MENUS_Y, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+      tft.print(currentMicRelease, 1);
+      filterEncoderMove = 0;
+    }
+
+    val = ReadSelectedPushButton();                                  // Read pin that controls all switches
+    val = ProcessButtonPress(val);
+    MyDelay(150L);
+
+    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+      EEPROMData.currentMicCompRatio = currentMicCompRatio;
+      EEPROMWrite();
+
       break;
     }
   }
