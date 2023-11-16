@@ -749,7 +749,8 @@ void SetupMode(int sideBand)
   }
   ShowBandwidth();
 
-  tft.fillRect(pos_x_frequency + 10, pos_y_frequency + 24, 210, 16, RA8875_BLACK);
+ // tft.fillRect(pos_x_frequency + 10, pos_y_frequency + 24, 210, 16, RA8875_BLACK);
+  tft.fillRect(OPERATION_STATS_X + 170, FREQUENCY_Y + 30, tft.getFontWidth() * 5, tft.getFontHeight(), RA8875_BLACK);        // Clear top-left menu area
   old_demod_mode = bands[currentBand].mode; // set old_mode flag for next time, at the moment only used for first time radio is switched on . . .
 } // end void setup_mode
 
@@ -775,55 +776,6 @@ void SetupMode(int sideBand)
 *****/
 int Xmit_IQ_Cal() //AFP 09-21-22
 {
-/*switch (IQEXChoice) {
-      case 0:    //Volume
-        break;
-      case 1:  // IQ Receive Gain Cal
-        spectrum_zoom = 0;
-        //Serial.print("adjustVolEncoder= ");Serial.println(adjustVolEncoder);
-        //Serial.println("case 1: ");
-        tft.setFontScale( (enum RA8875tsize) 1);
-        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
-        tft.setTextColor(RA8875_WHITE);
-        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
-        tft.print("IQGainCal:");
-        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
-        tft.print(IQ_amplitude_correction_factor, 3);
-        val = ReadSelectedPushButton();
-        if (val != BOGUS_PIN_READ) {                        // Any button press??
-          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
-          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
-            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
-            IQChoice = 0;
-            spectrum_zoom = 1;
-            EEPROMWrite();
-            break;
-          }
-        }
-        break;
-      case 2:  // IQ Receive Phase Cal
-        spectrum_zoom = 0;
-        //Serial.print("adjustVolEncoder= ");Serial.println(adjustVolEncoder);
-        //Serial.println("case 1: ");
-        tft.setFontScale( (enum RA8875tsize) 1);
-        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
-        tft.setTextColor(RA8875_WHITE);
-        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
-        tft.print("IQPhaseCal:");
-        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
-        tft.print(IQ_phase_correction_factor, 3);
-        val = ReadSelectedPushButton();
-        if (val != BOGUS_PIN_READ) {                        // Any button press??
-          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
-          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
-            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
-            IQChoice = 0;
-            spectrum_zoom = 1;
-            EEPROMWrite();
-            break;
-          }
-        }
-        break;
-*/
+
   return -1;
 }

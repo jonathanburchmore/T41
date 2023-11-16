@@ -3,6 +3,27 @@
 #endif
 
 
+/***** //AFP 10-11-22 all new
+  Purpose:  Reset tuning to center
+
+  Parameter list:
+  void
+
+  Return value;
+  void
+*****/
+void ResetTuning()
+{
+  centerTuneFlag = 1;
+  centerFreq = TxRxFreq;
+  NCOFreq = 0L;
+  DrawBandWidthIndicatorBar();
+  BandInformation();
+  //FilterOverlay(); // AFP 10-20-22
+  ShowFrequency();
+}
+// ===== End AFP 10-11-22
+
 /*****
   Purpose: SetFrequency
 
@@ -24,63 +45,41 @@ void SetFreq() {  //AFP 09-22-22
     Clk2SetFreq = (((TxRxFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  // AFP 09-27-22
     Clk1SetFreq = (TxRxFreq  * SI5351_FREQ_MULT) * MASTER_CLK_MULT;                                  // AFP 09-27-22
   } else {
-    // =========================  CW Xmit 
+    // =========================  CW Xmit
     if (xmtMode == CW_MODE ) {
       if (bands[currentBand].mode == DEMOD_LSB) {
         Clk2SetFreq = (((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ; // AFP 09-27-22
-        Clk1SetFreq = (((TxRxFreq - CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 09-27-22;
+        Clk1SetFreq = (((TxRxFreq + CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 09-27-22;
       }
       else {
         if (bands[currentBand].mode == DEMOD_USB) {
           Clk2SetFreq = (((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;// AFP 09-27-22
-          Clk1SetFreq = (((TxRxFreq - CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 10-01-22;
-       }
+          Clk1SetFreq = (((TxRxFreq + CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 10-01-22;
+        }
       }
     }
   }
-  // =========================  End CW Xmit 
+  // =========================  End CW Xmit
 
   if ((digitalRead(PTT) == LOW ) && (currentBand == BAND_10M )) {
+    //Clk2SetFreq = (((7000000) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  //AFP 08-22-22
     Clk2SetFreq = (((7000000) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  //AFP 08-22-22
+  } else {
+    Clk2SetFreq = (((TxRxFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;
   }
-//=====================  AFP 10-03-22 =================
-  si5351.set_freq(Clk2SetFreq, SI5351_CLK2);           
-  // =====================  AFP 10-02-22 ==================
+  //=====================  AFP 10-03-22 =================
+  si5351.set_freq(Clk2SetFreq, SI5351_CLK2);
+
   if (xrState == RECEIVE_STATE) {             // Turn CLK1 off during Receive and on for Transmit  AFP 10-02-22
     si5351.set_freq(0, SI5351_CLK1);         // CLK1 off during receive to prevent birdies
+  } else {                                     // TRANSMIT_STATE
+    si5351.set_freq(Clk1SetFreq, SI5351_CLK1);
   }
-  else {
-    if (xrState ==  TRANSMIT_STATE) {
-      si5351.set_freq(Clk1SetFreq, SI5351_CLK1);
-    }
-  }
-//=====================  AFP 10-03-22 =================
+  //=====================  AFP 10-03-22 =================
   DrawFrequencyBarValue();
 }
 
-/*****
-  Purpose: Set Frequency Display Cursor for Fast Tune
 
-  Parameter list:
-
-  Return value;
-    void
-    Extensively modified 12-23-21 AFP
-    Note:  Fast tune frequency offset is determined in FreqShift2()
-*****/
-void SetFineTuneFrequency()
-{
-  if (newCursorPosition != oldCursorPosition) {
-    oldCursorPosition = newCursorPosition;
-    TxRxFreq = centerFreq + NCO_Freq;
-    currentFreqA = TxRxFreq;
-    ShowSpectrum();
-  }
-  if (T41State == CW_RECEIVE && decoderFlag == DECODE_ON) { // No reason to reset if we're not doing decoded CW AFP 09-27-22
-    ResetHistograms();
-  }
-  tft.writeTo(L1);                                                    //AFP 03-27-22 Layers
-}
 
 /*****
   Purpose: Places the Fast Tune cursor in the center of the spectrum display

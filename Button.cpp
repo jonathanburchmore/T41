@@ -78,7 +78,6 @@ void ExecuteButtonPress(int val)
   } else {
     menuStatus = PRIMARY_MENU_ACTIVE;
   }
-
   switch (val) {
     case MENU_OPTION_SELECT:                                     // 0
       /*                                    Useful comment in understanding how menues align:
@@ -119,8 +118,9 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       ButtonBandIncrease();
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
-      NCO_Freq = 0L;
-      CenterFilterOverlay();
+      NCOFreq = 0L;
+      DrawBandWidthIndicatorBar(); // AFP 10-20-22
+      //FilterOverlay();   // AFP 10-20-22
       SetFreq(); 
       ShowSpectrum(); 
       break;
@@ -145,8 +145,9 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       ButtonBandDecrease();
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
-      NCO_Freq = 0L;
-      CenterFilterOverlay();  
+      NCOFreq = 0L;
+      DrawBandWidthIndicatorBar(); //AFP 10-20-22
+      //FilterOverlay();             // AFP 10-20-22
       break;
 
     case FILTER:                                                  // 6
@@ -187,12 +188,14 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       break;    
 
     case DECODER_TOGGLE:                                          // 13
+//      decoderFlag = !decoderFlag;
+      
       if (decoderFlag == DECODE_OFF) {
-        decoderFlag = DECODE_ON; 
-               
+        decoderFlag = DECODE_ON;               
       } else {
         decoderFlag = DECODE_OFF;
       }
+      
       UpdateDecoderField();
       break;
 
@@ -200,14 +203,14 @@ int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROpt
       ButtonFreqIncrement();
       break;
 
-    case UNUSED_1:                                                // 15
+    case RESET_TUNING:                                            // 15   AFP 10-11-22
+      ResetTuning();                                              // AFP 10-11-22
+      break;                                                      // AFP 10-11-22
+
+    case UNUSED_1:                                                // 16    
       break;
 
-    case UNUSED_2:                                                // 16
-      break;
-
-    case CALIBRATE_FREQUENCY:                                                // 17
-      Xmit_IQ_Cal();  //AFP 09-21-22
+    case UNUSED_2:                                                // 17  // AFP 10-11-22
       break;
 
     default:

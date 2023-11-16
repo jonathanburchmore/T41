@@ -67,25 +67,35 @@ void ButtonMenuDecrease()
 void ButtonBandIncrease()
 {
   int tempIndex;
-  
+
   tempIndex = currentBand;                                      // Save the current index
   currentBand++;
-  
+
   if (currentBand == NUMBER_OF_BANDS) {                         // Incremented too far?
     currentBand = 0;                                            // Yep. Roll to list front.
   }
-
+  NCOFreq = 0L;
   switch (activeVFO) {
     case VFO_A:
+      currentBandA++;
+      if (currentBandA == NUMBER_OF_BANDS) {                         // Incremented too far?
+        currentBandA = 0;                                            // Yep. Roll to list front.
+      }
       lastFrequencies[tempIndex][VFO_A] = currentFreqA;         // Save pre-increment frequency for VFO A
-      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBand][VFO_A];
+      currentBand = currentBandA;
+      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;   
       break;
-      
+
     case VFO_B:
+      currentBandB++;
+      if (currentBandB == NUMBER_OF_BANDS) {                         // Incremented too far?
+       currentBandB = 0;                                            // Yep. Roll to list front.
+      }
       lastFrequencies[tempIndex][VFO_B] = currentFreqB;         // Same for VFO B
-      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBand][VFO_B];   
+      currentBand = currentBandB;    
+      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;    
       break;
-      
+
     case VFO_SPLIT:
       DoSplitVFO();
       break;
@@ -97,6 +107,7 @@ void ButtonBandIncrease()
   SetBand();
   SetFreq();
   ShowFrequency();
+  ShowSpectrumdBScale();
   MyDelay(1L);
   AudioInterrupts();
 }
@@ -112,10 +123,9 @@ void ButtonBandIncrease()
 *****/
 void ButtonBandDecrease()
 {
-  int tempIndex;
-  //AudioNoInterrupts();
+  int tempIndex = currentBand;;
+//  NCOFreq = 0L;
 
-  tempIndex = currentBand;                                      // Save the current index
   currentBand--;                                                // decrement band index
 
   if (currentBand < 0) {                                        // decremented too far?
@@ -124,15 +134,25 @@ void ButtonBandDecrease()
 
   switch (activeVFO) {
     case VFO_A:                                                 // 0
+      currentBandA--;
+      if (currentBandA < 0) {                         // Incremented too far?
+        currentBandA = NUMBER_OF_BANDS - 1;                                            // Yep. Roll to list front.
+      }
       lastFrequencies[tempIndex][VFO_A] = currentFreqA;         // Save pre-increment frequency for VFO A
-      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBand][VFO_A];
+      currentBand = currentBandA;
+      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
       break;
-      
+
     case VFO_B:                                                 // 1
+      currentBandB--;
+      if (currentBandB < 0) {                         // Incremented too far?
+        currentBandB = NUMBER_OF_BANDS - 1;                                            // Yep. Roll to list front.
+      }
       lastFrequencies[tempIndex][VFO_B] = currentFreqB;         // Same for VFO B
-      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBand][VFO_B];   
+      currentBand = currentBandB;
+      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
       break;
-      
+
     case VFO_SPLIT:                                             // 3
       DoSplitVFO();
       break;
@@ -144,6 +164,7 @@ void ButtonBandDecrease()
   SetFreq();
   ShowFrequency();
   MyDelay(1L);
+  ShowSpectrumdBScale();
   AudioInterrupts();
 }
 
@@ -176,6 +197,7 @@ void ButtonZoom()
   DrawBandWidthIndicatorBar();
   DrawFrequencyBarValue();
   ShowBandwidth();
+  ResetTuning();                                              // AFP 10-11-22
 }
 
 /*****
@@ -231,51 +253,36 @@ void ButtonDemodMode()
   Return value:
     void
 *****/
-void ButtonMode()        //====== CW Receive code AFP 08-04-22   Most of function is new=================
+void ButtonMode()        //====== Changed AFP 10-05-22  =================
 {
   if (xmtMode == CW_MODE) {                     // Toggle the current mode
     xmtMode = SSB_MODE;
   } else {
     xmtMode = CW_MODE;
   }
-//  RedrawDisplayScreen();
+  FLoCutOld = bands[currentBand].FLoCut;
+  FHiCutOld = bands[currentBand].FHiCut;
 
-  if (xmtMode == CW_MODE) {
-    modeSelectOutL.gain(0, 5);
-    modeSelectOutR.gain(0, 5);
-    FLoCutOld = bands[currentBand].FLoCut;
-    FHiCutOld = bands[currentBand].FHiCut;
-    currentFreqA = centerFreq + NCO_Freq;             // Yep, prepare lower sideband
-    if (currentBand < 2) {                            // 80 or 40M?
-      bands[currentBand].FLoCut = -3000;
-      bands[currentBand].FHiCut = -200;
-      TxRxFreq = centerFreq +NCO_Freq;                // AFP 09-27-22
-    } else {
-      bands[currentBand].FLoCut = 200;
-      bands[currentBand].FHiCut = 3000;
-      TxRxFreq = centerFreq + NCO_Freq;              // AFP 09-27-22
-    }
-  } else {
-    modeSelectOutL.gain(0, 1.0);
-    modeSelectOutR.gain(0, 1.0);
-    if (currentBand < 2) {
-      bands[currentBand].FLoCut = FLoCutOld;
-      bands[currentBand].FHiCut = FHiCutOld;
-    } else {
-      bands[currentBand].FLoCut = FLoCutOld;
-      bands[currentBand].FHiCut = FHiCutOld;
-    }
-    TxRxFreq = centerFreq +NCO_Freq;
-    currentFreqA = TxRxFreq;
-  }
-  
-  RedrawDisplayScreen();  
-  EraseSpectrumDisplayContainer();
+  tft.fillWindow();
   DrawSpectrumDisplayContainer();
+  DrawFrequencyBarValue();
+  DrawInfoWindowFrame();
+  UpdateIncrementField();
+  AGCPrep();
+  UpdateAGCField();
+  EncoderVolume();
+  ShowDefaultSettings();
   ControlFilterF();
+  BandInformation();
   FilterBandwidth();
-  UpdateDecoderField();
-  SetFreq();
+  DrawSMeterContainer();
+  DrawAudioSpectContainer();
+  SpectralNoiseReductionInit();
+  UpdateNoiseField();
+  DrawBandWidthIndicatorBar();
+  ShowName();
+  ShowSpectrumdBScale();
+  ShowTransmitReceiveStatus();
   ShowFrequency();
 }
 
@@ -292,7 +299,7 @@ void ButtonNR()  //AFP 09-19-22 update
 {
   nrOptionSelect++;
   if (nrOptionSelect > 3) {
-    nrOptionSelect = 0;  
+    nrOptionSelect = 0;
   }
   NROptions();   //AFP 09-19-22
   UpdateNoiseField();
@@ -360,8 +367,8 @@ int ButtonSetNoiseFloor()
     if (val == MENU_OPTION_SELECT)               // If they made a choice...
     {
       spectrumNoiseFloor = SPECTRUM_BOTTOM - currentNoiseFloor;
-      if (spectrumNoiseFloor > SPECTRUM_BOTTOM+15) { //AFP 09-22-22
-        spectrumNoiseFloor = SPECTRUM_BOTTOM+15; //AFP 09-22-22
+      if (spectrumNoiseFloor > SPECTRUM_BOTTOM + 15) { //AFP 09-22-22
+        spectrumNoiseFloor = SPECTRUM_BOTTOM + 15; //AFP 09-22-22
       } else {
         if (spectrumNoiseFloor < SPECTRUM_BOTTOM - 50)
           spectrumNoiseFloor = SPECTRUM_BOTTOM - 50;

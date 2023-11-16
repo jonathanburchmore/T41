@@ -2,6 +2,28 @@
 #include "SDT.h"
 #endif
 
+//=================  AFP10-18-22 ================
+/*****
+  Purpose: Select CW Filter. CWFilterIndex has these values:
+           0 = 840Hz
+           1 = 1kHz
+           2 = 1.3kHz
+           3 = 1.8kHz
+           4 = 2kHz
+           5 = Off
+  
+  Parameter list:
+    void
+
+  Return value:
+    void
+*****/
+void SelectCWFilter()
+{
+  CWFilterIndex = SubmenuSelect(CWFilter, 6, 0);
+  RedrawDisplayScreen();
+}
+//=================  AFP10-18-22 ================
 /*****
   Purpose: to process CW specific signals
 
@@ -25,24 +47,24 @@ void DoCWReceiveProcessing() {  // All New AFP 09-19-22
 
     //Calculate correlation between calc sine and incoming signal
 
-    arm_correlate_f32  ( float_buffer_R_CW, 256, sinBuffer, 256, float_Corr_BufferR);    
-    arm_max_f32  ( float_Corr_BufferR, 511, &corrResultR, &corrResultIndexR);               
-                                                                                    //running average of corr coeff. R
+    arm_correlate_f32  ( float_buffer_R_CW, 256, sinBuffer, 256, float_Corr_BufferR);
+    arm_max_f32  ( float_Corr_BufferR, 511, &corrResultR, &corrResultIndexR);
+    //running average of corr coeff. R
     aveCorrResultR = .7 * corrResultR + .3 * aveCorrResultR;
-    arm_correlate_f32  ( float_buffer_L_CW, 256, sinBuffer, 256, float_Corr_BufferL ) ;    
-                                                                                    //get max value of correlation
-    arm_max_f32  ( float_Corr_BufferL, 511, &corrResultL, &corrResultIndexL);   
-                                                                                    //running average of corr coeff. L
+    arm_correlate_f32  ( float_buffer_L_CW, 256, sinBuffer, 256, float_Corr_BufferL ) ;
+    //get max value of correlation
+    arm_max_f32  ( float_Corr_BufferL, 511, &corrResultL, &corrResultIndexL);
+    //running average of corr coeff. L
     aveCorrResultL = .7 * corrResultL + .3 * aveCorrResultL;
     aveCorrResult = (corrResultR + corrResultL) / 2;
-                                                                                    // Calculate Goertzel Mahnitude of incomming signal
+    // Calculate Goertzel Mahnitude of incomming signal
     goertzelMagnitude1 = goertzel_mag(256, 768, 24000, float_buffer_L_CW);
     goertzelMagnitude2 = goertzel_mag(256, 768, 24000, float_buffer_R_CW);
     goertzelMagnitude = (goertzelMagnitude1 + goertzelMagnitude2) / 2;
-                                                                                    //Combine Correlation and Gowetzel Coefficients
+    //Combine Correlation and Gowetzel Coefficients
     combinedCoeff = 10 * aveCorrResult * 100 * goertzelMagnitude;
     combinedCoeff2 = combinedCoeff;
-                                                                                    // ==========  Changed CW decode "lock" indicator
+    // ==========  Changed CW decode "lock" indicator
     if (combinedCoeff > 2) {
       tft.fillRect(745, 448,  15 , 15, RA8875_GREEN);
     }
@@ -62,9 +84,9 @@ void DoCWReceiveProcessing() {  // All New AFP 09-19-22
       audioTemp = 0;
     }
     //==============  acquire data on CW  ================
-    DoCWDecoding(audioTemp);   
-  } 
-} 
+    DoCWDecoding(audioTemp);
+  }
+}
 
 /*****
   Purpose: to provide spacing between letters
@@ -345,7 +367,7 @@ void ResetHistograms()
   gapAtom = ditLength       = 80;             // Start with 15wpm ditLength
   gapChar = dahLength       = 240;
   thresholdGeometricMean    = 160;            // Use simple mean for starters so we don't have 0
-                                              // Clear graph arrays
+  // Clear graph arrays
   memset(signalHistogram, 0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
   memset(gapHistogram,    0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
   UpdateWPMField();
@@ -649,8 +671,8 @@ void DoSignalHistogram(long val)
   signalHistogram[val]++;                             // Don't care which half it's in, just put it in
 
   offset = (uint32_t)thresholdGeometricMean - 1;      // Only do cast once
-                                                      // Dit calculation
-                                                      // 2nd parameter means we only look for dits below the geomean.
+  // Dit calculation
+  // 2nd parameter means we only look for dits below the geomean.
 
   for (int32_t j = (int32_t) thresholdGeometricMean; j; j--) {
     if (signalHistogram[j] != 0) {
@@ -660,8 +682,8 @@ void DoSignalHistogram(long val)
   }
 
   JackClusteredArrayMax(signalHistogram, offset, &tempDit,  (int32_t *) &ditLength, &firstNonEmpty, (int32_t) 1);
-                                                      // dah calculation
-                                                      // Elements above the geomean. Note larger spread: higher variance
+  // dah calculation
+  // Elements above the geomean. Note larger spread: higher variance
   JackClusteredArrayMax(&signalHistogram[offset], HISTOGRAM_ELEMENTS - offset, &tempDah, (int32_t *) &dahLength, &firstNonEmpty, (uint32_t) 3);
   dahLength += (uint32_t) offset;
 

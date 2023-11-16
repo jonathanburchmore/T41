@@ -96,7 +96,7 @@ void ExciterIQData()
      **********************************************************************************/
 
     if (bands[currentBand].mode == DEMOD_LSB) { //AFP 12-27-21
-      arm_scale_f32 (float_buffer_L_EX, -1.015, float_buffer_L_EX, 256);
+      arm_scale_f32 (float_buffer_L_EX, 1.015, float_buffer_L_EX, 256);
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, .013, 256);
     }
     else if (bands[currentBand].mode == DEMOD_USB) { //AFP 12-27-21

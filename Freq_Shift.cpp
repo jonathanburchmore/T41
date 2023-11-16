@@ -77,31 +77,31 @@ void FreqShift2()
   long currentFreqAOld;
 
   if (fineTuneEncoderMove != 0L) {
-    SetFreq();
+    //SetFreq();           //AFP 10-04-22
     ShowFrequency();
     DrawBandWidthIndicatorBar();
 
-    SetFineTuneFrequency();
-    EncoderFineTune();
+   // ); //AFP 10-04-22
+   // EncoderFineTune();      //AFP 10-04-22
 
-    if (NCO_Freq > 40000L) {
-      NCO_Freq = 40000L;
+    if (NCOFreq > 40000L) {
+      NCOFreq = 40000L;
     }
     centerFreq += freqIncrement;
-    currentFreqA = centerFreq + NCO_Freq;
-    SetFreq();
+    currentFreqA = centerFreq + NCOFreq;
+    //SetFreq(); //AFP 10-04-22
     ShowFrequency();
   }
 
   encoderStepOld = fineTuneEncoderMove;
 
   currentFreqAOld = TxRxFreq;       
-  TxRxFreq = centerFreq + NCO_Freq;
+  TxRxFreq = centerFreq + NCOFreq;
   if (abs(currentFreqAOld - TxRxFreq) < 3 * stepFT && currentFreqAOld != TxRxFreq) {  
     ShowFrequency();
     DrawBandWidthIndicatorBar();
   }
-  NCO_INC = 2.0 * PI * NCO_Freq / 192000.0; //192000 SPS is the actual sample rate used in the Receive ADC
+  NCO_INC = 2.0 * PI * NCOFreq / 192000.0; //192000 SPS is the actual sample rate used in the Receive ADC
 
   OSC_COS = cos (NCO_INC);
   OSC_SIN = sin (NCO_INC);

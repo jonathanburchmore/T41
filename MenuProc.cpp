@@ -1,7 +1,7 @@
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
-
+//  ====AFP 10-18-22 =====
 /*****
   Purpose: Present the CW options available and return the selection
 
@@ -13,10 +13,10 @@
 *****/
 int CWOptions()                              // new option for Sidetone and Delay JJP 9/1/22
 {
-  const char *cwChoices[]   = {"WPM", "Key Type", "Paddle Flip", "Sidetone Volume", "Transmit Delay", "Cancel"};   // Add code practice oscillator
+  const char *cwChoices[]   = {"WPM", "Key Type", "CW Filter", "Paddle Flip", "Sidetone Volume", "Transmit Delay", "Cancel"};   // AFP 10-18-22
   int CWChoice = 0;
 
-  CWChoice = SubmenuSelect(cwChoices, 6, 0);
+  CWChoice = SubmenuSelect(cwChoices, 7, 0);
 
   switch (CWChoice) {
     case 0:                                 // WPM
@@ -30,15 +30,19 @@ int CWOptions()                              // new option for Sidetone and Dela
       UpdateWPMField();
       break;
 
-    case 2:                                 // Flip paddles
+    case 2:                                 // CW Filter BW:      // AFP 10-18-22
+      SelectCWFilter();                      // in CWProcessing    // AFP 10-18-22
+      break;                                                      // AFP 10-18-22
+
+    case 3:                                 // Flip paddles
       DoPaddleFlip();                       // Stored in EEPROM; variables paddleDit and paddleDah
       break;
 
-    case 3:                                 // Sidetone volume
+    case 4:                                 // Sidetone volume
       SetSidetoneVolume();
       break;
 
-    case 4:                                 // new function JJP 9/1/22
+    case 5:                                 // new function JJP 9/1/22
       SetTransmitDelay();                   // Transmit relay hold delay
       break;
 
@@ -120,11 +124,18 @@ int AGCOptions()
   UpdateAGCField();
   return AGCMode;
 }
+/*****
+  Purpose: IQ Options
 
-int IQOptions()     //============================== AFP 09-21-22  All new
+  Parameter list:
+    void
+
+  Return value
+*****/
+int IQOptions()     //============================== AFP 10-21-22  All new
 {
-  const char *IQOptions[] = {"Volume", "Rec Gain Cal", "Rec Phase Cal", "Xmit Gain Cal", "Xmit Phase Cal", "Freq Cal"};
-  IQChoice = SubmenuSelect(IQOptions, 6, 0);
+  const char *IQOptions[] = {"Volume", "Rec Gain Cal", "Rec Phase Cal", "Xmit Gain Cal", "Xmit Phase Cal", "Freq Cal", "SSB PA Cal", "CW PA Cal",}; //AFP 10-21-22
+  IQChoice = SubmenuSelect(IQOptions, 8, 0); //AFP 10-21-22
   return IQChoice;
 }
 /*****
@@ -319,10 +330,10 @@ int EqualizerXmtOptions()
       xmitEQFlag = OFF;
       break;
     case 2:
-  ProcessEqualizerChoices(EEPROMData.equalizerXmt, (char *) "Transmit Equalizer");
-  EEPROMWrite();
-  RedrawDisplayScreen();
-  case 3:
+      ProcessEqualizerChoices(EEPROMData.equalizerXmt, (char *) "Transmit Equalizer");
+      EEPROMWrite();
+      RedrawDisplayScreen();
+    case 3:
       break;
   }
   return 0;
@@ -379,14 +390,22 @@ int RFOptions()
   rfSet = SubmenuSelect(rfOptions, 3, rfSet);
 
   switch (rfSet) {
-    case 0:                                 // Power
-      // Argument:  min  max  start,                 increment    prompt
+    case 0:                                 // AFP 10-21-22
       transmitPowerLevel = (float)GetEncoderValue(1,   20,  transmitPowerLevel, 1, (char *) "Power: ");
-      powerOut = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * .015; // Needs to be a calibration variable
-      EEPROMData.powerLevel = transmitPowerLevel;
-      EEPROMData.powerOut   = powerOut;
-      EEPROMWrite();
-      returnValue = transmitPowerLevel;
+      if (xmtMode == CW_MODE) {  //AFP 10-13-22
+        powerOutCW = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor; //  afp 10-21-22
+            EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-21-22
+      EEPROMData.powerOutCW   = powerOutCW;//AFP 10-21-22
+      EEPROMWrite();//AFP 10-21-22
+      } else {//AFP 10-13-22
+        if (xmtMode == SSB_MODE) {
+          powerOutSSB = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) *  SSBPowerCalibrationFactor;   // afp 10-21-22
+        }
+      }
+      //EEPROMData.powerLevel = transmitPowerLevel; //AFP 10-13-22
+      //EEPROMData.powerOutSSB   = powerOutSSB;//AFP 10-21-22
+      //EEPROMWrite();//AFP 10-21-22
+      // returnValue = transmitPowerLevel;//AFP 10-21-22
       BandInformation();
       break;
 
@@ -481,11 +500,12 @@ int VFOSelect()
 
   choice = SubmenuSelect(VFOOptions, 4 , 0);
   MyDelay(10);
-
+  NCOFreq = 0L;
   switch (choice) {
     case VFO_A:                                     // VFO A
       centerFreq = TxRxFreq = currentFreqA;
       activeVFO = VFO_A;
+      currentBand = currentBandA;
       tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);      // Erase split message
       splitOn = 0;
       break;
@@ -493,6 +513,7 @@ int VFOSelect()
     case VFO_B:                                     // VFO B
       centerFreq = TxRxFreq = currentFreqB;
       activeVFO = VFO_B;
+      currentBand = currentBandB;
       tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);      // Erase split message
       splitOn = 0;
       break;
@@ -506,7 +527,6 @@ int VFOSelect()
       return activeVFO;
       break;
   }
-
   bands[currentBand].freq = TxRxFreq;
   SetFreq();
   RedrawDisplayScreen();

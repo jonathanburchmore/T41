@@ -51,12 +51,13 @@ void FilterSetSSB()
     ControlFilterF();
     Menu2 = MENU_F_LO_CUT;      // set Menu2 to MENU_F_LO_CUT
     FilterBandwidth();
-    SetFreq();
+//    centerTuneFlag = 1; //AFP 10-03-22
+    //SetFreq();               //  AFP 10-04-22
     ShowFrequency();
   }
   notchPosOld = filter_pos;
 
-} 
+}
 
 
 /*****
@@ -68,19 +69,19 @@ void FilterSetSSB()
 *****/
 void EncoderCenterTune()
 {
-  long tuneChange      = 0L;
-  long old_freq;
-  long newFreq;
-
+  long tuneChange = 0L;
+//  long oldFreq    = centerFreq;
+  
   unsigned char result  = tuneEncoder.process();   // Read the encoder
 
   if (result == 0)                                // Nothing read
     return;
 
+  centerTuneFlag = 1; //AFP 10-03-22
+
   if (T41State == CW_XMIT && decoderFlag == DECODE_ON) {        // No reason to reset if we're not doing decoded CW AFP 09-27-22
     ResetHistograms();
   }
-  old_freq = centerFreq;    //AFP 09-27-22
 
   switch (result) {
     case DIR_CW:                                  // Turned it clockwise, 16
@@ -91,23 +92,27 @@ void EncoderCenterTune()
       tuneChange = -1L;
       break;
   }
-  newFreq = (long)freqIncrement * tuneChange;
+//  newFreq = (long)freqIncrement * tuneChange;
 
-  centerFreq += newFreq;                    // tune the master vfo and check boundaries
-  if (centerFreq > F_MAX) {
-    centerFreq = F_MAX;
-  } else if (centerFreq < F_MIN) {
-    centerFreq = F_MIN;
-  }
-  if (centerFreq != old_freq) {           // If the frequency has changed...
-    
-    TxRxFreq = centerFreq + NCO_Freq;
-    SetFreq();
-    NCO_Freq = 0L;                        // Reset the fine tune indicator  
-    DrawBandWidthIndicatorBar();
-    CenterFilterOverlay();
-    ShowFrequency();
-  }
+  centerFreq += ((long)freqIncrement * tuneChange);                    // tune the master vfo
+
+
+//  if (centerFreq != oldFreq) {           // If the frequency has changed...
+//=== AFP 10-19-22
+  TxRxFreq = centerFreq + NCOFreq;
+  DrawBandWidthIndicatorBar(); // AFP 10-20-22
+  //FilterOverlay(); // AFP 10-20-22
+  ShowFrequency();
+  BandInformation();
+//=== AFP 10-19-22
+/*
+  TxRxFreq = centerFreq + NCOFreq;
+  DrawBandWidthIndicatorBar();
+  BandInformation();
+  FilterOverlay();
+  ShowFrequency();
+*/  
+//  }
 }
 
 /*****
@@ -119,7 +124,7 @@ void EncoderCenterTune()
   Return value;
     int               0 means encoder didn't move; otherwise it moved
 *****/
-void EncoderVolume()      //============================== AFP 09-21-22  Begin new
+void EncoderVolume()      //============================== AFP 10-21-22  Begin new
 {
   char result;
   int32_t increment = 5000L;
@@ -162,13 +167,20 @@ void EncoderVolume()      //============================== AFP 09-21-22  Begin n
     case 3:     // Xmit Gain Calibrate
       IQ_Xamplitude_correction_factor += adjustVolEncoder * 0.001;
       break;
-      case 4:     // Xmit Phase Calibrate
+    case 4:     // Xmit Phase Calibrate
       IQ_Xphase_correction_factor += adjustVolEncoder * 0.001;
       break;
-      case 5:     // Frequency Calibrate
+    case 5:     // Frequency Calibrate
       frequencyCorrectionFactor += adjustVolEncoder * increment;
       break;
-
+      //=========== AFP 10-21-22 ==========
+    case 6:     // SSB Power Calibrate
+      SSBPowerCalibrationFactor += adjustVolEncoder * 0.001;
+      break;
+    case 7:     // CW Power Calibrate
+      CWPowerCalibrationFactor += adjustVolEncoder * 0.001;
+      break;
+//=========== AFP 10-21-22 =========
   } // End switch(IQChoice)
 
 }     //============================== AFP 09-21-22  End new
@@ -207,12 +219,12 @@ int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, c
       else if (currentValue > maxValue)
         currentValue = maxValue;
 
-        tft.fillRect(465, 0, 65, CHAR_HEIGHT, RA8875_MAGENTA);
-        tft.setCursor(470, 1);
-        tft.print(currentValue);
-        filterEncoderMove = 0;
+      tft.fillRect(465, 0, 65, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(470, 1);
+      tft.print(currentValue);
+      filterEncoderMove = 0;
     }
-    
+
     val = ReadSelectedPushButton();                     // Read the ladder value
     //MyDelay(100L); //AFP 09-22-22
     if (val != -1  && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
@@ -264,7 +276,6 @@ int SetWPM()
 
     val = ReadSelectedPushButton();                                  // Read pin that controls all switches
     val = ProcessButtonPress(val);
-    //MyDelay(150L);
     if (val == MENU_OPTION_SELECT) {                             // Make a choice??
       currentWPM = lastWPM;
       EEPROMData.wordsPerMinute = currentWPM;
@@ -280,7 +291,7 @@ int SetWPM()
 
 /*****
   Purpose: Determines how long the transmit relay remains on after last CW atom is sent.
-  
+
   Parameter list:
     void
 
@@ -353,16 +364,20 @@ void EncoderFineTune()
       fineTuneEncoderMove = -1L;
     }
   }
-  NCO_Freq += stepFT * fineTuneEncoderMove;
-
+  NCOFreq += stepFT * fineTuneEncoderMove;
+//  centerTuneFlag = 1; //AFP 10-12-22
   if (activeVFO == VFO_A) {
-    currentFreqA = centerFreq + NCO_Freq;
+    currentFreqA = centerFreq + NCOFreq;   //AFP 10-05-22
   } else {
-    currentFreqB = centerFreq + NCO_Freq; 
+    currentFreqB = centerFreq + NCOFreq;  //AFP 10-05-22
   }
   fineTuneEncoderMove = 0L;
 }
 FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
+
+
+
+
 void EncoderFilter()
 {
   char result;
