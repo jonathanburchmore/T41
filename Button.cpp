@@ -1,23 +1,65 @@
+
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
 
 /*****
-  Purpose: Error message if Select button pressed with no Menu active
+  Purpose: Determine which UI button was pressed
 
   Parameter list:
-    void
+    int valPin            the ADC value from analogRead()
 
   Return value;
-    void
+    int                   -1 if not valid push button, index of push button if valid
 *****/
-void NoActiveMenu()
+int ProcessButtonPress(int valPin)
 {
-    tft.setFontScale( (enum RA8875tsize) 1);    
-    tft.setTextColor(RA8875_RED);
-    tft.setCursor(10, 0);
-    tft.print("No menu selected");  
+  int switchIndex;
+
+  if (valPin == BOGUS_PIN_READ) {                  // Not valid press
+    return -1;
+  }
+  if (valPin == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {
+    NoActiveMenu();
+    return -1;
+  }
+  for (switchIndex = 0; switchIndex < NUMBER_OF_SWITCHES; switchIndex++)
+  {
+    if (abs(valPin - EEPROMData.switchValues[switchIndex]) < WIGGLE_ROOM)    // ...because ADC does return exact values every time
+    {     
+      return switchIndex;
+    }
+  }
+  return -1;                                              // Really should never do this
 }
+
+/*****
+  Purpose: Check for UI button press. If pressed, return the ADC value
+
+  Parameter list:
+    int vsl               the value from analogRead in loop()\
+
+  Return value;
+    int                   -1 if not valid push button, ADC value if valid
+*****/
+int ReadSelectedPushButton()
+{
+  minPinRead        = 0;
+  int buttonReadOld = 1023;
+  
+  while (abs(minPinRead - buttonReadOld) > 3) {                   // do averaging to smooth out the button response
+    minPinRead = analogRead(BUSY_ANALOG_PIN);
+    buttonRead = .1 * minPinRead + (1 - .1) * buttonReadOld;      // See expected values in next function.
+    buttonReadOld = buttonRead;
+  }
+  if (buttonRead > 1023 - WIGGLE_ROOM) {
+    return -1;
+  }
+  minPinRead = buttonRead;
+  MyDelay(100L);
+  return minPinRead;  
+}
+
 /*****
   Purpose: Function is designed to route program control to the proper execution point in response to
            a button press.
@@ -30,85 +72,98 @@ void NoActiveMenu()
 *****/
 void ExecuteButtonPress(int val)
 {
-  if (val == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {          // Pressed Select with no primary/secondary menu selected
+  if (val == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {          // Pressed Select with no primary/secondary menu selected  
     NoActiveMenu();
     return;
   } else {
     menuStatus = PRIMARY_MENU_ACTIVE;
   }
+
   switch (val) {
     case MENU_OPTION_SELECT:                                     // 0
       /*                                    Useful comment in understanding how menues align:
+const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",      "NR Set",   "IQ Manual",
+                               "EQ Rec Set", "EQ Xmt Set",   "Mic Comp", "Calibrate Freq", "Noise Floor",
+                               "RF Set",     "VFO Select",   "EEPROM",
+                              };
 
-          const char *topMenus[]    = { "CW",  "Spectrum Set", "AGC", "NR Set",
-                                        "IQ Manual", "EQ Rec Set", "EQ Xmt Set", "Mic Comp", "Freq Cal",
-                                        "NB Set", "RF Set", "Audio Post Proc", "VFO Select", "EEPROM"
-                                      };
-         int (*functionPtr[])()     = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions,
-                                         &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &FrequencyOptions,
-                                         &NBOptions, &RFOptions, &PostProcessorAudio, &VFOSelect, &EEPROMOptions
-                                         };
-      */
+int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions, &IQOptions,
+                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &CalibrateFrequency, &ButtonSetNoiseFloor,
+                               &RFOptions, &VFOSelect, &EEPROMOptions
+                              };      */
 
-      if (secondaryMenuIndex == -1) {                             // Doing primary menu
-        secondaryMenuChoiceMade = functionPtr[mainMenuIndex]();   // These are processed in MenuProcessing.cpp
+      if (menuStatus == PRIMARY_MENU_ACTIVE) {                             // Doing primary menu
+        ErasePrimaryMenu();
+        secondaryMenuChoiceMade = functionPtr[mainMenuIndex]();            // These are processed in MenuProcessing.cpp
         menuStatus = SECONDARY_MENU_ACTIVE;
         secondaryMenuIndex = -1;                                  // Reset secondary menu
+      } else {
+        if (menuStatus == SECONDARY_MENU_ACTIVE) {                         // Doing primary menu
+          menuStatus = PRIMARY_MENU_ACTIVE;
+          mainMenuIndex = 0;
+        }
       }
       EraseMenus();
       break;
 
     case MAIN_MENU_UP:                                            // 1
-      ButtonMenuIncrease();
-      if (secondaryMenuIndex == -1) {           // Doing primary menu
+      ButtonMenuIncrease();                                       // This makes sure the increment does go outta range
+      if (menuStatus != NO_MENUS_ACTIVE) {                        // Doing primary menu
         ShowMenu(&topMenus[mainMenuIndex], PRIMARY_MENU);
       }
       break;
 
-    case BAND_UP:
-      ShowSpectrum();                                           //Now calls ProcessIQData and Encoders calls
+    case BAND_UP:                                                 // 2 Now calls ProcessIQData and Encoders calls
+      EraseMenus();
       digitalWrite(bandswitchPins[currentBand], LOW);
       ButtonBandIncrease();
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
-      NCO_FREQ = 0L;
+      NCO_Freq = 0L;
       CenterFilterOverlay();
+      SetFreq(); 
+      ShowSpectrum(); 
       break;
 
     case ZOOM:                                                    // 3
+      menuStatus = PRIMARY_MENU_ACTIVE;
+      EraseMenus();
       ButtonZoom();
       break;
 
     case MAIN_MENU_DN:                                            // 4
       ButtonMenuDecrease();
-      if (secondaryMenuIndex == -1) {           // Doing primary menu
+      if (menuStatus != NO_MENUS_ACTIVE) {                        // Doing primary menu
         ShowMenu(&topMenus[mainMenuIndex], PRIMARY_MENU);
       }
       break;
 
     case BAND_DN:                                                 // 5
-      //filterWidth = FILTER_WIDTH;
+      EraseMenus();
       ShowSpectrum();                                           //Now calls ProcessIQData and Encoders calls
       digitalWrite(bandswitchPins[currentBand], LOW);
       ButtonBandDecrease();
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
-      NCO_FREQ = 0L;
-      CenterFilterOverlay();
+      NCO_Freq = 0L;
+      CenterFilterOverlay();  
       break;
 
     case FILTER:                                                  // 6
+      EraseMenus();
       ButtonFilter();
       break;
 
     case DEMODULATION:                                            // 7
+      EraseMenus();
       ButtonDemodMode();
       break;
 
-    case SET_MODE:                                                //  8
+    case SET_MODE:                                                // 8
       ButtonMode();
+      ShowSpectrumdBScale();
       break;
-
+      
     case NOISE_REDUCTION:                                         // 9
       ButtonNR();
       break;
@@ -117,33 +172,42 @@ void ExecuteButtonPress(int val)
       ButtonNotchFilter();
       UpdateNotchField();
       break;
-    /*
-        case DISPLAY_OPTIONS:                                         //  11
-          ButtonDisplayOptions();
-          break;
-    */
-    case INCREMENT:                                               // 12
-      ButtonFreqIncrement();
-      break;
 
-    case NOISE_FLOOR:                                             // 13
+    case NOISE_FLOOR:                                             // 11
       ButtonSetNoiseFloor();
       break;
 
-    case UNUSED_1:                                                // 14
-      if (stepFT == 50) {                                                       // AFP 06-22-22 Fine tune step toggle
+    case FINE_TUNE_INCREMENT:                                     // 12
+      if (stepFT == 50) {                                          
         stepFT = 500;
-      }
-      else {
-        if (stepFT == 500) {
-          stepFT = 50;
-        }
+      } else {
+        stepFT = 50;
       }
       UpdateIncrementField();
+      break;    
+
+    case DECODER_TOGGLE:                                          // 13
+      if (decoderFlag == DECODE_OFF) {
+        decoderFlag = DECODE_ON; 
+               
+      } else {
+        decoderFlag = DECODE_OFF;
+      }
+      UpdateDecoderField();
       break;
 
-    case UNUSED_2:
-      ResetHistograms();     // JJP 1/28/22
+    case MAIN_TUNE_INCREMENT:                                     // 14
+      ButtonFreqIncrement();
+      break;
+
+    case UNUSED_1:                                                // 15
+      break;
+
+    case UNUSED_2:                                                // 16
+      break;
+
+    case CALIBRATE_FREQUENCY:                                                // 17
+      Xmit_IQ_Cal();  //AFP 09-21-22
       break;
 
     default:
@@ -151,109 +215,6 @@ void ExecuteButtonPress(int val)
   }
 }
 
-/*****
-  Purpose: To process a band decrease button push
-
-  Parameter list:
-    void
-
-  Return value:
-    void
-*****/
-void ButtonDecrease()
-{
-  if (secondaryMenuIndex == -1) {                   // We're working on main menu
-    mainMenuIndex--;
-    if (mainMenuIndex < 0) {                        // At last menu option, so...
-      mainMenuIndex = TOP_MENU_COUNT - 1;           // ...wrap around to first menu option
-    }
-  } else {
-    secondaryMenuIndex--;
-    if (secondaryMenuIndex < 0) {                   // Same here...
-      secondaryMenuIndex = subMenuMaxOptions - 1;
-    }
-  }
-}
-
-/*****
-  Purpose: To process a band decrease button push
-
-  Parameter list:
-    void
-
-  Return value:
-    void
-*****/
-void ButtonIncrease()
-{
-  if (secondaryMenuIndex == -1) {                   // We're working on main menu
-    mainMenuIndex++;
-    if (mainMenuIndex == TOP_MENU_COUNT) {          // At last menu option, so...
-      mainMenuIndex = 0;                            // ...wrap around to first menu option
-    }
-  } else {
-    secondaryMenuIndex++;
-    if (secondaryMenuIndex == subMenuMaxOptions) {  // Same here...
-      secondaryMenuIndex = 0;
-    }
-  }
-}
-
-/*****
-  Purpose: To process a band decrease button push
-
-  Parameter list:
-    void
-
-  Return value:
-    void
-*****/
-void BandDecrease()
-{
-  currentBand--;
-  if (currentBand < FIRST_BAND) {
-    currentBand = LAST_BAND; // cycle thru radio bands
-  }
-  if (currentBand > LAST_BAND)  {
-    currentBand = FIRST_BAND;
-  }
-  AudioNoInterrupts();
-  freq_flag[1] = 0;
-  SetBand();
-  ControlFilterF();
-  FilterBandwidth();
-  DrawSMeterContainer();
-  SetFreq();
-  AGCPrep();
-  AudioInterrupts();
-}
-
-/*****
-  Purpose: To process a band decrease button push
-
-  Parameter list:
-    void
-
-  Return value:
-    void
-*****/
-void BandIncrease()
-{
-  AudioNoInterrupts();
-  currentBand++;
-  if (currentBand > LAST_BAND) {
-    currentBand = FIRST_BAND; // cycle thru radio bands
-  }
-  freq_flag[1] = 0;
-  SetBand();
-  UpdateIncrementField();
-  FilterBandwidth();
-  DrawSMeterContainer();
-  AGCPrep();
-  SetFreq();
-  MyDelay(1L);
-  AudioInterrupts();
-}
 
 /*****
   Purpose: To process a band decrease button push
@@ -273,57 +234,24 @@ void ButtonFreqIncrement()
   UpdateIncrementField();
 }
 
-/*****
-  Purpose: Check for UI button press. If pressed, return the ADC value
-
-  Parameter list:
-    int vsl               the value from analogRead in loop()\
-
-  Return value;
-    int                   -1 if not valid push button, ADC value if valid
-*****/
-int ReadSelectedPushButton()
-{
-
-  minPinRead = analogRead(BUSY_ANALOG_PIN);
- 
-  if (minPinRead > NOTHING_TO_SEE_HERE) {          // Value too high; not valid choice
-    return -1;
-  }
-  if (menuStatus == NO_MENUS_ACTIVE) {
-
-  }
-  return minPinRead;
-}
 
 /*****
-  Purpose: Determine which UI button was pressed
+  Purpose: Error message if Select button pressed with no Menu active
 
   Parameter list:
-    int valPin            the ADC value from analogRead()
+    void
 
   Return value;
-    int                   -1 if not valid push button, index of push button if valid
+    void
 *****/
-int ProcessButtonPress(int valPin)
+void NoActiveMenu()
 {
-  int switchIndex;
-
-  if (valPin == BOGUS_PIN_READ) {                  // Not valid press
-    return -1;
-  }
-
-  if (valPin == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {
-    NoActiveMenu();
-    return -1;
-  }
-  for (switchIndex = 0; switchIndex < TOP_MENU_COUNT; switchIndex++)
-  {
-    if (abs(valPin - EEPROMData.switchValues[switchIndex]) < WIGGLE_ROOM)    // ...because ADC does return exact values every time
-    {
-      MyDelay(100L);
-      return switchIndex;
-    }
-  }
-  return -1;                                              // Really should never do this
+  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setTextColor(RA8875_RED);
+  tft.setCursor(10, 0);
+  tft.print("No menu selected");
+  
+  menuStatus         = NO_MENUS_ACTIVE;
+  mainMenuIndex      = 0;
+  secondaryMenuIndex = 0;
 }

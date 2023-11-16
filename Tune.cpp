@@ -14,32 +14,48 @@
 
   CAUTION: SI5351_FREQ_MULT is set in the si5253.h header file and is 100UL
 *****/
-void SetFreq() {
+void SetFreq() {  //AFP 09-22-22
 
-  // Changes for Bobs Octave Filters:  18 March 2018  W7PUA <<<<<<
-  // http://www.janbob.com/electron/FilterBP1/FiltBP1.html
   // NEVER USE AUDIONOINTERRUPTS HERE: that introduces annoying clicking noise with every frequency change
   // SI5351_FREQ_MULT is 100ULL, MASTER_CLK_MULT is 4;
 
-  hilfsf = ((centerFreq * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT * 1000000000;        // AFP 12-30-21
 
-  if (IQ_RecCalFlag == 0) {                                                                                     //IQ receive Test flag
-    hilfsfEx = ((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) * MASTER_CLK_MULT * 1000000000;                    //Xmit Clock CLK1
+  if (xmtMode == SSB_MODE) {
+    Clk2SetFreq = (((TxRxFreq) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  // AFP 09-27-22
+    Clk1SetFreq = (TxRxFreq  * SI5351_FREQ_MULT) * MASTER_CLK_MULT;                                  // AFP 09-27-22
   } else {
-    if (IQ_RecCalFlag == 1) {
-      hilfsfEx = ((7180000 * SI5351_FREQ_MULT)) * 1 * 1000000000;                                               //create test tone at 7.180MHZ for IQ calibration
+    // =========================  CW Xmit 
+    if (xmtMode == CW_MODE ) {
+      if (bands[currentBand].mode == DEMOD_LSB) {
+        Clk2SetFreq = (((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ; // AFP 09-27-22
+        Clk1SetFreq = (((TxRxFreq - CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 09-27-22;
+      }
+      else {
+        if (bands[currentBand].mode == DEMOD_USB) {
+          Clk2SetFreq = (((TxRxFreq + CWFreqShift) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;// AFP 09-27-22
+          Clk1SetFreq = (((TxRxFreq - CWFreqShift ) * SI5351_FREQ_MULT) ) * MASTER_CLK_MULT;  // AFP 10-01-22;
+       }
+      }
     }
   }
+  // =========================  End CW Xmit 
 
-  hilfsf = hilfsf / calibration_factor;
-  hilfsfEx = hilfsfEx / calibration_factor;
-
-  si5351.set_freq(hilfsf, SI5351_CLK2);                                                                         // this is actually SI5351_CLK2
-  si5351.set_freq(hilfsfEx, SI5351_CLK1);                                                                       // this is actually SI5351_CLK1
-
-//  DrawBandWidthIndicatorBar();
+  if ((digitalRead(PTT) == LOW ) && (currentBand == BAND_10M )) {
+    Clk2SetFreq = (((7000000) * SI5351_FREQ_MULT) + IFFreq * SI5351_FREQ_MULT) * MASTER_CLK_MULT ;  //AFP 08-22-22
+  }
+//=====================  AFP 10-03-22 =================
+  si5351.set_freq(Clk2SetFreq, SI5351_CLK2);           
+  // =====================  AFP 10-02-22 ==================
+  if (xrState == RECEIVE_STATE) {             // Turn CLK1 off during Receive and on for Transmit  AFP 10-02-22
+    si5351.set_freq(0, SI5351_CLK1);         // CLK1 off during receive to prevent birdies
+  }
+  else {
+    if (xrState ==  TRANSMIT_STATE) {
+      si5351.set_freq(Clk1SetFreq, SI5351_CLK1);
+    }
+  }
+//=====================  AFP 10-03-22 =================
   DrawFrequencyBarValue();
-//  CenterFilterOverlay();
 }
 
 /*****
@@ -55,21 +71,15 @@ void SetFreq() {
 void SetFineTuneFrequency()
 {
   if (newCursorPosition != oldCursorPosition) {
-    //DrawBandWidthIndicatorBar();                                      // Did fast tune cursor change? // AFP 03-27-22 Layers
-//    CenterFilterOverlay();                // JJP 7/24/22    
     oldCursorPosition = newCursorPosition;
-    TxRxFreq = centerFreq + NCO_FREQ;
+    TxRxFreq = centerFreq + NCO_Freq;
     currentFreqA = TxRxFreq;
     ShowSpectrum();
   }
-  if (xmtMode == CW_MODE && decoderFlag == true) { // No reason to reset if we're not doing decoded CW
+  if (T41State == CW_RECEIVE && decoderFlag == DECODE_ON) { // No reason to reset if we're not doing decoded CW AFP 09-27-22
     ResetHistograms();
   }
-  if (displayMode == NO_DISPLAY || displayMode == WATERFALL_ONLY) {   // Don't show a Spectrum
-    return;
-  }
   tft.writeTo(L1);                                                    //AFP 03-27-22 Layers
-
 }
 
 /*****
@@ -82,8 +92,6 @@ void SetFineTuneFrequency()
 *****/
 void CenterFastTune()
 {
-  //oldCursorPosition = newCursorPosition = 256;    // AFP 12-10-21
-  //  fineTuneEncoder.write(newCursorPosition);
   tft.drawFastVLine(oldCursorPosition, SPECTRUM_TOP_Y + 20, SPECTRUM_HEIGHT - 27, RA8875_BLACK);
   tft.drawFastVLine(newCursorPosition , SPECTRUM_TOP_Y + 20, SPECTRUM_HEIGHT - 27, RA8875_RED);
 }
@@ -105,13 +113,9 @@ int DoSplitVFO()
   int val;
   long chunk = SPLIT_INCREMENT;
   long splitOffset;
-  
-  //  TxRxFreq = currentFreqB;
-  //  activeVFO = VFO_B;
 
-                // 537 - 10 = 527             292 - 2 = 290
   tft.drawRect(INFORMATION_WINDOW_X - 10, INFORMATION_WINDOW_Y - 2, 260, 200, RA8875_MAGENTA);
-  tft.fillRect(INFORMATION_WINDOW_X - 8, INFORMATION_WINDOW_Y, 250, 170, RA8875_BLACK);  // Clear volume field
+  tft.fillRect(INFORMATION_WINDOW_X - 8, INFORMATION_WINDOW_Y, 250, 185, RA8875_BLACK);  // Clear volume field
   tft.setFontScale( (enum RA8875tsize) 1);
   tft.setCursor(INFORMATION_WINDOW_X + 10, INFORMATION_WINDOW_Y + 5);
   tft.print("xmit offset: ");
@@ -136,7 +140,7 @@ int DoSplitVFO()
     val = ProcessButtonPress(val);
     MyDelay(150L);
     if (val == MENU_OPTION_SELECT) {                              // Make a choice??
-      hilfsfEx += splitOffset;                                    // New transmit frequency
+      Clk1SetFreq += splitOffset;                                    // New transmit frequency // AFP 09-27-22
       ShowDefaultSettings();
       filterEncoderMove = 0L;
       break;
@@ -156,13 +160,12 @@ int DoSplitVFO()
   tft.setCursor(FREQUENCY_X, FREQUENCY_Y + 6);
   tft.print(freqBuffer);                                          // Show VFO_A
 
-  tft.useLayers(1);                 //mainly used to turn on layers! //AFP 03-27-22 Layers
+  tft.useLayers(1);                 //mainly used to turn on layers!
   tft.layerEffect(OR);
   tft.writeTo(L2);
   tft.clearMemory();
   tft.writeTo(L1);
 
-//  tft.setFontScale( (enum RA8875tsize) 0);
   tft.setFont(&FreeMono9pt7b);
   tft.setTextColor(RA8875_RED);
   tft.setCursor(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y + 6);

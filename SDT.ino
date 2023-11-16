@@ -13,6 +13,53 @@
   Any and all other commercial uses, written or implied, are forbidden without written permission from
   Dr. Jack Purdum, W8TEE, and Al Peter, AC8GY.
 
+  V026 Oct, 03, 2022  Jack Purdum (W8TEE) and Al Peter (AC8GY):
+    Activated: Receiver EQ
+    Activated; Mic compression, but not yet tested
+    Simplified: Refactored the band up-/down code
+    Added: Menu CW option to set sidetone volume
+    Fixed: Activated transmit qualizer
+    Fixed: Reset fine tune indicator to center line when main tuning changed
+    Fixed: AGC attach speed
+    Fixed: Band up/down bugs plus several menu prompts and formatting
+    Fixed: 80M upper limit was wrong.
+    Fixed: Switching between bands now preserves the last frequency of the VFO before the switch so you
+    Added: Last used frequency by band and by VFO saved in EEPROM if an EEPROM --> Save is done before poer off
+    Fixed: Could lock up after a mode push button change
+    Added: Display noise filter currently in use
+    Added: EEPROM option to save up to 10 "favorite frequencies
+    Fixed: spectrum display scale disappeared after band change
+    Added: Sidetone Volume and Transmit Delay variables added to CWOptions choices
+    Fixed: When calibrating the switch matrix, some of the prompts overwrote data on the display
+    Fixed: Spectrum scale disappeared after the mode was changed
+    Added: When changing bands, saves the current frequency before band change. Returning to that band recalls this last frequency
+    Fixed: Changing Noise Filter erased part of Zoom message in Information Window when display updated.
+    Fixed: Changing VFO's did not change the x axis for frequency
+    Fixed: Press Select with no menu selected followed by a menu decrease locked up system
+    Added: Small rectangle below the Seconds field to show the Xmt/Rec state of the T41
+    Removed: Menu options: Display, Audio post processor, Sidetone. They are 0no longer used.
+    Fixed: CW-->Paddle Flip prompt was overwritten
+    Moved "CW Fine Tune" message from Audio plot to bottom of Info Window to minimize refresh jitter
+    Fixed: Some Noise Reduction filter info was not written to EEPROM and display was awkward and didn't erase correctly
+    Changed: Noise floor changed to the number of pixels above the spectrum X axis to plot the noise floor.
+    Fixed: The CalibrateFrequency() is now functional. I'll be writing up how to use it with and without a signal generator.
+    Fixed: Overwrote Zoom field on setting the Noise filter. Same for Compress field when writing Zoom.
+    Fixed: Changing Noise Filter erased part of Zoom message in Information Window when display updated.
+    Fixed: Changing VFO's did not change the x axis for frequency
+    Fixed: Press Select with no menu selected followed by a menu decrease locked up system
+    Added: Small rectangle below the Seconds field to show the Xmt/Rec state of the T41
+    Removed: Menu options: Display, Audio post processor, Sidetone. They are 0no longer used.
+    Fixed: CW-->Paddle Flip prompt was overwritten
+    Moved "CW Fine Tune" message from Audio plot to bottom of Info Window to minimize refresh jitter
+    Fixed: Some Noise Reduction filter info was not written to EEPROM and display was awkward and didn't erase correctly
+    Changed: Noise floor changed to the number of pixels above the spectrum X axis to plot the noise floor.
+    Fixed: The CalibrateFrequency() is now functional. I'll be writing up how to use it with and without a signal generator.
+    Fixed: Overwrote Zoom field on setting the Noise filter. Same for Compress field when writing Zoom.
+  Memory Usage on Teensy 4.1:
+  FLASH: code:188276, data:98016, headers:8612   free for files:7831560
+   RAM1: variables:200832, code:185000, padding:11608   free for local variables:126848
+   RAM2: variables:323872  free for malloc/new:200416
+
   V015 Aug, 06, 2022  Jack Purdum (W8TEE): Made the following changes (most "runaway" problems caused by moving to ISR's):
     Fixed: Changed encoders from polling to interrupt-driven
     Fixed: Spectrum set now saved to EEPROM
@@ -37,25 +84,29 @@
     Not fixed yet: Unresponsive S Meter
     Not fixed yet: IQ Manual setting
     Not fixed yet: Other undiscovered bugs...and there will be some!
+    Removed dead code, unused variables, etc. Also added Split VFO code
+    Removed non-macro Serial.print() statements
   FLASH: code:182384, data:95848, headers:8484   free for files:7839748
    RAM1: variables:165280, code:179112, padding:17496   free for local variables:162400
    RAM2: variables:425824  free for malloc/new:98464
-
-  V012 Jul, 11, 2022  Jack Purdum (W8TEE): Removed dead code, unused variables, etc. Also added Split VFO code
-                       and removed non-macro Serial.print() statements
-  FLASH: code:181840, data:96824, headers:9076   free for files:7838724
-   RAM1: variables:166304, code:178568, padding:18040   free for local variables:161376
-   RAM2: variables:425824  free for malloc/new:98464
-
-  V011 June, 08, 2022  Jack Purdum (W8TEE): Changed all encoders from polling to interrupt.
-    FLASH: code:192720, data:82940, headers:9008   free for files:7841796
-      RAM1: variables:166592, code:189448, padding:7160   free for local variables:161088
-      RAM2: variables:425824  free for malloc/new:98464
 
   V010 June, 03, 2022  Jack Purdum (W8TEE): CW sending section still incomplete
     FLASH: code:193424, data:82860, headers:8384   free for files:7841796
       RAM1: variables:162528, code:190152, padding:6456   free for local variables:165152
       RAM2: variables:429920  free for malloc/new:94368
+  V025 9-30-22 Al Peter AC8GY : 1. RFGain is hooked up – set gain from -60dB to +10dB
+      2.  Optimized the CW straight key lags
+      3.  Fixed the Decoder on/off so it is is only on when the front button is pushed to turn it on
+      4.  Set up the filter band display so it works correctly at each Zoom level
+      5.  Re-organized the T41 States for SSB Receive, SSB Transmit, CW Receive, and CW transmit
+      6.  Fixed the interaction between Center tune and Fine tune so hey work properly
+      7.  Fixed up fine Tune to work with the spectrum Zoom
+      8.  Got rid of a bunch of dead code – display spectrum and waterfall that we don’t use.
+      9.  Power Setting calibration in Watts
+     10. IQ for Receive and Xmit and frequency cal all combined into one submenu.
+     11. Exciter IQ calibration Partly done
+     12. Receive EQ connected with menu options
+
 *********************************************************************************************/
 
 // setup() and loop() at the bottom of this file
@@ -63,60 +114,96 @@
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
+const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",    "Calibrate",
+                               "EQ Rec Set", "EQ Xmt Set",   "Mic Comp",  "Noise Floor",
+                               "RF Set",     "VFO Select",   "EEPROM",
+                              };
+int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions,  &IQOptions,
+                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions,  &ButtonSetNoiseFloor,
+                               &RFOptions, &VFOSelect, &EEPROMOptions
+                              };
+const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
+                               "Zoom",         "Menu Dn",  "Band Dn",
+                               "Filter",       "DeMod",    "Mode",
+                               "NR",           "Notch",    "Noise Floor",
+                               "Fine Tune",    "Decoder",  "Tune Increment",
+                               "User 1",       "User 2",   "User 3"
+                              };
 
-#define TEMPMON_ROOMTEMP 25.0f
-//const uint32_t FFT_LENGTH                 = 512;
+
 uint32_t FFT_length                       = FFT_LENGTH;
 
 extern "C"
 uint32_t set_arm_clock(uint32_t frequency);
+
 // lowering this from 600MHz to 200MHz makes power consumption less
 uint32_t T4_CPU_FREQUENCY  =  500000000UL;                             //AFP 2-10-21
-//uint32_t T4_CPU_FREQUENCY  =  300000000UL;
+//uint32_t T4_CPU_FREQUENCY  =  400000000UL;
 
 //======================================== Global object definitions ==================================================
-
+// ===========================  AFP 08-22-22
 AudioInputI2SQuad     i2s_quadIn;
 AudioOutputI2SQuad    i2s_quadOut;
 
 AudioMixer4           recMix_3;         // JJP
 
-AudioMixer4           modeSelectOutL;
-AudioMixer4           modeSelectOutR;
-AudioMixer4           modeSelectOutExL;
-AudioMixer4           modeSelectOutExR;
+AudioMixer4           modeSelectInR; // AFP 09-01-22
+AudioMixer4           modeSelectInL;// AFP 09-01-22
+AudioMixer4           modeSelectInExR;// AFP 09-01-22
+AudioMixer4           modeSelectInExL;// AFP 09-01-22
 
-AudioMixer4           modeSelectInR;
-AudioMixer4           modeSelectInL;
+AudioMixer4           modeSelectOutL;// AFP 09-01-22
+AudioMixer4           modeSelectOutR;// AFP 09-01-22
+AudioMixer4           modeSelectOutExL;// AFP 09-01-22
+AudioMixer4           modeSelectOutExR;// AFP 09-01-22
+
+//=============== // AFP 09-01-22
+//AudioMixer4           CW_AudioOutR; //AFP 09-01-22
+//AudioMixer4           CW_AudioOutL; //AFP 09-01-22
+
+AudioMixer4           CW_AudioOut;
+
+AudioRecordQueue      Q_in_L;
+AudioRecordQueue      Q_in_R;
+AudioRecordQueue      Q_in_L_Ex;
+AudioRecordQueue      Q_in_R_Ex;
 
 AudioPlayQueue        Q_out_L;
 AudioPlayQueue        Q_out_R;
-AudioRecordQueue      Q_in_L;
-AudioRecordQueue      Q_in_R;
+AudioPlayQueue        Q_out_L_Ex;
+AudioPlayQueue        Q_out_R_Ex;
 
-AudioConnection       patchCord25(i2s_quadIn, 0, modeSelectInL, 0); //Mixer Input 0 = Ex
-AudioConnection       patchCord26(i2s_quadIn, 1, modeSelectInR, 0);
+AudioConnection       patchCord1(i2s_quadIn, 0, modeSelectInExL, 0); //Input Ex
+AudioConnection       patchCord2(i2s_quadIn, 1, modeSelectInExR, 0);
 
-AudioConnection       patchCord21(i2s_quadIn, 2, modeSelectInL, 1); //Mixer Input 1 = Rec
-AudioConnection       patchCord22(i2s_quadIn, 3, modeSelectInR, 1);
+AudioConnection       patchCord3(i2s_quadIn, 2, modeSelectInL, 0); //Input Rec
+AudioConnection       patchCord4(i2s_quadIn, 3, modeSelectInR, 0);
 
-AudioConnection       patchCord23(modeSelectInR, 0, Q_in_R,   0);
-AudioConnection       patchCord24(modeSelectInL, 0, Q_in_L,   0);
+AudioConnection       patchCord5(modeSelectInExR, 0, Q_in_R_Ex, 0); //Ex in Queue
+AudioConnection       patchCord6(modeSelectInExL, 0, Q_in_L_Ex, 0);
 
-AudioConnection       patchCord3(Q_out_L,    0, modeSelectOutL,  0);
-AudioConnection       patchCord4(Q_out_R,    0, modeSelectOutR, 0);
+AudioConnection       patchCord7(modeSelectInR, 0,   Q_in_R, 0);    //Rec in Queue
+AudioConnection       patchCord8(modeSelectInL, 0,   Q_in_L, 0);
 
-AudioConnection       patchCord9(modeSelectOutL,    0, i2s_quadOut, 3);    //AFP12-06-21
-AudioConnection       patchCord10(modeSelectOutR,  0, i2s_quadOut, 2);    //AFP12-06-21
+AudioConnection       patchCord9(Q_out_L_Ex,    0, modeSelectOutExL,  0); //Ex out Queue
+AudioConnection       patchCord10(Q_out_R_Ex,    0, modeSelectOutExR, 0);
 
-AudioConnection       patchCord13(Q_out_L,    0, modeSelectOutExL,  0);
-AudioConnection       patchCord14(Q_out_R,    0, modeSelectOutExR, 0);
+AudioConnection       patchCord11(Q_out_L,       0, modeSelectOutL,  0);   //Rec out Queue
+AudioConnection       patchCord12(Q_out_R,        0, modeSelectOutR, 0);
 
-AudioConnection       patchCord15(modeSelectOutExL,    0, i2s_quadOut, 0);    //AFP12-06-21
-AudioConnection       patchCord16(modeSelectOutExR,  0, i2s_quadOut, 1);    //AFP12-06-21
+AudioConnection       patchCord13(modeSelectOutExL,    0, i2s_quadOut, 0); //Ex out
+AudioConnection       patchCord14(modeSelectOutExR,    0, i2s_quadOut, 1);
+AudioConnection       patchCord15(modeSelectOutL,      0, i2s_quadOut, 2); //Rec out
+AudioConnection       patchCord16(modeSelectOutR,      0, i2s_quadOut, 3);
+
+AudioConnection       patchCord17(Q_out_L_Ex,       0, modeSelectOutL,  1);   //Rec out Queue for sidetone
+AudioConnection       patchCord18(Q_out_R_Ex,       0, modeSelectOutR,  1);
+
+// ================================== AFP 09-01-22
 
 AudioControlSGTL5000  sgtl5000_1;
 AudioControlSGTL5000  sgtl5000_2;
+// ===========================  AFP 08-22-22 end
 
 Bounce decreaseBand       = Bounce(BAND_MENUS,       50);
 Bounce increaseBand       = Bounce(BAND_PLUS,        50);
@@ -130,19 +217,19 @@ Bounce changeNR           = Bounce(CHANGE_NOISE,     50);
 Bounce demodSwitch        = Bounce(CHANGE_DEMOD,     50);
 Bounce zoomSwitch         = Bounce(CHANGE_ZOOM,      50);
 Bounce cursorSwitch       = Bounce(SET_FREQ_CURSOR,  50);
+Bounce KeyPin2       = Bounce(KEYER_DAH_INPUT_RING,  5);
+Bounce KeyPin1       = Bounce(KEYER_DIT_INPUT_TIP,  5);
 
-Rotary volumeEncoder        = Rotary(VOLUME_ENCODER_A,   VOLUME_ENCODER_B);   //( 2,  3)
-Rotary tuneEncoder          = Rotary(TUNE_ENCODER_A,     TUNE_ENCODER_B);     //(16, 17)
-Rotary filterEncoder        = Rotary(FILTER_ENCODER_A,   FILTER_ENCODER_B);   //(15, 14)
-Rotary fineTuneEncoder      = Rotary(ENCODER3_ENCODER_A, ENCODER3_ENCODER_B); //( 4,  5)
-//Encoder fineTuneEncoder(ENCODER3_ENCODER_A,  ENCODER3_ENCODER_B);    //( 4,  5)
-//Encoder filterEncoder(FILTER_ENCODER_A,      FILTER_ENCODER_B);    //(14, 15)
-//Encoder volumeEncoder(VOLUME_ENCODER_A,      VOLUME_ENCODER_B);    //( 2,  3)
+Rotary volumeEncoder      = Rotary(VOLUME_ENCODER_A,   VOLUME_ENCODER_B);   //( 2,  3)
+Rotary tuneEncoder        = Rotary(TUNE_ENCODER_A,     TUNE_ENCODER_B);     //(16, 17)
+Rotary filterEncoder      = Rotary(FILTER_ENCODER_A,   FILTER_ENCODER_B);   //(15, 14)
+Rotary fineTuneEncoder    = Rotary(ENCODER3_ENCODER_A, ENCODER3_ENCODER_B); //( 4,  5)
 
-Metro ms_500          = Metro(500);                             // Set up a Metro
-Metro encoder_check   = Metro(100);                             // Set up a Metro
+Metro ms_500              = Metro(500);                                     // Set up a Metro
+Metro encoder_check       = Metro(100);                                     // Set up a Metro
 
 Si5351 si5351;
+
 #ifndef RA8875_DISPLAY
 ILI9488_t3 tft = ILI9488_t3(&SPI, TFT_CS, TFT_DC, TFT_RST);
 #else
@@ -150,110 +237,119 @@ ILI9488_t3 tft = ILI9488_t3(&SPI, TFT_CS, TFT_DC, TFT_RST);
 #define RA8875_RESET    TFT_DC                         // any pin or nothing!
 RA8875 tft = RA8875(RA8875_CS, RA8875_RESET);
 #endif
+
 SPISettings settingsA(70000000UL, MSBFIRST, SPI_MODE1);
 
-//================== Excite Variables=================
-/**********************************************************************************
-             The Excite variables are declared and in some cases initialized
-             Both the EQ filter parameters and Hilbert Tranformer parameters are created here
- **********************************************************************************/
-
-//uint8_t SampleRate = 192000;
-#define IIR_ORDER                 8
-#define IIR_NUMSTAGES             (IIR_ORDER / 2)
-int NumExBlocks                   = 8;
 const uint32_t N_B_EX             = 16;
-
+//================== Receive EQ Variables================= AFP 08-08-22
+float32_t recEQ_Level[14];
 //Setup for EQ filters
-float32_t EQ_Band1_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};//declare and zero biquad state variables
-float32_t EQ_Band2_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band3_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band4_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band5_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band6_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band7_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band8_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};//declare and zero biquad state variables
-float32_t EQ_Band9_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band10_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band11_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band12_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band13_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
-float32_t EQ_Band14_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ1_float_buffer_L[256];
+float32_t rec_EQ2_float_buffer_L[256];
+float32_t rec_EQ3_float_buffer_L[256];
+float32_t rec_EQ4_float_buffer_L[256];
+float32_t rec_EQ5_float_buffer_L[256];
+float32_t rec_EQ6_float_buffer_L[256];
+float32_t rec_EQ7_float_buffer_L[256];
+float32_t rec_EQ8_float_buffer_L[256];
+float32_t rec_EQ9_float_buffer_L[256];
+float32_t rec_EQ10_float_buffer_L[256];
+float32_t rec_EQ11_float_buffer_L[256];
+float32_t rec_EQ12_float_buffer_L[256];
+float32_t rec_EQ13_float_buffer_L[256];
+float32_t rec_EQ14_float_buffer_L[256];
 
-int updateFilter[5];
-
-//EQ band Gain variables
-float EQBand1GaindB  = 0;
-float EQBand2GaindB  = 0;
-float EQBand3GaindB  = 0;
-float EQBand4GaindB  = 0;
-float EQBand5GaindB  = 0;
-float EQBand6GaindB  = 0;
-float EQBand7GaindB  = 0;
-float EQBand8GaindB  = 0;
-float EQBand9GaindB  = 0;
-float EQBand10GaindB = 0;
-float EQBand11GaindB = 0;
-float EQBand12GaindB = 0;
-float EQBand13GaindB = 0;
-float EQBand14GaindB = 0;
-
-float EQBand1Scale  = 1;
-float EQBand2Scale  = 1;
-float EQBand3Scale  = 1;
-float EQBand4Scale  = 1;
-float EQBand5Scale  = 1;
-float EQBand6Scale  = 1;
-float EQBand7Scale  = 1;
-float EQBand8Scale  = 1;
-float EQBand9Scale  = 1;
-float EQBand10Scale = 1;
-float EQBand11Scale = 1;
-float EQBand12Scale = 1;
-float EQBand13Scale = 1;
-float EQBand14Scale = 1;
+float32_t rec_EQ_Band1_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};//declare and zero biquad state variables
+float32_t rec_EQ_Band2_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band3_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band4_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band5_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band6_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band7_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band8_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};//declare and zero biquad state variables
+float32_t rec_EQ_Band9_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band10_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band11_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band12_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band13_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t rec_EQ_Band14_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 //EQ filter instances
-arm_biquad_cascade_df2T_instance_f32 S1_EXcite = {IIR_NUMSTAGES, EQ_Band1_state, EQ_Band1Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S2_EXcite  = {IIR_NUMSTAGES, EQ_Band2_state, EQ_Band2Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S3_EXcite  = {IIR_NUMSTAGES, EQ_Band3_state, EQ_Band3Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S4_EXcite  = {IIR_NUMSTAGES, EQ_Band4_state, EQ_Band4Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S5_EXcite  = {IIR_NUMSTAGES, EQ_Band5_state, EQ_Band5Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S6_EXcite  = {IIR_NUMSTAGES, EQ_Band6_state, EQ_Band6Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S7_EXcite  = {IIR_NUMSTAGES, EQ_Band7_state, EQ_Band7Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S8_EXcite  = {IIR_NUMSTAGES, EQ_Band8_state, EQ_Band8Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S9_EXcite  = {IIR_NUMSTAGES, EQ_Band9_state, EQ_Band9Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S10_EXcite = {IIR_NUMSTAGES, EQ_Band10_state, EQ_Band10Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S11_EXcite = {IIR_NUMSTAGES, EQ_Band11_state, EQ_Band11Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S12_EXcite = {IIR_NUMSTAGES, EQ_Band12_state, EQ_Band12Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S13_EXcite = {IIR_NUMSTAGES, EQ_Band13_state, EQ_Band13Coeffs};
-arm_biquad_cascade_df2T_instance_f32 S14_EXcite = {IIR_NUMSTAGES, EQ_Band14_state, EQ_Band14Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S1_Rec  = {IIR_NUMSTAGES, rec_EQ_Band1_state, EQ_Band1Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S2_Rec  = {IIR_NUMSTAGES, rec_EQ_Band2_state, EQ_Band2Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S3_Rec  = {IIR_NUMSTAGES, rec_EQ_Band3_state, EQ_Band3Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S4_Rec  = {IIR_NUMSTAGES, rec_EQ_Band4_state, EQ_Band4Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S5_Rec  = {IIR_NUMSTAGES, rec_EQ_Band5_state, EQ_Band5Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S6_Rec  = {IIR_NUMSTAGES, rec_EQ_Band6_state, EQ_Band6Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S7_Rec  = {IIR_NUMSTAGES, rec_EQ_Band7_state, EQ_Band7Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S8_Rec  = {IIR_NUMSTAGES, rec_EQ_Band8_state, EQ_Band8Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S9_Rec  = {IIR_NUMSTAGES, rec_EQ_Band9_state, EQ_Band9Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S10_Rec = {IIR_NUMSTAGES, rec_EQ_Band10_state, EQ_Band10Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S11_Rec = {IIR_NUMSTAGES, rec_EQ_Band11_state, EQ_Band11Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S12_Rec = {IIR_NUMSTAGES, rec_EQ_Band12_state, EQ_Band12Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S13_Rec = {IIR_NUMSTAGES, rec_EQ_Band13_state, EQ_Band13Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S14_Rec = {IIR_NUMSTAGES, rec_EQ_Band14_state, EQ_Band14Coeffs};
 
-
-
+// ===============================  AFP 10-02-22 ================
+//Setup for Xmit EQ filters
+float32_t xmtEQ_Level[14];
 //EQBuffers
-float32_t float_buffer_L1_EX [256];
-float32_t float_buffer_L2_EX [256];
-float32_t float_buffer_L3_EX [256];
-float32_t float_buffer_L4_EX [256];
-float32_t float_buffer_L5_EX [256];
-float32_t float_buffer_L6_EX [256];
-float32_t float_buffer_L7_EX [256];
-float32_t float_buffer_L8_EX [256];
-float32_t float_buffer_L9_EX [256];
-float32_t float_buffer_L10_EX[256];
-float32_t float_buffer_L11_EX[256];
-float32_t float_buffer_L12_EX[256];
-float32_t float_buffer_L13_EX[256];
-float32_t float_buffer_L14_EX[256];
+float32_t xmt_EQ1_float_buffer_L[256];
+float32_t xmt_EQ2_float_buffer_L[256];
+float32_t xmt_EQ3_float_buffer_L[256];
+float32_t xmt_EQ4_float_buffer_L[256];
+float32_t xmt_EQ5_float_buffer_L[256];
+float32_t xmt_EQ6_float_buffer_L[256];
+float32_t xmt_EQ7_float_buffer_L[256];
+float32_t xmt_EQ8_float_buffer_L[256];
+float32_t xmt_EQ9_float_buffer_L[256];
+float32_t xmt_EQ10_float_buffer_L[256];
+float32_t xmt_EQ11_float_buffer_L[256];
+float32_t xmt_EQ12_float_buffer_L[256];
+float32_t xmt_EQ13_float_buffer_L[256];
+float32_t xmt_EQ14_float_buffer_L[256];
+
+float32_t xmt_EQ_Band1_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};//declare and zero biquad state variables
+float32_t xmt_EQ_Band2_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band3_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band4_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band5_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band6_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band7_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band8_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band9_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band10_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band11_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band12_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band13_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+float32_t xmt_EQ_Band14_state[IIR_NUMSTAGES * 2] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+//EQ filter instances
+arm_biquad_cascade_df2T_instance_f32 S1_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band1_state, EQ_Band1Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S2_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band2_state, EQ_Band2Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S3_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band3_state, EQ_Band3Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S4_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band4_state, EQ_Band4Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S5_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band5_state, EQ_Band5Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S6_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band6_state, EQ_Band6Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S7_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band7_state, EQ_Band7Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S8_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band8_state, EQ_Band8Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S9_Xmt  = {IIR_NUMSTAGES, xmt_EQ_Band9_state, EQ_Band9Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S10_Xmt = {IIR_NUMSTAGES, xmt_EQ_Band10_state, EQ_Band10Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S11_Xmt = {IIR_NUMSTAGES, xmt_EQ_Band11_state, EQ_Band11Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S12_Xmt = {IIR_NUMSTAGES, xmt_EQ_Band12_state, EQ_Band12Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S13_Xmt = {IIR_NUMSTAGES, xmt_EQ_Band13_state, EQ_Band13Coeffs};
+arm_biquad_cascade_df2T_instance_f32 S14_Xmt = {IIR_NUMSTAGES, xmt_EQ_Band14_state, EQ_Band14Coeffs};
+// ===============================End xmit EQ filter setup  AFP 10-02-22 ================
+
+// HP BiQuad IIR DC filter
+float32_t HP_DC_Butter_state[6] = {0, 0, 0, 0, 0, 0};
+arm_biquad_cascade_df2T_instance_f32  s1_Receive = {3, HP_DC_Butter_state, HP_DC_Filter_Coeffs}; //AFP 09-23-22
 
 //Hilbert FIR Filters
 float32_t FIR_Hilbert_state_L [100 + 256 - 1];
 float32_t FIR_Hilbert_state_R [100 + 256 - 1];
-
 arm_fir_instance_f32 FIR_Hilbert_L;
 arm_fir_instance_f32 FIR_Hilbert_R;
-
 //Decimation and Interpolation Filters
 arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
 arm_fir_decimate_instance_f32 FIR_dec1_EX_Q;
@@ -265,10 +361,10 @@ arm_fir_interpolate_instance_f32 FIR_int1_EX_Q;
 arm_fir_interpolate_instance_f32 FIR_int2_EX_I;
 arm_fir_interpolate_instance_f32 FIR_int2_EX_Q;
 
-
 float32_t DMAMEM FIR_dec1_EX_I_state[2095];
 float32_t DMAMEM FIR_dec1_EX_Q_state[2095];
 
+float32_t audioMaxSquaredAve;
 
 float32_t DMAMEM FIR_dec2_EX_I_state[535];
 float32_t DMAMEM FIR_dec2_EX_Q_state[535];
@@ -285,18 +381,13 @@ float32_t DMAMEM float_buffer_L_EX[2048];
 float32_t DMAMEM float_buffer_R_EX[2048];
 float32_t DMAMEM float_buffer_LTemp[2048];
 float32_t DMAMEM float_buffer_RTemp[2048];
-
 //==================== End Excite Variables================================
 
 //======================================== Global structure declarations ===============================================
-
 //=== CW Filter ===
 float32_t CW_Filter_state[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 //---------  Code Filter instance -----
-arm_biquad_cascade_df2T_instance_f32 S1_CW_Filter = {IIR_CW_NUMSTAGES, CW_Filter_state, CW_Filter_Coeffs};
-
-//=== end CW Filter ===
-
+arm_biquad_cascade_df2T_instance_f32 S1_CW_Filter = {IIR_CW_NUMSTAGES, CW_Filter_state, CW_Filter_Coeffs};                                                             //=== end CW Filter ===
 
 struct config_t EEPROMData;
 
@@ -348,89 +439,82 @@ arm_lms_norm_instance_f32 LMS_Norm_instance;
 arm_lms_instance_f32      LMS_instance;
 
 
-struct band bands[NUM_BANDS] = {  //AFP Changed 1-30-21
-  //   freq       band low   band hi    mode    LSB/USB    Low    Hi  Gain  type    gain  AGC   pixel
-  //                                                     filter filter             correct     offset
-  3700000,   3500000,  3800000, "80M", DEMOD_LSB, -100, -4000, 15, HAM_BAND, 6.0, 30,   20,
-  7150000,   7000000,  7300000, "40M", DEMOD_LSB, -100, -4000,  0, HAM_BAND, 4.0, 30,   20,
-  14200000, 14000000, 14350000, "20M", DEMOD_USB, 4000,   100,  0, HAM_BAND, 7.0, 30,   20,
-  18100000, 18068000, 18168000, "17M", DEMOD_USB, 4000,   100,  5, HAM_BAND, 6.0, 30,   20,
-  21200000, 21000000, 21450000, "15M", DEMOD_USB, 4000,   100,  5, HAM_BAND, 6.0, 30,   20,
-  24920000, 24890000, 24990000, "12M", DEMOD_USB, 4000,   100,  6, HAM_BAND, 6.0, 30,   20,
-  28350000, 28000000, 29700000, "10M", DEMOD_USB, 4000,   100,  6, HAM_BAND, 0.0, 30,   20
+struct band bands[NUMBER_OF_BANDS] = {  //AFP Changed 1-30-21
+  //freq    band low   band hi   mode   LSB/USB   Low    Hi    Gain  type    gain  AGC   pixel
+  //                                             filter filter             correct     offset
+  3700000,   3500000,  4000000, "80M", DEMOD_LSB, -100, -4000,  1, HAM_BAND, 1, 30,   20,
+  7150000,   7000000,  7300000, "40M", DEMOD_LSB, -100, -4000,  1, HAM_BAND, 1, 30,   20,
+  14200000, 14000000, 14350000, "20M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
+  18100000, 18068000, 18168000, "17M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
+  21200000, 21000000, 21450000, "15M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
+  24920000, 24890000, 24990000, "12M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20,
+  28350000, 28000000, 29700000, "10M", DEMOD_USB, 4000,   100,  1, HAM_BAND, 1, 30,   20
 };
-//DEMOD_Desc;
 const DEMOD_Descriptor DEMOD[4] =
-{
-  //   DEMOD_n, name
-  {  DEMOD_USB, "(USB) "},
-  {  DEMOD_LSB, "(LSB) "},
-  {  DEMOD_AM2, "(AM) "},
-  {  DEMOD_SAM, "(SAM) "},
+{ //   DEMOD_n, name
+  {  DEMOD_USB, "(USB)"},
+  {  DEMOD_LSB, "(LSB)"},
+  {  DEMOD_AM2, "(AM2)"}, //AFP09-22-22
+  {  DEMOD_SAM, "(SAM)"},
 };
 
 dispSc displayScale[] =  //r *dbText,dBScale, pixelsPerDB, baseOffset, offsetIncrement
 {
   "20 dB/", 10.0,   2,  24, 1,
   "10 dB/", 20.0,   4,  10, 0.5,  //AFP  Changed 03-12-21
-  "5 dB/",  40.0,   8, 58, 0.25,
+  "5 dB/",  40.0,   8,  58, 0.25,
   "2 dB/",  100.0, 20, 120, 0.1,
   "1 dB/",  200.0, 40, 200, 0.05
 };
 
 //======================================== Global variables declarations for Quad Oscillator 2 ===============================================
-//  AFP 12-11-21
-//float32_t NCO_FREQ; // AFP 04-16-22
-long NCO_FREQ;
-//float32_t NCO_FREQ = AUDIO_SAMPLE_RATE_EXACT /8;  //LSB
+long NCO_Freq;
 
+int stepFTOld         = 0;
 unsigned long stepFT  = 50UL;
 unsigned long stepFT2 = 50UL;
-int stepFTOld = 0;
-float32_t NCO_INC; // AFP 04-16-22
+
+float32_t NCO_INC;
+
 double OSC_COS;
 double  OSC_SIN ;
 double  Osc_Vect_Q = 1.0;
 double  Osc_Vect_I = 0.0;
-double  Osc_Gain = 0.0;
-double  Osc_Q = 0.0;
-double  Osc_I = 0.0;
-float32_t i_temp = 0.0;
-float32_t q_temp = 0.0;
-
-//========================================
-
+double  Osc_Gain   = 0.0;
+double  Osc_Q      = 0.0;
+double  Osc_I      = 0.0;
+float32_t i_temp   = 0.0;
+float32_t q_temp   = 0.0;
 
 //======================================== Global variables declarations ===============================================
 //=============================== Any variable initialized to zero is done for documentation ===========================
 //=============================== purposes since the compiler does that for globals by default =========================
-
-
 //================== Global CW Correlation and FFT Variables =================
-float32_t corrResult;      //AFP 02-04-22
-uint32_t corrResultIndex;  //AFP 02-04-22
-float32_t sinBuffer[256];  //AFP 02-04-22
+float32_t corrResult;
+uint32_t corrResultIndex;
+float32_t cosBuffer2[256];
+float32_t sinBuffer[256];
 float32_t sinBuffer2[256];
-float32_t aveCorrResult;   //AFP 02-04-22
-float32_t aveCorrResultR;   //AFP 02-06-22
-float32_t aveCorrResultL;   //AFP 02-06-2
-float32_t magFFTResults[256];  //AFP 02-04-22
-float32_t float_Corr_Buffer[511];   //AFP 02-02-22
-float32_t corrResultR;  //AFP 02-02-22
-uint32_t corrResultIndexR;  //AFP 02-02-22
-float32_t corrResultL;  //AFP 02-02-22
-uint32_t corrResultIndexL;  //AFP 02-02-22
+float32_t aveCorrResult;
+float32_t aveCorrResultR;
+float32_t aveCorrResultL;
+float32_t magFFTResults[256];
+float32_t float_Corr_Buffer[511];
+float32_t corrResultR;
+uint32_t corrResultIndexR;
+float32_t corrResultL;
+uint32_t corrResultIndexL;
 float32_t combinedCoeff;
 float32_t combinedCoeff2;
 float32_t combinedCoeff2Old;
-int CWCoeffLevelOld = 0.0;
-float CWLevelTimer = 0.0;
-float CWLevelTimerOld = 0.0;
-float ticMarkTimer = 0.0;
-float ticMarkTimerOld = 0.0;
+int CWCoeffLevelOld           = 0.0;
+float CWLevelTimer            = 0.0;
+float CWLevelTimerOld         = 0.0;
+float ticMarkTimer            = 0.0;
+float ticMarkTimerOld         = 0.0;
 
-float32_t float_Corr_BufferR[511];   //AFP 02-06-22
-float32_t float_Corr_BufferL[511];   //AFP 02-06-22
+float32_t float_Corr_BufferR[511];
+float32_t float_Corr_BufferL[511];
 long tempSigTime = 0;
 
 int audioTemp           = 0;
@@ -524,27 +608,21 @@ char *bigMorseCodeTree  = (char *) "-EISH5--4--V---3--UF--------?-2--ARL--------
 //         10        20        30        40        50        60        70        80        90       100       110       120
 
 const char *tune_text       = "Fast Tune";
-const char *topMenus[]      = {"CW Options", "Spectrum Set",    "AGC",        "NR Set",
-                               "IQ Manual",   "EQ Rec Set",      "EQ Xmt Set",      "Mic Comp",   "Freq Cal",
-                               "Noise Floor", "RF Set",          "Audio Post Proc", "VFO Select", "EEPROM",
-                               "Unused 1",    "Unused 2"
-                              };
 const char *zoomOptions[]   = {"1x ", "2x ", "4x ", "8x ", "16x"};
 
+byte currentDashJump        = DECODER_BUFFER_SIZE;
+byte currentDecoderIndex    = 0;
 
-byte currentDashJump      = DECODER_BUFFER_SIZE;
-byte currentDecoderIndex  = 0;
-
-int8_t AGCMode                            = 1;
+int8_t AGCMode              = 2;
 int8_t auto_IQ_correction;
 int filterWidthX;                                           // The current filter X.
 int filterWidthY;                                           // The current filter Y.
-float32_t pixel_per_khz = ((1 << spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate) ; //AFP 03-27-22 Layers
-int pos_left            = centerLine - (int)(bands[currentBand].FLoCut / 1000.0 * pixel_per_khz);//AFP 03-27-22 Layers
-int centerLine  = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;//AFP 03-27-22 Layers
-int filterWidth             = (int)((bands[currentBand].FHiCut - bands[currentBand].FLoCut) / 1000.0 * pixel_per_khz);//AFP 03-27-22 Layers
-int h               = SPECTRUM_HEIGHT + 3;
-int8_t first_block                        = 1;
+float32_t pixel_per_khz = ((1 << spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate) ;
+int pos_left            = centerLine - (int)(bands[currentBand].FLoCut / 1000.0 * pixel_per_khz);
+int centerLine          = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+int filterWidth         = (int)((bands[currentBand].FHiCut - bands[currentBand].FLoCut) / 1000.0 * pixel_per_khz);
+int h                   = SPECTRUM_HEIGHT + 3;
+int8_t first_block      = 1;
 
 int8_t Menu2                              = MENU_F_LO_CUT;
 int8_t mesz                               = -1;
@@ -584,7 +662,6 @@ uint8_t erase_flag                        = 0;
 uint8_t fade_leveler                      = 1;
 uint8_t FIR_filter_window                 = 1;
 uint8_t flagg                             = 0;
-uint8_t freq_flag[2]                      = {0, 0};
 uint8_t half_clip                         = 0;
 uint8_t hang_enable;
 uint8_t hour10_old;
@@ -592,14 +669,16 @@ uint8_t hour1_old;
 uint8_t IQCalFlag = 0;
 uint8_t iFFT_flip                         = 0;
 uint8_t IQ_state                          = 1;
-uint8_t IQ_RecCalFlag = 0; //AFP 04-17-22
+uint8_t IQ_RecCalFlag                     = 0;
+uint8_t keyPressedOn                      = 0;
+uint8_t relayLatch                        = 0;
 uint8_t LastSampleRate                    = SAMPLE_RATE_192K;
 uint8_t minute10_old;
 uint8_t minute1_old;
-uint8_t NB_on = 0;
-uint8_t NB_test = 0;
-uint8_t notchButtonState = 0;
-uint8_t notchIndex = 0;
+uint8_t NB_on                             = 0;
+uint8_t NB_test                           = 0;
+uint8_t notchButtonState                  = 0;
+uint8_t notchIndex                        = 0;
 uint8_t notches_on[2]                     = {0, 0};
 uint8_t NR_first_time                     = 1;
 uint8_t NR_Kim;
@@ -618,6 +697,7 @@ uint8_t show_spectrum_flag                = 1;
 uint8_t spectrum_mov_average              = 0;
 uint8_t state                             = 0;
 uint8_t twinpeaks_tested                  = 2;                      // initial value --> 2 !!
+uint8_t T41State                          = 1;
 uint8_t wait_flag;
 uint8_t WDSP_SAM                          = 1;
 uint8_t which_menu                        = 1;
@@ -627,11 +707,10 @@ uint8_t zoom_display                      = 1;
 const uint8_t NR_L_frames                 = 3;
 const uint8_t NR_N_frames                 = 15;
 
-uint16_t base_y = spectrum_y + spectrum_WF_height + 4;
+uint16_t base_y = SPECTRUM_BOTTOM;
 
 int16_t activeVFO;
 int16_t currentMode;
-int16_t displayMode                       = BOTH_DISPLAYS;          // Show Spectrum and waterfall
 int16_t pixelnew[SPECTRUM_RES];
 int16_t pixelold[SPECTRUM_RES];
 int16_t pixelnew2[MAX_WATERFALL_WIDTH + 1];                         //AFP
@@ -643,7 +722,7 @@ int16_t notch_pixel_L[2]                  = {1, 2};
 int16_t notch_pixel_R[2]                  = {2, 3};
 int16_t offsetPixels;
 int16_t pos_x_dbm                         = pos_x_smeter + 170;
-int16_t pos_y_dbm                         = pos_y_smeter - 10;       // Was 7
+int16_t pos_y_dbm                         = pos_y_smeter - 10;
 int16_t pos_y_db;
 int16_t pos_y_frequency                   = 48;
 int16_t pos_x_time                        = 390;         // 14;
@@ -653,8 +732,7 @@ int16_t *sp_L;
 int16_t *sp_R;
 int16_t spectrum_brightness               = 255;
 int16_t spectrum_height                   = 96;
-int16_t spectrum_pos_centre_f             = 64 * xExpand;               //AFP
-//int16_t h                                 = spectrum_height + 3;        //AFP
+int16_t spectrum_pos_centre_f             = 64 * xExpand;
 int16_t spectrum_WF_height                = 96;
 int16_t spectrum_x                        = SPECTRUM_LEFT_X;
 int16_t spectrum_y                        = SPECTRUM_TOP_Y;
@@ -690,35 +768,45 @@ int atomGapLength;
 int atomGapLength2;
 int charGapLength;
 int charGapLength2;
+int receiveEQFlag;
+int xmitEQFlag;
+
+unsigned long cwTimer;
+long signalTime;
+unsigned long ditTimerOn;
+long DahTimer;
+long cwTime0;
+long cwTime5;
+long cwTime6;
 long valRef1;
 long valRef2;
 long gapRef1;
 int valFlag = 0;
-long signalStartOld = 0;
+long signalStartOld           = 0;
 int valCounter;
-long aveDitLength = 80;
-long aveDahLength = 200;
-float thresholdGeometricMean = 140.0;     // This changes as decoder runs
+long aveDitLength             = 80;
+long aveDahLength             = 200;
+float thresholdGeometricMean  = 140.0;     // This changes as decoder runs
 float thresholdArithmeticMean;
-float aveAtomGapLength = 40;
+float aveAtomGapLength        = 40;
 float thresholdGapGeometricMean;
 float thresholdGapArithmeticMean;
 long CWFreqShift;
-long filter_pos  = 0;
-long last_filter_pos  = 0;
+long filter_pos               = 0;
+long last_filter_pos          = 0;
 // ============ end new stuff =======
 
 
-uint16_t notches_BW[2]                    = {4, 4}; // no. of bins --> notch BW = no. of bins * bin_BW
+uint16_t notches_BW[2]          = {4, 4}; // no. of bins --> notch BW = no. of bins * bin_BW
 uint16_t SAM_display_count;
-uint16_t temp_check_frequency;      /*!< The temperature measure frequency.*/
+uint16_t temp_check_frequency;
 uint16_t uAfter;
 uint16_t uB4;
 uint16_t xx;
 
 int16_t y_old, y_new, y1_new, y1_old, y_old2;//A
-int16_t y1_old_minus = 0;
-int16_t y1_new_minus = 0;
+int16_t y1_old_minus          = 0;
+int16_t y1_new_minus          = 0;
 
 const float32_t DF1                       = 4.0;           // decimation factor
 const float32_t DF2                       = 2.0;           // decimation factor
@@ -744,11 +832,9 @@ const uint16_t n_dec2_taps                = (1 + (uint16_t) (n_att / (22.0 * (n_
 int resultOldFactor;
 float incrFactor;
 int mute = 0;
-int (*functionPtr[])()                    = {&CWOptions, &SpectrumOptions, &AGCOptions,
-                                             &NROptions, &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions,
-                                             &MicOptions, &FrequencyOptions, &ButtonSetNoiseFloor, &RFOptions,
-                                             &PostProcessorAudio, &VFOSelect, &EEPROMOptions
-                                            };
+
+float adjustVolEncoder;
+int adjustIQ;
 int exciteOn = 0;
 int agc_decay                             = 100;
 int agc_slope                             = 100;
@@ -770,14 +856,13 @@ int audioPostProcessorCells[AUDIO_POST_PROCESSOR_BANDS];
 int bandswitchPins[]                      = {30,   // 80M
                                              31,   // 40M
                                              28,   // 20M
-                                             0,    // 17M
+                                             0,   // 17M
                                              29,   // 15M
                                              0,   // 12M
                                              0    // 10M
                                             };
 int button9State;
-int buttonRead = 0;
-int cwSidetone                            = 700;
+int buttonRead                            = 0;
 int currentBand                           = BAND_40M;
 int dahLength;
 int dcfCount;
@@ -787,14 +872,13 @@ int dcfTheSecond;
 int dcfPulseTime;
 int decoderFlag;
 int demodIndex                            = 0;//AFP 2-10-21
-int ditLength;
 int EEPROMChoice;
 int encoderStepOld;
 int equalizerRecChoice;
 int equalizerXmtChoice;
 int fastTuneActive;
-int filterLoPositionMarkerOld;// AFP 03-27-22 Layers
-int filterHiPositionMarkerOld;// AFP 03-27-22 Layers
+int filterLoPositionMarkerOld;
+int filterHiPositionMarkerOld;
 int FLoCutOld;
 int FHiCutOld;
 int freqCalibration = -1000;
@@ -810,8 +894,10 @@ int helpyear;
 int helpsec;
 int idx, idpk;
 int lidx, hidx;
-int kDisplay = 0; //AFP
 int IQChoice;
+int IQEXChoice;
+int kDisplay = 0; //AFP
+int keyType;
 int LMS_nr_strength;
 int LP_F_help                             = 3500;
 int mainTuneEncoder;
@@ -840,42 +926,40 @@ int pmode                                 = 1;
 int pos_centre_f                          = 64;
 int pos_x_frequency                       = 12;
 int pos_y_smeter                          = (spectrum_y - 12);
-int rfGain;
+int rfGainAllBands = 1;
 int SAM_AM_Choice;
-int spectrumNoiseFloor                    = SPECTRUM_NOISE_FLOOR;
-int splitOn;
 int secondaryMenuChoiceMade;
 int smeterLength;
+int spectrumNoiseFloor                    = SPECTRUM_NOISE_FLOOR;
+int splitOn;
 
 int SSB_AUTOTUNE_counter;
 int switchFilterSideband                  = 0;
 
-/*
-  int switchThreshholds[]                   = {888, 827, 772, 730,
+int switchThreshholds[]                   = {888, 827, 772, 730,
                                              673, 603, 552, 505,
                                              448, 387, 318, 268,
                                              12,  202, 150, 73
                                             };
-*/
 int termCursorXpos                        = 0;
-int transmitPowerLevel;
-int x2 = 0;                                                             //AFP
+float transmitPowerLevel;
+int x2                                    = 0;                          //AFP
 int zeta_help                             = 65;
 int zoom_sample_ptr                       = 0;
-int zoomIndex                             = 0; //AFP 2-10-21
+int zoomIndex                             = 1; //AFP 9-26-22
 int tuneIndex                             = DEFAULTFREQINDEX;           //AFP 2-10-21
 int wtf;
 int updateDisplayFlag = 1;
+int xrState;                                                            // Is the T41 in xmit or rec state? 1 = rec, 0 = xmt
 
 const int BW_indicator_y                  = SPECTRUM_TOP_Y + SPECTRUM_HEIGHT + 2;
 const int DEC2STATESIZE                   = n_dec2_taps + (BUFFER_SIZE * N_B / (uint32_t)DF1) - 1;
 const int INT1_STATE_SIZE                 = 24 + BUFFER_SIZE * N_B / (uint32_t)DF - 1;
 const int INT2_STATE_SIZE                 = 8 + BUFFER_SIZE * N_B / (uint32_t)DF1 - 1;
 const int myInput                         = AUDIO_INPUT_LINEIN;
-//const int myInput                         = AUDIO_INPUT_MIC;
 const int pos_x_smeter                    = 11;
-const int waterfallBottom                = spectrum_y + spectrum_height + 4;
-const int waterfallTop                   = spectrum_y + spectrum_height + 4;
+const int waterfallBottom                 = spectrum_y + spectrum_height + 4;
+const int waterfallTop                    = spectrum_y + spectrum_height + 4;
 
 unsigned framesize;
 unsigned nbits;
@@ -883,7 +967,11 @@ unsigned ring_buffsize                    = RB_SIZE;
 unsigned tcr5;
 unsigned tcr2div;
 
+
+int CW_IRR_on = 0;
 int32_t FFT_shift                         = 2048;
+int32_t frequencyCorrectionFactor         = 230000L;
+int32_t frequencyCorrectionFactorOld      = 230000L;
 int32_t IFFreq                            = SR[SampleRate].rate / 4;      // IF (intermediate) frequency
 int32_t IF_FREQ1 = 0;
 int32_t mainMenuIndex                     = START_MENU;                   // Done so we show menu[0] at startup
@@ -896,9 +984,9 @@ int32_t spectrum_zoom                     = SPECTRUM_ZOOM_2;
 
 uint32_t N_BLOCKS                         = N_B;
 uint32_t BUF_N_DF                         = BUFFER_SIZE * N_BLOCKS / (uint32_t)DF;
-uint32_t highAlarmTemp;  /*!< The high alarm temperature.*/
+uint32_t highAlarmTemp;
 uint32_t in_index;
-uint32_t lowAlarmTemp;   /*!< The low alarm */
+uint32_t lowAlarmTemp;
 uint32_t MDR;
 uint32_t n_para                           = 512;
 uint32_t NR_X_pointer                     = 0;
@@ -912,21 +1000,21 @@ uint32_t s_hotTemp;    /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at room 
 uint32_t s_hotCount;   /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
 uint32_t twinpeaks_counter                = 0;
 
+unsigned long cwTransmitDelay             = 2000L;
 long jackStart, jackEnd;
 long averageDit;
 long averageDah;
-long calibration_constant                 = 10000L;
 
 long currentFreq;
-long centerFreq                           = 7047700L;
-long CWRecFreq;     //  = TxRxFreq +/- 700Hz
-long currentFreqA                         = 7047700L;  //Initial VFOA center freq
-long currentFreqB                         = 7030000;  //Initial VFOB center freq
+long centerFreq                           = 7150000L;
+long CWRecFreq;                                         //  = TxRxFreq +/- 750Hz
+long currentFreqA                         = 7150000L;   //Initial VFOA center freq
+long currentFreqB                         = 7030000;    //Initial VFOB center freq
 long currentWPM                           = 15L;
 long frequencyCorrection;
 long incrementValues[]                    = {10, 50, 100, 250, 1000, 10000};
-long lastWPM;
 long int n_clear;
+long lastFrequencies[NUMBER_OF_BANDS][2];
 long notchPosOld;
 long notchFreq = 1000;
 long notchCenterBin;
@@ -947,10 +1035,10 @@ ulong samp_ptr;
 
 uint64_t output12khz;
 
-//unsigned long long calibration_factor     = 1000000000ULL;
-unsigned long long calibration_factor     = 999920000ULL;   // AFP 12-30-21
-unsigned long long hilfsf                 = 1000000000ULL;
-unsigned long long hilfsfEx               = 1000000000ULL;
+unsigned long long calibrationFactor     = 1000000000ULL;
+unsigned long long Clk2SetFreq;                             // AFP 09-27-22
+unsigned long long Clk1SetFreq           = 1000000000ULL;   // AFP 09-27-22
+unsigned long ditLength;
 float dcfRefLevel;
 float CPU_temperature                     = 0.0;
 
@@ -987,7 +1075,7 @@ float32_t audioSpectBuffer[1024];
 float32_t b[3 * SAM_PLL_HILBERT_STAGES + 3];
 float32_t bass                            = 0.0;
 float32_t farnsworthValue;
-float32_t micCompression;
+int micCompression                        = -18;
 float32_t midbass                         = 0.0;
 float32_t mid                             = 0.0;
 float32_t midtreble                       = 0.0;
@@ -1004,7 +1092,7 @@ float32_t coefficient_set[5]              = {0, 0, 0, 0, 0};
 float32_t corr[2];
 float32_t Cos                             = 0.0;
 float32_t cursorIncrementFraction;
-//float32_t CPU_temperature                 = 0.0;
+//float32_t CPU_temperature               = 0.0;
 float32_t d[3 * SAM_PLL_HILBERT_STAGES + 3];
 float32_t dc                              = 0.0;
 float32_t dc_insert                       = 0.0;
@@ -1052,34 +1140,37 @@ float32_t DMAMEM float_buffer_L2[BUFFER_SIZE * N_B];
 float32_t DMAMEM float_buffer_R2[BUFFER_SIZE * N_B];
 float32_t float_buffer_L_3[BUFFER_SIZE * N_B];
 float32_t float_buffer_R_3[BUFFER_SIZE * N_B];
-float32_t g1                                    = 1.0 - exp(-2.0 * omegaN * zeta * DF / SR[SampleRate].rate);
-float32_t g2                                    = - g1 + 2.0 * (1 - exp(- omegaN * zeta * DF / SR[SampleRate].rate) * cosf(omegaN * DF / SR[SampleRate].rate * sqrtf(1.0 - zeta * zeta)));
-float32_t hang_backaverage                      = 0.0;
+
+float32_t DMAMEM float_buffer_L_CW[256];//AFP 09-01-22
+float32_t DMAMEM float_buffer_R_CW[256];//AFP 09-01-22
+
+float32_t g1                                = 1.0 - exp(-2.0 * omegaN * zeta * DF / SR[SampleRate].rate);
+float32_t g2                                = - g1 + 2.0 * (1 - exp(- omegaN * zeta * DF / SR[SampleRate].rate) * cosf(omegaN * DF / SR[SampleRate].rate * sqrtf(1.0 - zeta * zeta)));
+float32_t hang_backaverage                  = 0.0;
 float32_t hang_backmult;
 float32_t hang_decay_mult;
 float32_t hang_thresh;
 float32_t hang_level;
 float32_t hangtime;
-float32_t hh1                                   = 0.0;
-float32_t hh2                                   = 0.0;
-//float32_t DMAMEM iFFT_buffer[FFT_LENGTH * 2] __attribute__ ((aligned (4)));
+float32_t hh1                               = 0.0;
+float32_t hh2                               = 0.0;
 float32_t DMAMEM iFFT_buffer[FFT_LENGTH * 2 + 1];
-float32_t I_old                                 = 0.2;
+float32_t I_old                             = 0.2;
 float32_t I_sum;
 float32_t IIR_biquad_Zoom_FFT_I_state[IIR_biquad_Zoom_FFT_N_stages * 4];
 float32_t IIR_biquad_Zoom_FFT_Q_state[IIR_biquad_Zoom_FFT_N_stages * 4];
 float32_t inv_max_input;
 float32_t inv_out_target;
-float32_t IQ_amplitude_correction_factor        = 1.0;
-float32_t IQ_phase_correction_factor            = 0.0;
-float32_t IQ_Xamplitude_correction_factor        = 1.0;
-float32_t IQ_Xphase_correction_factor            = 0.0;
-float32_t IQ_sum                                = 0.0;
-float32_t K_dirty                               = 0.868;
-float32_t K_est                                 = 1.0;
-float32_t K_est_old                             = 0.0;
-float32_t K_est_mult                            = 1.0 / K_est;
-float32_t last_dc_level                         = 0.0f;
+float32_t IQ_amplitude_correction_factor     = 1.0;
+float32_t IQ_phase_correction_factor         = 0.0;
+float32_t IQ_Xamplitude_correction_factor    = 1.0;
+float32_t IQ_Xphase_correction_factor        = 0.0;
+float32_t IQ_sum                             = 0.0;
+float32_t K_dirty                            = 0.868;
+float32_t K_est                              = 1.0;
+float32_t K_est_old                          = 0.0;
+float32_t K_est_mult                         = 1.0 / K_est;
+float32_t last_dc_level                      = 0.0f;
 float32_t DMAMEM last_sample_buffer_L[BUFFER_SIZE * N_DEC_B];
 float32_t DMAMEM last_sample_buffer_R[BUFFER_SIZE * N_DEC_B];
 float32_t DMAMEM L_BufferOffset[BUFFER_SIZE * N_B];
@@ -1087,36 +1178,36 @@ float32_t LMS_errsig1[256 + 10];
 float32_t LMS_NormCoeff_f32[MAX_LMS_TAPS + MAX_LMS_DELAY];
 float32_t LMS_nr_delay[512 + MAX_LMS_DELAY];
 float32_t LMS_StateF32[MAX_LMS_TAPS + MAX_LMS_DELAY];
-float32_t LP_Astop                              = 90.0;
-float32_t LP_Fpass                              = 3500.0;
-float32_t LP_Fstop                              = 3600.0;
-float32_t LPF_spectrum                          = 0.82;
-float32_t M_c1                                  = 0.0;
-float32_t M_c2                                  = 0.0;
-float32_t m_AttackAlpha                         = 0.03;
-float32_t m_AttackAvedbm                        = -73.0;
-float32_t m_DecayAvedbm                         = -73.0;;
-float32_t m_DecayAlpha                          = 0.01;
-float32_t m_AverageMagdbm                       = -73.0;;
-float32_t m_AttackAvedbmhz                      = -103.0;
-float32_t m_DecayAvedbmhz                       = -103.0;
-float32_t m_AverageMagdbmhz                     = -103.0;
+float32_t LP_Astop                           = 90.0;
+float32_t LP_Fpass                           = 3500.0;
+float32_t LP_Fstop                           = 3600.0;
+float32_t LPF_spectrum                       = 0.82;
+float32_t M_c1                               = 0.0;
+float32_t M_c2                               = 0.0;
+float32_t m_AttackAlpha                      = 0.03;
+float32_t m_AttackAvedbm                     = -73.0;
+float32_t m_DecayAvedbm                      = -73.0;;
+float32_t m_DecayAlpha                       = 0.01;
+float32_t m_AverageMagdbm                    = -73.0;;
+float32_t m_AttackAvedbmhz                   = -103.0;
+float32_t m_DecayAvedbmhz                    = -103.0;
+float32_t m_AverageMagdbmhz                  = -103.0;
 float32_t max_gain;
-float32_t max_input                             = -0.1;
+float32_t max_input                          = -0.1;
 float32_t min_volts;
-float32_t mtauI                                 = exp(- DF / (SR[SampleRate].rate * tauI));
-float32_t mtauR                                 = exp(- DF / (SR[SampleRate].rate * tauR));
+float32_t mtauI                              = exp(- DF / (SR[SampleRate].rate * tauI));
+float32_t mtauR                              = exp(- DF / (SR[SampleRate].rate * tauR));
 float32_t noiseThreshhold;
-float32_t notches[10]                           = {500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0, 4000.0, 4500.0, 5000.0};
+float32_t notches[10]                        = {500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0, 4000.0, 4500.0, 5000.0};
 float32_t DMAMEM NR_FFT_buffer[512] __attribute__ ((aligned (4)));
-float32_t NR_sum                                = 0 ;
-float32_t NR_PSI                                = 3.0;
-float32_t NR_KIM_K                              = 1.0;
-float32_t NR_alpha                              = 0.95;
-float32_t NR_onemalpha                          = (1.0 - NR_alpha);
-float32_t NR_beta                               = 0.85;
-float32_t NR_onemtwobeta                        = (1.0 - (2.0 * NR_beta));
-float32_t NR_onembeta                           = 1.0 - NR_beta;
+float32_t NR_sum                             = 0 ;
+float32_t NR_PSI                             = 3.0;
+float32_t NR_KIM_K                           = 1.0;
+float32_t NR_alpha                           = 0.95;
+float32_t NR_onemalpha                       = (1.0 - NR_alpha);
+float32_t NR_beta                            = 0.85;
+float32_t NR_onemtwobeta                     = (1.0 - (2.0 * NR_beta));
+float32_t NR_onembeta                        = 1.0 - NR_beta;
 float32_t NR_G_bin_m_1;
 float32_t NR_G_bin_p_1;
 float32_t NR_T;
@@ -1165,6 +1256,8 @@ float32_t pll_fmax                        = 4000.0;
 float32_t phaseLO                         = 0.0;
 float32_t phzerror                        = 0.0;
 float32_t pop_ratio;
+float32_t powerOut                        = 0.076;       //0.13 =22W,0.1 = 12W,.076=5W. These will likely vary on your system
+float32_t powerOut2;
 float32_t Q_old                           = 0.2;
 float32_t Q_sum;
 float32_t DMAMEM R_BufferOffset[BUFFER_SIZE * N_B];
@@ -1173,6 +1266,7 @@ float32_t ring_max                        = 0.0;
 float32_t SAM_carrier                     = 0.0;
 float32_t SAM_lowpass                     = 2700.0;
 float32_t SAM_carrier_freq_offset         = 0.0;
+float32_t sidetoneVolume                  = 0.001;
 float32_t Sin                             = 0.0;
 float32_t sample_meanL                    = 0.0;
 float32_t sample_meanR                    = 0.0;
@@ -1273,12 +1367,9 @@ time_t getTeensy3Time()
   return Teensy3Clock.get();
 }
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
+//#pragma GCC diagnostic ignored "-Wunused-variable"
 
 PROGMEM
-
-
-
 //==================================================================================
 
 /*****
@@ -1315,8 +1406,7 @@ void Codec_gain()
         }
       }
     }
-  }
-  else if (quarter_clip == 0)     // no clipping occurred
+  } else if (quarter_clip == 0)     // no clipping occurred
   {
     if (timer >= 50)    // 500   // has it been long enough since the last increase?
     {
@@ -1328,16 +1418,11 @@ void Codec_gain()
       }
       AudioNoInterrupts();
       AudioInterrupts();
-      if (Menu2 == MENU_RF_GAIN) {
-        //        ShowMenu(1);
-      }
     }
   }
   half_clip = 0;      // clear "half clip" indicator that tells us that we should decrease gain
   quarter_clip = 0;   // clear indicator that, if not triggered, indicates that we can increase gain
 }
-
-
 
 // is added in Teensyduino 1.52 beta-4, so this can be deleted !?
 /*****
@@ -1375,6 +1460,7 @@ void T4_rtc_set(unsigned long t)
 
 /*****
   Purpose: void initTempMon
+
   Parameter list:
     void
   Return value;
@@ -1385,7 +1471,6 @@ void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, u
 
   uint32_t calibrationData;
   uint32_t roomCount;
-  uint32_t mode1;
   //first power on the temperature sensor - no register change
   TEMPMON_TEMPSENSE0 &= ~TMS0_POWER_DOWN_MASK;
   TEMPMON_TEMPSENSE1 = TMS1_MEASURE_FREQ(freq);
@@ -1443,7 +1528,6 @@ float VolumeToAmplification(int volume)
   //Approximation:
   float ampl = x * x * x * x * x; //70dB
 #endif
-
   return ampl;
 }
 
@@ -1709,16 +1793,11 @@ void InitializeDataArrays()
   ZoomFFTPrep();
 
   /****************************************************************************************
-     IQ imbalance correction
-  ****************************************************************************************/
-
-  /****************************************************************************************
      start local oscillator Si5351
   ****************************************************************************************/
-  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 230000);
+  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 55000);
 
   SetFreq();
-  MyDelay(100L);
 
   SpectralNoiseReductionInit();
   InitLMSNoiseReduction();
@@ -1768,57 +1847,6 @@ void Splash()
   tft.fillWindow(RA8875_BLACK);
 }
 
-/*****
-  Purpose: Call to refresh main screen
-
-  Parameter list:
-    int displayMode     SPECTRUM_ONLY         0                 // Display state
-                        WATERFALL_ONLY        1
-                        BOTH_DISPLAYS         2
-                        NO_DISPLAY            3
-                        NOISE_DISPLAY         4
-                        DO_NOTHING           -1
-
-  Return value;
-    void
-*****/
-void RefreshMainDisplay(int displayMode)
-{
-  switch (displayMode) {
-    case DO_NOTHING:
-      return;
-      break;
-    case SPECTRUM_ONLY:
-      break;
-    case WATERFALL_ONLY:
-      tft.fillRect(SPECTRUM_LEFT_X - 1, SPECTRUM_TOP_Y, MAX_WATERFALL_WIDTH + 2, SPECTRUM_HEIGHT + 30,  RA8875_BLACK);  // Spectrum box
-
-      break;
-    case BOTH_DISPLAYS:
-      //      tft.fillWindow();
-      DrawSpectrumDisplayContainer();
-      DrawFrequencyBarValue();
-      tft.drawRect(BAND_INDICATOR_X - 10, BAND_INDICATOR_Y - 2, 260, 200, RA8875_LIGHT_GREY);
-      tft.fillRect(TEMP_X_OFFSET, TEMP_Y_OFFSET + 80, 80, tft.getFontHeight() + 10, RA8875_BLACK);  // Clear volume field
-
-      SetupMode(bands[currentBand].mode);
-      SetBand();
-      ControlFilterF();
-      FilterBandwidth();
-      DrawSMeterContainer();
-      DrawAudioSpectContainer();
-      SetAttenuator(attenuator);
-      SetFreq();
-      AGCPrep();
-      EncoderVolume();
-      break;
-    case NO_DISPLAY:
-      break;
-    case NOISE_DISPLAY:
-      break;
-  }
-}
-
 //===============================================================================================================================
 //===============================================================================================================================
 //==========================  Setup ================================
@@ -1836,11 +1864,8 @@ void setup()
 {
   //  Serial.begin(115200);
   Serial.begin(9600);
-  //  while (!Serial)
-  //    ;
-  AudioMemory(400);
+
   MyDelay(100L);
-  //  set_arm_clock(T4_CPU_FREQUENCY);
 
   setSyncProvider(getTeensy3Time);            // get TIME from real time clock with 3V backup battery
   setTime(now());
@@ -1849,12 +1874,15 @@ void setup()
 
   sgtl5000_1.setAddress(LOW);
   sgtl5000_1.enable();
-  AudioMemory(400); //
+  AudioMemory(400);
   sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
   //sgtl5000_1.inputSelect(AUDIO_INPUT_LINEIN);
-  sgtl5000_1.micGain(20);
+  sgtl5000_1.micGain(50);
   sgtl5000_1.lineInLevel(0);
   sgtl5000_1.lineOutLevel(20);
+  sgtl5000_1.audioPreProcessorEnable();        // AFP 09-22-22
+  sgtl5000_1.autoVolumeControl(0, 1, 0, -18, 5, 8); // AFP 09-22-22
+  sgtl5000_1.autoVolumeDisable();              // AFP 09-22-22
 
   sgtl5000_2.setAddress(HIGH);
   sgtl5000_2.enable();
@@ -1875,10 +1903,9 @@ void setup()
   pinMode(FILTER_ENCODER_B, INPUT);
 
   pinMode(OPTO_OUTPUT,      OUTPUT);
+
   pinMode(KEYER_DIT_INPUT_TIP,  INPUT_PULLUP);
   pinMode(KEYER_DAH_INPUT_RING, INPUT_PULLUP);
-  digitalWrite(KEYER_DIT_INPUT_TIP,  HIGH);
-  digitalWrite(KEYER_DAH_INPUT_RING, HIGH);
 
   pinMode(TFT_MOSI,         OUTPUT);
   digitalWrite(TFT_MOSI,    HIGH);
@@ -1886,7 +1913,7 @@ void setup()
   digitalWrite(TFT_SCLK,    HIGH);
   pinMode(TFT_CS,           OUTPUT);
   digitalWrite(TFT_CS,      HIGH);
-  MyDelay(1);
+  //MyDelay(1);
 
   arm_fir_init_f32(&FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, FIR_Hilbert_state_L, 256);  //AFP01-16-22
   arm_fir_init_f32(&FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg45, FIR_Hilbert_state_R, 256);
@@ -1905,20 +1932,6 @@ void setup()
 
   //***********************  EQ Gain Settings ************
 
-  EQBand1GaindB = 0;  //200
-  EQBand2GaindB = 0;  //250
-  EQBand3GaindB = 0;  //315
-  EQBand4GaindB = 0;  //400
-  EQBand5GaindB = 0;  //500
-  EQBand6GaindB = 0;  //630
-  EQBand7GaindB = 0;  //800
-  EQBand8GaindB = 0;  //1000
-  EQBand9GaindB = 0;  //1250
-  EQBand10GaindB = 0; //1600
-  EQBand11GaindB = 0; //2000
-  EQBand12GaindB = 0; //2500
-  EQBand13GaindB = 0; //3150
-  EQBand14GaindB = 0; //4000
 
   uint32_t iospeed_display                  = IOMUXC_PAD_DSE(3) | IOMUXC_PAD_SPEED(1);
   *(digital_pin_to_info_PGM + 13)->pad      = iospeed_display;                            //clk
@@ -1926,8 +1939,6 @@ void setup()
   *(digital_pin_to_info_PGM + TFT_CS)->pad  = iospeed_display;
 
   tuneEncoder.begin(true);
-  //    attachInterrupt(digitalPinToInterrupt(TUNE_ENCODER_A),     MainTune,   CHANGE);
-  //    attachInterrupt(digitalPinToInterrupt(TUNE_ENCODER_B),     MainTune,   CHANGE);
   volumeEncoder.begin(true);
   attachInterrupt(digitalPinToInterrupt(VOLUME_ENCODER_A),   EncoderVolume,   CHANGE);
   attachInterrupt(digitalPinToInterrupt(VOLUME_ENCODER_B),   EncoderVolume,   CHANGE);
@@ -1938,8 +1949,8 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(ENCODER3_ENCODER_A), EncoderFineTune, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER3_ENCODER_B), EncoderFineTune, CHANGE);
 
-  //  attachInterrupt(digitalPinToInterrupt(KEYER_DIT_INPUT_TIP),  Dit,           CHANGE);
-  //  attachInterrupt(digitalPinToInterrupt(KEYER_DAH_INPUT_RING), Dah,           CHANGE);
+  attachInterrupt(digitalPinToInterrupt(KEYER_DIT_INPUT_TIP),  KeyTipOn,      CHANGE);    // Changed to keyTipOn from KeyOn everywhere JJP 8/31/22
+  attachInterrupt(digitalPinToInterrupt(KEYER_DAH_INPUT_RING), KeyRingOn,     CHANGE);
 
   tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);              // parameter list from library code
 
@@ -1960,51 +1971,46 @@ void setup()
   xExpand           = 1.4;
   h                 = 135;
   nrOptionSelect    = 0;
-  freq_flag[1]      = 0;
 
-  Q_in_L.begin();
+  Q_in_L.begin();  //Initialize receive input buffers
   Q_in_R.begin();
-
   MyDelay(100L);
-
-  InitializeDataArrays();
-
-  displayMode = BOTH_DISPLAYS;
 
 
   // ========================  Initial set up of EEPROM data ===============
+  EEPROMRead();                                                 // Read what's stored in EEPROM...junk or not?
 
-  EEPROMRead();                                     // Read what's stored in EEPROM...junk or not?
-
-  if (EEPROMData.version_of_settings[0] != 'V') {   // EEPROM has not been set
-    EEPROMSaveDefaults();                           // Use default values so things will work
-    SaveAnalogSwitchValues();                       // Call to reset switch matrix values
+  if (strcmp(EEPROMData.version_of_settings, VERSION) != 0) {   // EEPROM has not been set, save defaults and do switch matrix
+    EEPROMSaveDefaults();                                       // Use default values so things will work
+    SaveAnalogSwitchValues();                                   // Call to reset switch matrix values
   }
+  freqIncrement        = incrementValues[tuneIndex];
+  NR_Index = nrOptionSelect;
 
-#ifdef DEBUG
+#ifdef DEBUG //AFP 09-26-22
   EEPROMShow();
 #endif
-
+  // ========================  End set up of EEPROM data ===============
   activeVFO     = EEPROMData.currentVFO;
-  xmtMode       = EEPROMData.xmtMode;
-  freqIncrement = incrementValues[tuneIndex];
+  //xmtMode       = EEPROMData.xmtMode;
+  if (xmtMode == CW_MODE) {
+    decoderFlag = DECODE_ON;                 // AFP 09-27-22
+  } else {
+    decoderFlag = DECODE_OFF;                     // Turns decoder off // AFP 09-27-22
+  }
 
   if (activeVFO == VFO_A)
-    centerFreq = TxRxFreq = currentFreqA;
+    TxRxFreq = currentFreqA;
   else
-    centerFreq = TxRxFreq = currentFreqB;
+    TxRxFreq = currentFreqB;
 
-#ifdef DEBUG
-  currentFreqA    = TxRxFreq = centerFreq = 7150000L;
-//  decoderFlag     = CW_MODE;        // These could be SSB_MODE too
-//  xmtMode         = CW_MODE;
-  xmtMode         = SSB_MODE;
-  decoderFlag     = SSB_MODE;
+#ifdef DEBUG1 //AFP 09-26-22
+  currentFreqA    = TxRxFreq  = 7030000L; //AFP 09-26-22
+  xmtMode         = CW_MODE;  //AFP 09-26-22
+  decoderFlag     = DECODE_ON;  //AFP 09-26-22
 #endif
 
-  if (decoderFlag == CW_MODE) {
-    ShowDecoderMessage();
-  }
+  InitializeDataArrays();
   splitOn = 0;                                        // Split VFO not active
   SetupMode(bands[currentBand].mode);
 
@@ -2014,29 +2020,55 @@ void setup()
 
   SetDitLength(currentWPM);
 
-  mainMenuIndex = 0;
-  menuStatus = NO_MENUS_ACTIVE;               // Blank menu field
-  RedrawDisplayScreen();
-
   jackStart = millis();
-  digitalWrite(PTT, HIGH);
+  //digitalWrite(PTT, HIGH);
 
   float32_t theta = 0.0;                      //AFP 02-02-22
-  float32_t term  = 3.1415926535897932;
   for (int kf = 0; kf < 255; kf++) {          //Calc sine wave
     //    theta = kf * 2*PI * 1600/ 24000;
     //    theta = kf * 2 * PI * 11 / 256;           // 2 * PI * 11 = 69.115038377 / 256 = 0.2699806186601563
     theta = kf * 0.2699806186601563;          // Simplify terms from above
     sinBuffer[kf] = sin(theta);
   }
-  ShowName();                                 // Show name and version
-  SetFreq();
+  CWFreqShift = 650;  //AFP 10-01-22
   sineTone(BUFFER_SINE_COUNT);                // Set t0 7 from above
   filterEncoderMove   = 0;
   fineTuneEncoderMove = 0L;
-  CenterFastTune();
   ShowDefaultSettings();
+  DrawSpectrumDisplayContainer();
+  RedrawDisplayScreen();
+//  BandInformation();
+//  ShowTransmitReceiveStatus();
+
+  mainMenuIndex = TOP_MENU_COUNT / 2 - 1;     // Start with middle menu options; quicker to get to average selection
+
   menuStatus = NO_MENUS_ACTIVE;               // Blank menu field
+  ShowName();
+
+  // ================  Excite AutoVolume (Compressor) =========== AFP 08-11-22
+  //                   Parameters:
+  //                   maxGain has 3 values 0 = 0dB, 1 = 6dB and 3 = 12dB
+  //                   response has 4 values 0 (0mS, 1 (25mS). 2 (50mS) and 3 100mS
+  //                   hardLimit 0 = "soft knee', and 1= "hard limit"
+  //                   threshold float in range 0dBfs to -97 dBFS (-18 typical)
+  //                   attack - rate of gain change in dBPS over threshold
+  //                   decay - rate rate of gain decrease below threshold in dBPS
+
+  sgtl5000_1.audioPreProcessorEnable(); // AFP 09-22-22
+  sgtl5000_1.autoVolumeControl(0, 1, 0, -18, 6, 100); //  AFP 09-01-22 parameters (maxGain dB,response,hardLimit,threshold, attack, decay)
+  //===================  End Compressor setup ===========
+  xrState = RECEIVE_STATE;
+  SetFreq();
+  BandInformation();
+  ShowBandwidth();
+  FilterBandwidth();
+  tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit
+  tft.fillRect(FREQUENCY_X,       FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit  tft.setFontScale( (enum RA8875tsize) 0);
+  ShowFrequency();
+  RedrawDisplayScreen();
+  DrawFrequencyBarValue();
+  xrState = RECEIVE_STATE;
+  SetFreq();
 }
 //============================================================== END setup() =================================================================
 //===============================================================================================================================
@@ -2058,53 +2090,226 @@ FASTRUN                   // Causes function to be allocated in RAM1 at startup 
 *****/
 void loop()
 {
-  unsigned char result;
-  static int passFlag = 0;
+
   int pushButtonSwitchIndex = -1;
   int valPin;
+  long ditTimerOff; //AFP 09-22-22
+  long dahTimerOn;
 
   valPin = ReadSelectedPushButton();                        // Poll UI push buttons
-  if (valPin != BOGUS_PIN_READ) {                           // If not -1, a button was pushed...
+  if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
     pushButtonSwitchIndex = ProcessButtonPress(valPin);     // Winner, winner...chicken dinner!
     ExecuteButtonPress(pushButtonSwitchIndex);
   }
-  //===========================  Receive ================
-  if (digitalRead(PTT) == HIGH ) {
-    //if (digitalRead(PTT) == HIGH && (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH || digitalRead(KEYER_DAH_INPUT_RING) == HIGH)) {
+  if ( xmtMode == SSB_MODE ) {                      //SSB Mode
+    if (digitalRead(PTT) == HIGH) {
+      digitalWrite(MUTE, LOW);  // Audio Mute off
+      modeSelectInR.gain(0, 1);
+      modeSelectInL.gain(0, 1);
+      digitalWrite(RXTX, LOW); //xmit off
+      T41State = SSB_RECEIVE;
+      xrState = RECEIVE_STATE;
+      modeSelectInR.gain(0, 1);
+      modeSelectInL.gain(0, 1);
 
-    modeSelectInR.gain(0, 0.0);                 //Selects Rec
-    modeSelectInR.gain(1, 1.0);                 //Selects Rec
-    modeSelectInL.gain(0, 0.0);                 //Selects Rec
-    modeSelectInL.gain(1, 1.0);                 //Selects Rec
-    digitalWrite(RXTX, LOW);                    // New board with wisker fix
+      modeSelectInExR.gain(0, 0);
+      modeSelectInExL.gain(0, 0);
 
-    modeSelectOutExL.gain(0, 0);
-    modeSelectOutExR.gain(0, 0);
-    modeSelectOutL.gain(0, 1.0);
-    modeSelectOutR.gain(0, 1.0);
+      modeSelectOutL.gain(0, 1);
+      modeSelectOutR.gain(0, 1);
+      modeSelectOutL.gain(1, 0);
+      modeSelectOutR.gain(1, 0);
 
-    phaseLO             = 0.0;
-    barGraphUpdate      = 0;
-    omitOutputFlag      = false;
-    SetFineTuneFrequency();                                   // draw FastTune frequency line
-    ShowSpectrum();                                           // Now calls ProcessIQData and Encoders calls
-  } else {
-    if (digitalRead(PTT) == LOW ) {  //===========================  Transmit ================
-      digitalWrite(RXTX, HIGH);
-      modeSelectInR.gain(0, 1.0);               //Selects Ex
-      modeSelectInR.gain(1, 0.0);               //Selects Ex
-      modeSelectInL.gain(0, 1.0);               //Selects Ex
-      modeSelectInL.gain(1, 0.0);               //Selects Ex
+      modeSelectOutExL.gain(0, 0);
+      modeSelectOutExR.gain(0, 0);
+      phaseLO             = 0.0;
+      barGraphUpdate      = 0;
+      omitOutputFlag      = false;
+      SetFineTuneFrequency();
+      if ( keyPressedOn == 1) {
+        return;
+      }
+      ShowTransmitReceiveStatus();
+      ShowSpectrum();
+    } else {          //================  SSB Transmit Mode ===========
+      if (digitalRead(PTT) == LOW) {
+        Q_in_L.end();               //Set up input Queues for transmit
+        Q_in_R.end();
+        Q_in_L_Ex.begin();
+        Q_in_R_Ex.begin();
+        xrState = TRANSMIT_STATE;
+        SetFreq();
+      }
+      digitalWrite(MUTE, HIGH);               //  Mute Audio  (HIGH=Mute)
+      digitalWrite(RXTX, HIGH);               //xmit on
+      xrState = TRANSMIT_STATE;
+      modeSelectInR.gain(0, 0);
+      modeSelectInL.gain(0, 0);
+      modeSelectInExR.gain(0, 1);
+      modeSelectInExL.gain(0, 1);
 
       modeSelectOutL.gain(0, 0);
       modeSelectOutR.gain(0, 0);
-      modeSelectOutExL.gain(0, 1.0);
-      modeSelectOutExR.gain(0, 1.0);
-      CWFreqShift = 0;
+      modeSelectOutExL.gain(0, .3);
+      modeSelectOutExR.gain(0, .3 );
+      ShowTransmitReceiveStatus();
+
+      while (digitalRead(PTT) == LOW) {
+        ExciterIQData();
+      }
+      Q_in_L_Ex.end();      // End Transmit Queue
+      Q_in_R_Ex.end();
+      Q_in_L.begin();             // Start Receive Queue
+      Q_in_R.begin();
+      xrState = RECEIVE_STATE;
       SetFreq();
-      ExciterIQData();
+    }
+  } else {                        //Start CW mode
+    if ( xmtMode == CW_MODE) {    //CW  Receive Mode
+      if (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH && digitalRead(KEYER_DAH_INPUT_RING) == HIGH) { //CW Receive Mode
+        digitalWrite(MUTE, LOW);                //turn off mute
+        xmtMode = CW_MODE;
+        xrState = RECEIVE_STATE;
+        ShowTransmitReceiveStatus();
+        T41State = CW_RECEIVE ;
+        modeSelectInR.gain(0, 1);
+        modeSelectInL.gain(0, 1);
+        modeSelectInExR.gain(0, 0);
+        modeSelectInExL.gain(0, 0);
+
+        modeSelectOutL.gain(0, 1);
+        modeSelectOutR.gain(0, 1);
+        modeSelectOutL.gain(1, 0);
+        modeSelectOutR.gain(1, 0);
+
+        modeSelectOutExL.gain(0, 0);
+        modeSelectOutExR.gain(0, 0);
+        phaseLO             = 0.0;
+        barGraphUpdate      = 0;
+        omitOutputFlag      = false;
+        SetFineTuneFrequency();
+        ShowSpectrum();  // if removed CW signal on is 2 mS
+      } else {
+        if (keyPressedOn == 1 && xmtMode == CW_MODE) {
+          xrState = TRANSMIT_STATE;
+          SetFreq();
+                          //================  CW Transmit Mode Straight Key ===========
+          if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW && xmtMode == CW_MODE && keyType == 0) { //Straight Key
+            xrState = TRANSMIT_STATE;
+            SetFreq();
+            cwTimer = millis();
+            while (millis() - cwTimer <= cwTransmitDelay) {            //Start CW transmit timer on
+              digitalWrite(RXTX, HIGH);
+              if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW  && keyType == 0) { // AFP 09-25-22  Turn on CW signal
+                CW_ExciterIQData();
+                cwTimer = millis();                                           //Reset timer
+                modeSelectOutExL.gain(0, powerOut);
+                modeSelectOutExR.gain(0, powerOut);
+                digitalWrite(MUTE, LOW);                // unmutes audio
+                modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone AFP 10-03-22
+                modeSelectOutR.gain(1, sidetoneVolume);          // Sidetone AFP 10-03-22
+              } else {
+                if (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH  && keyType == 0) {  //Turn off CW signal
+                  keyPressedOn = 0;
+                  digitalWrite(MUTE, HIGH);                // mutes audio
+                  modeSelectOutExL.gain(0, 0);        //Power = 0
+                  modeSelectOutExR.gain(0, 0);
+                  modeSelectOutL.gain(1, 0);         // Sidetone off
+                  modeSelectOutR.gain(1, 0);
+                }
+              }
+              CW_ExciterIQData();
+            }
+            digitalWrite(RXTX, LOW);
+           } else {                                 //Start Keyer Mode
+            if (keyPressedOn == 1 && xmtMode == CW_MODE && keyType == 1) {
+              CW_ExciterIQData();
+              xrState = TRANSMIT_STATE;
+              SetFreq();                            //  AFP 10-02-22
+              ShowTransmitReceiveStatus();
+              digitalWrite(MUTE, HIGH);   //   Mute Audio  (HIGH=Mute)
+              modeSelectInR.gain(0, 0);
+              modeSelectInL.gain(0, 0);
+              modeSelectInExR.gain(0, 0);
+              modeSelectInExL.gain(0, 0);
+              modeSelectOutL.gain(0, 0);
+              modeSelectOutR.gain(0, 0);
+              modeSelectOutExL.gain(0, 0);
+              modeSelectOutExR.gain(0, 0);
+              cwTimer = millis();
+              while (millis() - cwTimer <= cwTransmitDelay) {
+                digitalWrite(RXTX, HIGH);             //Turns on relay
+                CW_ExciterIQData();
+                modeSelectInR.gain(0, 0);
+                modeSelectInL.gain(0, 0);
+                modeSelectInExR.gain(0, 0);
+                modeSelectInExL.gain(0, 0);
+                modeSelectOutL.gain(0, 0);
+                modeSelectOutR.gain(0, 0);
+
+                if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW) {    // Keyer Dit
+                  cwTimer = millis();
+                  ditTimerOn = millis();
+                  while (millis() - ditTimerOn <= ditLength) {
+                    modeSelectOutExL.gain(0, powerOut);        //0.13 =22W,0.1 = 12W,.076=5W: default = 0.13
+                    modeSelectOutExR.gain(0, powerOut);
+                    digitalWrite(MUTE, LOW);                // unmutes audio
+                    modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone  AFP 10-03-22
+                    modeSelectOutR.gain(1, sidetoneVolume);
+                    CW_ExciterIQData();             // Creates CW output signal
+                    keyPressedOn = 0;
+                  }
+                  ditTimerOff = millis();
+                  while (millis() - ditTimerOff <= ditLength - 10UL) {  //Time between
+                    modeSelectOutExL.gain(0, 0);             //Power =0
+                    modeSelectOutExR.gain(0, 0);
+                    modeSelectOutL.gain(1, 0);              // Sidetone off
+                    modeSelectOutR.gain(1, 0);
+                    CW_ExciterIQData();
+                    keyPressedOn = 0;
+                  }
+                } else {
+                  if (digitalRead(KEYER_DAH_INPUT_RING) == LOW) {   //Keyer DAH
+                    cwTimer = millis();
+                    dahTimerOn = millis();
+                    while (millis() - dahTimerOn <= 3UL * ditLength) {
+                      modeSelectOutExL.gain(0, powerOut);        //0.13 =22W,0.1 = 12W,.076=5W: default = 0.13
+                      modeSelectOutExR.gain(0, powerOut);
+                      digitalWrite(MUTE, LOW);                // unmutes audio
+                      modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone AFP 10-03-22
+                      modeSelectOutR.gain(1, sidetoneVolume);
+                      CW_ExciterIQData();             // Creates CW output signal
+                      keyPressedOn = 0;
+                    }
+                    ditTimerOff = millis();
+                    while (millis() - ditTimerOff <= ditLength - 10UL) {     //Time between characters                         // mutes audio
+                      modeSelectOutExL.gain(0, 0);                       //Power =0
+                      modeSelectOutExR.gain(0, 0);
+                      modeSelectOutL.gain(1, 0);                         // Sidetone off
+                      modeSelectOutR.gain(1, 0);
+                      CW_ExciterIQData();
+                    }
+                  }
+                }
+              }  //End Relay timer
+//              MyDelay(100);
+            }
+          }
+          xrState = RECEIVE_STATE;
+          SetFreq();
+          BandInformation();
+          ShowBandwidth();
+          FilterBandwidth();
+          tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit
+          tft.fillRect(FREQUENCY_X,       FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit  tft.setFontScale( (enum RA8875tsize) 0);
+          ShowFrequency();
+          RedrawDisplayScreen();
+//          DrawFrequencyBarValue();         
+        }
+      }
     }
   }
+  ShowTransmitReceiveStatus();
 
 #ifdef DEBUG1
   if (elapsed_micros_idx_t > (SR[SampleRate].rate / 960) )
@@ -2117,10 +2322,9 @@ void loop()
     volumeChangeFlag = false;
     UpdateVolumeField();
   }
-
   if (ms_500.check() == 1)                                  // For clock updates
   {
     wait_flag = 0;
     DisplayClock();
   }
-}               // end loop
+}

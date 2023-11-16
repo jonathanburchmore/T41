@@ -56,46 +56,19 @@ void FilterSetSSB()
   }
   notchPosOld = filter_pos;
 
-} // end encoder2 was turned
+} 
 
 
 /*****
-  Purpose: Main tune frequency encoder
-  Parameter list:
-    void
-  Return value;
-    void
-*****//*
-  void MainTune()
-  {
-  unsigned char result  = tuneEncoder.process();  // Read the encoder
-  switch (result) {
-    case 0:                                       // Nothing happened
-      mainTuneEncoder = 0;
-      break;
-
-    case DIR_CW:                                  // Turned it clockwise, 16
-      mainTuneEncoder = 1;
-      break;
-
-    case DIR_CCW:                                 // Turned it counter-clockwise
-      mainTuneEncoder = -1;
-      break;
-  }
-  MyDelay(10);
-  }
-*/
-/*****
-  Purpose: EncoderTune
+  Purpose: EncoderCenterTune
   Parameter list:
     void
   Return value;
     void
 *****/
-void EncoderTune()
+void EncoderCenterTune()
 {
-  int audioVolumeOld   = audioVolume;
-  long tuneChange      = 1L;
+  long tuneChange      = 0L;
   long old_freq;
   long newFreq;
 
@@ -104,10 +77,10 @@ void EncoderTune()
   if (result == 0)                                // Nothing read
     return;
 
-  if (xmtMode == CW_MODE && decoderFlag == true) {        // No reason to reset if we're not doing decoded CW
+  if (T41State == CW_XMIT && decoderFlag == DECODE_ON) {        // No reason to reset if we're not doing decoded CW AFP 09-27-22
     ResetHistograms();
   }
-  old_freq = centerFreq;
+  old_freq = centerFreq;    //AFP 09-27-22
 
   switch (result) {
     case DIR_CW:                                  // Turned it clockwise, 16
@@ -118,23 +91,20 @@ void EncoderTune()
       tuneChange = -1L;
       break;
   }
-  audioVolume    = 0;
-  MyDelay(10);
-
   newFreq = (long)freqIncrement * tuneChange;
 
-  centerFreq += newFreq;                // tune the master vfo and check boundaries
+  centerFreq += newFreq;                    // tune the master vfo and check boundaries
   if (centerFreq > F_MAX) {
     centerFreq = F_MAX;
   } else if (centerFreq < F_MIN) {
     centerFreq = F_MIN;
   }
-  if (centerFreq != old_freq) {            // If the frequency has changed...
-    Q_in_L.clear();
-    Q_in_R.clear();
-    TxRxFreq = centerFreq + NCO_FREQ;
+  if (centerFreq != old_freq) {           // If the frequency has changed...
+    
+    TxRxFreq = centerFreq + NCO_Freq;
     SetFreq();
-    audioVolume = audioVolumeOld;  //Restore audio volume AFP12-17-21
+    NCO_Freq = 0L;                        // Reset the fine tune indicator  
+    DrawBandWidthIndicatorBar();
     CenterFilterOverlay();
     ShowFrequency();
   }
@@ -149,37 +119,59 @@ void EncoderTune()
   Return value;
     int               0 means encoder didn't move; otherwise it moved
 *****/
-void EncoderVolume()
+void EncoderVolume()      //============================== AFP 09-21-22  Begin new
 {
   char result;
-  int adjustVol = 0;
-
+  int32_t increment = 5000L;
   result = volumeEncoder.process();    // Read the encoder
 
   if (result == 0) {                                    // Nothing read
     return;
   }
-
   switch (result) {
     case DIR_CW:                          // Turned it clockwise, 16
-      adjustVol = 1;
+      adjustVolEncoder = 1;
       break;
 
     case DIR_CCW:                         // Turned it counter-clockwise
-      adjustVol = -1;
+      adjustVolEncoder = -1;
       break;
   }
-  audioVolume += adjustVol;
+  switch (IQChoice) {
+    case 0:                //Volume control
+      audioVolume += adjustVolEncoder;
 
-  if (audioVolume > 100) {                // In range?
-    audioVolume = 100;
-  } else {
-    if (audioVolume < 0) {
-      audioVolume = 0;
-    }
-  }
-  volumeChangeFlag = true;        // Need this because of unknown timing in display updating.
-}
+      if (audioVolume > 100) {                // In range?
+        audioVolume = 100;
+      } else {
+        if (audioVolume < 0) {
+          audioVolume = 0;
+        }
+      }
+      //set flags for IC calibration
+
+      volumeChangeFlag = true;        // Need this because of unknown timing in display updating.
+      break;
+    case 1:     // IQ Receive Gain Cal
+      IQ_amplitude_correction_factor += adjustVolEncoder * 0.001;
+      break;
+    case 2:     // IQ Receive Phase Cal
+      IQ_phase_correction_factor += adjustVolEncoder * 0.001;
+      break;
+
+    case 3:     // Xmit Gain Calibrate
+      IQ_Xamplitude_correction_factor += adjustVolEncoder * 0.001;
+      break;
+      case 4:     // Xmit Phase Calibrate
+      IQ_Xphase_correction_factor += adjustVolEncoder * 0.001;
+      break;
+      case 5:     // Frequency Calibrate
+      frequencyCorrectionFactor += adjustVolEncoder * increment;
+      break;
+
+  } // End switch(IQChoice)
+
+}     //============================== AFP 09-21-22  End new
 
 /*****
   Purpose: Use the encoder to change the value of a number in some other function
@@ -201,43 +193,34 @@ int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, c
   tft.setFontScale( (enum RA8875tsize) 1);
 
   tft.setTextColor(RA8875_WHITE);
-  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, 280, CHAR_HEIGHT, RA8875_MAGENTA);
-  tft.setCursor(SECONDARY_MENU_X + 5, MENUS_Y + 1);
+  tft.fillRect(250, 0, 280, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.setCursor(257, 1);
   tft.print(prompt);
-  tft.setCursor(SECONDARY_MENU_X + 150, MENUS_Y + 1);
+  tft.setCursor(470, 1);
   tft.print(startValue);
 
   while (true) {
     if (filterEncoderMove != 0) {
       currentValue += filterEncoderMove * increment;    // Bump up or down...
-
-      if (currentValue < minValue) {
+      if (currentValue < minValue)
         currentValue = minValue;
-      } else {
-        if (currentValue > maxValue) {      
-          currentValue = maxValue;
-        }
-      }
-      if (filterEncoderMove != 0) {
-        tft.fillRect(SECONDARY_MENU_X + 150, MENUS_Y + 1, 65, CHAR_HEIGHT, RA8875_MAGENTA);   // Show numeric encoder value
-        tft.setCursor(SECONDARY_MENU_X + 150, MENUS_Y + 1);
+      else if (currentValue > maxValue)
+        currentValue = maxValue;
+
+        tft.fillRect(465, 0, 65, CHAR_HEIGHT, RA8875_MAGENTA);
+        tft.setCursor(470, 1);
         tft.print(currentValue);
-      }
+        filterEncoderMove = 0;
     }
-    filterEncoderMove = 0;
-    MyDelay(200L);
     
     val = ReadSelectedPushButton();                     // Read the ladder value
-    MyDelay(100L);
+    //MyDelay(100L); //AFP 09-22-22
     if (val != -1  && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
-      MyDelay(100L);
       if (val == MENU_OPTION_SELECT) {                  // Make a choice??
-        menuStatus = NO_MENUS_ACTIVE;                   // We're done...
         return currentValue;
       }
     }
-//    filterEncoderMove = 0;
   }
 }
 
@@ -257,11 +240,11 @@ int SetWPM()
 
   tft.setFontScale( (enum RA8875tsize) 1);
 
-  tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_MAGENTA);
   tft.setTextColor(RA8875_WHITE);
-  tft.setCursor(252, 1);
+  tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
   tft.print("current WPM:");
-  tft.setCursor(450, 1);
+  tft.setCursor(SECONDARY_MENU_X + 200, MENUS_Y + 1);
   tft.print(currentWPM);
 
   while (true) {
@@ -273,17 +256,16 @@ int SetWPM()
       else if (lastWPM > MAX_WPM)
         lastWPM = MAX_WPM;
 
-      tft.fillRect(450, 0, 50, CHAR_HEIGHT, RA8875_MAGENTA);
-      tft.setCursor(450, 1);
+      tft.fillRect(SECONDARY_MENU_X + 200, MENUS_Y + 1, 50, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 200, MENUS_Y + 1);
       tft.print(lastWPM);
       filterEncoderMove = 0;
     }
 
     val = ReadSelectedPushButton();                                  // Read pin that controls all switches
     val = ProcessButtonPress(val);
-    MyDelay(150L);
+    //MyDelay(150L);
     if (val == MENU_OPTION_SELECT) {                             // Make a choice??
-      tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_BLACK);
       currentWPM = lastWPM;
       EEPROMData.wordsPerMinute = currentWPM;
       EEPROMWrite();
@@ -291,13 +273,63 @@ int SetWPM()
       break;
     }
   }
-  tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_BLACK);
+  tft.setTextColor(RA8875_WHITE);
+  EraseMenus();
   return currentWPM;
 }
 
-
 /*****
-  Purpose: Filter fast tune control.
+  Purpose: Determines how long the transmit relay remains on after last CW atom is sent.
+  
+  Parameter list:
+    void
+
+  Return value;
+    long            the delay length in milliseconds
+*****/
+long SetTransmitDelay()                               // new function JJP 9/1/22
+{
+  int val;
+  long lastDelay = cwTransmitDelay;
+  long increment = 250;                               // Means a quarter second change per detent
+
+  tft.setFontScale( (enum RA8875tsize) 1);
+
+  tft.fillRect(SECONDARY_MENU_X - 150, MENUS_Y, EACH_MENU_WIDTH + 150, CHAR_HEIGHT, RA8875_MAGENTA);  // scoot left cuz prompt is long
+  tft.setTextColor(RA8875_WHITE);
+  tft.setCursor(SECONDARY_MENU_X - 149, MENUS_Y + 1);
+  tft.print("current delay:");
+  tft.setCursor(SECONDARY_MENU_X + 79, MENUS_Y + 1);
+  tft.print(cwTransmitDelay);
+
+  while (true) {
+    if (filterEncoderMove != 0) {                     // Changed encoder?
+      lastDelay += filterEncoderMove * increment;     // Yep
+      if (lastDelay < 0L)
+        lastDelay = 250L;
+
+      tft.fillRect(SECONDARY_MENU_X + 80, MENUS_Y + 1, 200, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 79, MENUS_Y + 1);
+      tft.print(lastDelay);
+      filterEncoderMove = 0;
+    }
+
+    val = ReadSelectedPushButton();                              // Read pin that controls all switches
+    val = ProcessButtonPress(val);
+    //MyDelay(150L);  //ALF 09-22-22
+    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+      cwTransmitDelay = lastDelay;
+      EEPROMData.cwTransmitDelay = cwTransmitDelay;
+      EEPROMWrite();
+      break;
+    }
+  }
+  tft.setTextColor(RA8875_WHITE);
+  EraseMenus();
+  return cwTransmitDelay;
+}
+/*****
+  Purpose: Fine tune control.
 
   Parameter list:
     void
@@ -321,12 +353,12 @@ void EncoderFineTune()
       fineTuneEncoderMove = -1L;
     }
   }
-  NCO_FREQ += stepFT * fineTuneEncoderMove;
+  NCO_Freq += stepFT * fineTuneEncoderMove;
 
   if (activeVFO == VFO_A) {
-    currentFreqA = centerFreq + NCO_FREQ;
+    currentFreqA = centerFreq + NCO_Freq;
   } else {
-     currentFreqB = centerFreq + NCO_FREQ;
+    currentFreqB = centerFreq + NCO_Freq; 
   }
   fineTuneEncoderMove = 0L;
 }
@@ -338,6 +370,7 @@ void EncoderFilter()
   result = filterEncoder.process();   // Read the encoder
 
   if (result == 0) {
+    //    filterEncoderMove = 0;// Nothing read
     return;
   }
 

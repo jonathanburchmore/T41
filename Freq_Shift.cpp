@@ -55,8 +55,7 @@ void FreqShift1()
     Notes:  Routine includes checks to ensure the frequency selection stays within the bounds of the
     displayed spectrum
     Also included a variable frequency step, depending on how fast the encoder id turned.  Step varies from 50Hz/step to 10KHz/step
-*****/
-/*************************************************************************************************  AFP 12-13-21
+
     freq_conv2()
 
     FREQUENCY CONVERSION USING A SOFTWARE QUADRATURE OSCILLATOR (NCO)
@@ -71,41 +70,38 @@ void FreqShift1()
     Lyons, R.G. (2011): Understanding Digital Processing. – Pearson, 3rd edition.
     Requires 4 complex multiplies and two adds per data point within the time domain buffer.  Applied after the data
     stream is sent to the Zoom FFT , but befor decimation.
- *************************************************************************************************/
-
-
+*****/
 void FreqShift2()
 {
   uint i;
   long currentFreqAOld;
-  
+
   if (fineTuneEncoderMove != 0L) {
     SetFreq();
     ShowFrequency();
     DrawBandWidthIndicatorBar();
-  }
-  SetFineTuneFrequency();
-  EncoderFineTune();                            //AFP 07-23-22
 
-//  NCO_FREQ += stepFT * fineTuneEncoderMove;   //AFP 12-24-21
-  if (NCO_FREQ > 40000L) {                     //AFP 12-24-21
-    NCO_FREQ = 40000L;
+    SetFineTuneFrequency();
+    EncoderFineTune();
+
+    if (NCO_Freq > 40000L) {
+      NCO_Freq = 40000L;
+    }
     centerFreq += freqIncrement;
-    currentFreqA = centerFreq + NCO_FREQ;
+    currentFreqA = centerFreq + NCO_Freq;
     SetFreq();
     ShowFrequency();
   }
 
   encoderStepOld = fineTuneEncoderMove;
 
-  currentFreqAOld = TxRxFreq;         //AFP 12-24-21
-  TxRxFreq = centerFreq + NCO_FREQ;   //AFP 12-24-21
-  if (abs(currentFreqAOld - TxRxFreq) < 3 * stepFT and currentFreqAOld != TxRxFreq) {   //AFP 12-24-21
+  currentFreqAOld = TxRxFreq;       
+  TxRxFreq = centerFreq + NCO_Freq;
+  if (abs(currentFreqAOld - TxRxFreq) < 3 * stepFT && currentFreqAOld != TxRxFreq) {  
     ShowFrequency();
     DrawBandWidthIndicatorBar();
-//    CenterFilterOverlay();                // JJP 7/24/22
   }
-  NCO_INC = 2.0 * PI * NCO_FREQ / 192000.0; //192000 SPS is the actual sample rate used in the Receive ADC
+  NCO_INC = 2.0 * PI * NCO_Freq / 192000.0; //192000 SPS is the actual sample rate used in the Receive ADC
 
   OSC_COS = cos (NCO_INC);
   OSC_SIN = sin (NCO_INC);

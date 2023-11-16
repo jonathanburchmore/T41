@@ -1,4 +1,4 @@
-#ifndef BEENHERE
+ #ifndef BEENHERE
 #define BEENHERE
 
 //======================================== Library include files ========================================================
@@ -17,24 +17,27 @@
 #include <arm_math.h>
 #include <arm_const_structs.h>
 #include <si5351.h>                                 // https://github.com/etherkit/Si5351Arduino
-#include <RA8875.h>                              // https://github.com/mjs513/RA8875/tree/RA8875_t4
+#include <RA8875.h>                                 // https://github.com/mjs513/RA8875/tree/RA8875_t4
 #include <Rotary.h>                                 // https://github.com/brianlow/Rotary
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <util/crc16.h>                             //mdrhere
+#include <util/crc16.h>                             // mdrhere
 #include <utility/imxrt_hw.h>                       // for setting I2S freq, Thanks, FrankB!
 #include <EEPROM.h>
-
 //======================================== Symbolic Constants for Debugging and Version Control ========================
-#define VERSION                     "V015"
+#define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
+
+#define VERSION                     "V025"
 #define RIGNAME                     "T41-EP SDT"
+#define NUMBER_OF_SWITCHES          18            // Number of push button switches. 16 on older boards
+#define TOP_MENU_COUNT              11            // Menus to process AFP 09-27-22
 #define SPLASH_DELAY                1000L         // Probably should be 4000 to actually read it
-#define RIGNAME_X_OFFSET            570
+#define RIGNAME_X_OFFSET            570           // Pixel count to rig name field
 #define T4                                        // Says we are using a Teensy 4 or 4.1
 #define RA8875_DISPLAY              1             // Comment out if not using RA8875 display
+#define TEMPMON_ROOMTEMP            25.0f
 
-//#define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
 //#define STORE_SWITCH_VALUES                       // Uncomment to save the analog switch values for your push button matrix
 
 #define OFF                         0
@@ -58,19 +61,19 @@
 // These constants are used by the voltage divider network so only 1 analog pin is used for the 16 option switches. These may need
 // to be changed for the exact value for your system. They are initialized in the INO file.
 
-#define BUSY_ANALOG_PIN              39     // This is the analog pin that controls the 16 switches
+#define BUSY_ANALOG_PIN              39     // This is the analog pin that controls the 18 switches
 #define NOTHING_TO_SEE_HERE         950     // If the analog pin is greater than this value, nothing's going on
 #define BOGUS_PIN_READ               -1     // If no push button read
-#define WIGGLE_ROOM                  15     // This is the number of pixels within which a switch analog value must fall
+
+#define WIGGLE_ROOM                  20     // This is the maximum value that can added to a BUSY_ANALOG_PIN pin read value of a push
+                                            // button and still have the switch value be associated with the correct push button.
 #define SWITCH_DEBOUNCE_DELAY       50L     // Milliseconds for the switch to settle down
-#define NUMBER_OF_SWITCHES           16     // Number of push button switches
 #define CHAR_HEIGHT                  32
 
 #define PIXELS_PER_EQUALIZER_DELTA   10     // Number of pixeks per detent of encoder for equalizer changes
 #define PIXELS_PER_AUDIO_DELTA       10
 #define AUDIO_PLOT_CEILING          119     // (SPECTRUM_BOTTOM - AUDIO_SPECTRUM_TOP)
 
-#define TOP_MENU_COUNT               16     // Menus to process
 #define MAX_FAVORITES                10     // Max number of favorite frequencies stored in EEPROM
 
 #define PRIMARY_MENU                  0
@@ -79,15 +82,16 @@
 #define PRIMARY_MENU_X                0
 #define SECONDARY_MENU_X              250
 #define MENUS_Y                       0
-#define MENU_WIDTHS                   300
-
-
-/*                                      just put here to make it easy to see the menu sequence
-  const char *topMenus[]                    = {"CW",            "Display Choices", "Spectrum Set",   "AGC",        "NR Set",
-                                             "IQ Manual",       "EQ Rec Set",      "EQ Xmt Set",     "Mic Comp",   "Freq Cal",
-                                             "Noise Reduction", "RF Set",          "Audio Post Proc","VFO Select", "EEPROM",
-                                             "Noise Floor",     "Unused 1"
-                                            };
+#define EACH_MENU_WIDTH               250
+#define BOTH_MENU_WIDTHS              (EACH_MENU_WIDTH * 2 + 30)
+/*
+const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
+                               "Zoom",         "Menu Dw",  "Band Dn",
+                               "Filter",       "DeMod",    "Mode",
+                               "NR",           "Notch",    "Noise Floor", 
+                               "Fine Tune",    "Decoder",  "Tune incrment", 
+                               "User 1",       "User 2",   "User 2"
+                              };
 */
 #define MENU_OPTION_SELECT           0     // These are the expected values from the switch ladder
 #define MAIN_MENU_UP                 1
@@ -100,11 +104,13 @@
 #define SET_MODE                     8
 #define NOISE_REDUCTION              9
 #define NOTCH_FILTER                10
-#define DISPLAY_OPTIONS             11
-#define INCREMENT                   15
-#define NOISE_FLOOR                 13
-#define UNUSED_1                    14
-#define UNUSED_2                    12
+#define NOISE_FLOOR                 11
+#define FINE_TUNE_INCREMENT         12
+#define DECODER_TOGGLE              13
+#define MAIN_TUNE_INCREMENT         14
+#define UNUSED_1                    15
+#define UNUSED_2                    16
+#define CALIBRATE_FREQUENCY         17
 //=======================================================
 //#define XPIXELS             320           // This is for the standard 2.8" display
 //#define YPIXELS             240
@@ -153,8 +159,14 @@
 #define BAND_SUMMARY_Y        150
 #define START_BAND_DATA_X     TEMP_X_OFFSET
 #define START_BAND_DATA_Y     YPIXELS * 0.25
+
+#define X_R_STATUS_X          730
+#define X_R_STATUS_Y          70
+#define RECEIVE_STATE         1
+#define TRANSMIT_STATE        0
+
 #define SMETER_X              WATERFALL_RIGHT_X + 16
-#define SMETER_Y              YPIXELS * 0.22
+#define SMETER_Y              YPIXELS * 0.22                // 480 * 0.22 = 106
 #define SMETER_BAR_HEIGHT     18
 #define SMETER_BAR_LENGTH     180
 #define SPECTRUM_NOISE_FLOOR  (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT - 3)
@@ -170,6 +182,7 @@
 #define FREQUENCY_X_SPLIT     280
 #define VFO_A                 0
 #define VFO_B                 1
+#define VFO_SPLIT             2
 #define VFOA_PIXEL_LENGTH     275
 #define VFOB_PIXEL_LENGTH     280
 #define FREQUENCY_PIXEL_HI    45
@@ -184,8 +197,8 @@
 #define ZOOM_Y                WATERFALL_TOP_Y   + 130
 #define COMPRESSION_X         WATERFALL_RIGHT_X + 33
 #define COMPRESSION_Y         WATERFALL_TOP_Y   + 150
-#define DECODER_X             WATERFALL_RIGHT_X + 43                      // 512 + 43 = 555
-#define DECODER_Y             WATERFALL_TOP_Y   + 190
+#define DECODER_X             WATERFALL_RIGHT_X + 43                      // 512 +  43 = 555
+#define DECODER_Y             WATERFALL_TOP_Y   + 190                     // 255 + 190 = 345
 #define WPM_X                 WATERFALL_RIGHT_X + 58
 #define WPM_Y                 WATERFALL_TOP_Y   + 170
 #define NR_X_OFF              WATERFALL_RIGHT_X + 80
@@ -216,8 +229,6 @@
 
 #else // --------------------------------------             Non-standard display
 
-//#define BAND_INDICATOR_X      410
-//#define BAND_INDICATOR_Y      260
 #define SPECTRUM_TOP_Y        115                   // Start of spectrum plot space
 #define SPECTRUM_HEIGHT       60                    // This is the pixel height of spectrum plot area without disturbing the axes
 #define MAX_WATERFALL_WIDTH   383
@@ -230,11 +241,6 @@
 #endif
 
 #define DO_NOTHING           -1
-#define SPECTRUM_ONLY         0                 // Display state
-#define WATERFALL_ONLY        1
-#define BOTH_DISPLAYS         2
-#define NO_DISPLAY            3
-#define NOISE_DISPLAY         4
 
 #define FLOAT_PRECISION       6                 // Assumed precision for a float
 #define BUFFER_SINE_COUNT     7                 // Leads to a 750Hz signal
@@ -322,9 +328,9 @@
 #define TIMEZONE                    "EST: "     // Set for eastern time
 #define MOSELEY                     0
 
-#define DEFAULTFREQINCREMENT        1000L       //Values 10, 50, 250, 1000
+#define DEFAULTFREQINCREMENT        1000L       //Values 10, 50, 100, 250, 1000, 10000  AFP 09-26-22
 #define FAST_TUNE_INCREMENT         50L
-#define DEFAULTFREQINDEX            3           //  Index 10Hz=> 0, 50Hz=> 1, 250Hz=> 2, 1000Hz=> 3
+#define DEFAULTFREQINDEX            4           //  Index 10Hz=> 0, 50Hz=> 1, 100Hz=> 2, 250Hz=> 3, 1000Hz=> 4, 10000Hz=> 5  AFP 09-26-22
 #define TEMPMON_ROOMTEMP            25.0f
 #define MAX_WPM                     60
 #define MAX_TONE                    1000
@@ -385,9 +391,8 @@
 #define SECONDARY_MENU_ACTIVE       2      // Both primary and secondary menus active
 
 //========================================= Keyer pins
-//#define TONEPIN                     xx    // For sidetone
-#define KEYER_DIT_INPUT_TIP          35    // Tip connection for keyer
-#define KEYER_DAH_INPUT_RING         36    // Ring connection for keyer  -- default for righthanded user
+#define KEYER_DAH_INPUT_RING         35    // Ring connection for keyer  -- default for righthanded user
+#define KEYER_DIT_INPUT_TIP          36    // Tip connection for keyer
 
 #define OPTO_OUTPUT                  24    // To optoisolator and keyed circuit
 #define STRAIGHT_KEY                  0
@@ -428,6 +433,13 @@
 #define SSB_MODE                    0
 #define CW_MODE                     1
 #define RECEIVE_MODE                2
+#define DECODE_ON                   0    // AFP 09-27-22
+#define DECODE_OFF                  1    // AFP 09-27-22
+
+#define SSB_RECEIVE                 0
+#define SSB_XMIT                    1
+#define CW_RECEIVE                  2
+#define CW_XMIT                     3
 
 #define DIGIMODE_OFF                0
 #define CW                          1
@@ -484,7 +496,7 @@
 #define DEMOD_LSB                   1
 #define DEMOD_AM2                   2
 #define DEMOD_SAM                   3         // synchronous AM demodulation
-#define DEMOD_MAX                   3
+#define DEMOD_MAX                   2 // AFP 09-22-22
 
 #define DEMOD_IQ                    4
 #define DEMOD_DCF77                 29        // set the clock with the time signal station DCF77
@@ -500,26 +512,10 @@
 #define MISC_BAND                   2
 #define BUFFER_SIZE                 128
 
-//#define pos                         50        // position of spectrum display, has to be < 124
-//#define pos_version                 119       // position of version number printing
-//#define pos_x_tunestep              100
-//#define pos_y_tunestep              119       // = pos_y_menu 91
-
 #define NOTCHPOS                    spectrum_y + 6
 #define NOTCHL                      15
 #define NOTCHCOLOUR                  RA8875_YELLOW
 
-/*
-#define TUNE_STEP_MIN               0
-#define TUNE_STEP1                  0
-#define TUNE_STEP2                  1
-#define TUNE_STEP3                  2
-#define TUNE_STEP4                  3
-#define TUNE_STEP5                  4
-#define TUNE_STEP_MAX               4
-#define FIRST_TUNEHELP              1
-#define LAST_TUNEHELP               3
-*/
 // Menus !
 #define MENU_F_HI_CUT               0
 #define MENU_SPECTRUM_ZOOM          1
@@ -626,12 +622,10 @@
 
 #define FIRST_BAND                BAND_80M
 #define LAST_BAND                 BAND_10M    //AFP 1-28-21
-#define NUM_BANDS                 7           //AFP 1-28-21
+#define NUMBER_OF_BANDS                 7           //AFP 1-28-21
 #define STARTUP_BAND              BAND_40M    //AFP 1-28-21
 
 #endif
-
-
 
 //=== CW Filter ===
 
@@ -639,6 +633,8 @@
 
 extern arm_biquad_cascade_df2T_instance_f32 S1_CW_Filter;
 extern float32_t CW_Filter_state[];
+extern float32_t HP_DC_Filter_Coeffs[];
+
 #define IIR_CW_ORDER 8
 #define IIR_CW_NUMSTAGES   4
 extern float32_t CW_Filter_Coeffs[];
@@ -669,6 +665,8 @@ extern float32_t CW_Filter_Coeffs[];
 
 
 //================== Global CW Correlation and FFT Variables =================
+extern float32_t audioMaxSquaredAve;
+
 extern float32_t corrResult;  //AFP 02-02-22
 extern uint32_t corrResultIndex;  //AFP 02-02-22
 extern float32_t sinBuffer[];    //AFP 02-02-22
@@ -677,6 +675,7 @@ extern float32_t float_Corr_Buffer[];   //AFP 02-02-22
 extern float32_t aveCorrResult;   //AFP 02-02-22
 extern float32_t magFFTResults[];
 extern long tempSigTime;
+extern int CW_IRR_on;
 extern int audioTemp;
 extern int audioTempPrevious;
 extern int filterWidth;
@@ -687,7 +686,6 @@ extern float sigDuration;
 extern float gapStartData;
 extern float gapDurationData;
 extern int audioValuePrevious;
-extern int audioPostProcessorCells[];
 extern float goertzelMagnitude;
 extern float32_t corrResultR;  //AFP 02-02-22
 extern uint32_t corrResultIndexR;  //AFP 02-02-22
@@ -708,15 +706,21 @@ extern float ticMarkTimer;
 extern float ticMarkTimerOld;
 extern int CWOnState;  //AFP 05-17-22
 extern long CWFreqShift; //AFP 05-17-22
-
+extern long cwTime0;
+extern long cwTime1;
+extern long cwTime2;
+extern long cwTime3;
+extern long cwTime4;
+extern long cwTime5;
+extern long cwTime6;
 //===== New histogram stuff
 
+extern int endDitFlag;
+extern int endGapFlag;
 extern int topDitIndex;  //AFP 02-20-22
 extern int topDitIndexOld;
-extern int endDitFlag;
 extern int topGapIndex;
 extern int topGapIndexOld;
-extern int endGapFlag;
 
 extern int32_t signalHistogram[];
 extern int32_t gapHistogram[];
@@ -735,6 +739,8 @@ extern int atomGapLength;
 extern int atomGapLength2;
 extern int charGapLength;
 extern int charGapLength2;
+extern int receiveEQFlag;
+extern int xmitEQFlag;
 
 extern long valRef1;
 extern long valRef2;
@@ -756,15 +762,18 @@ extern long filter_pos;
 extern long last_filter_pos;
 // ============ end new stuff =======
 
-
 //================== Global Excite Variables =================
-
 
 #define IIR_ORDER 8
 #define IIR_NUMSTAGES (IIR_ORDER / 2)
+
+extern arm_biquad_cascade_df2T_instance_f32   s1_Receive ;  //AFP 09-23-22
+extern float32_t HP_DC_Butter_state[6];                     //AFP 09-23-22
+
 extern float32_t coeffs192K_10K_LPF_FIR[];
 extern float32_t coeffs48K_8K_LPF_FIR[];
 extern const uint32_t N_B_EX;
+extern float32_t recEQ_Level[];
 
 extern float32_t EQ_Band1Coeffs[];
 extern float32_t EQ_Band2Coeffs[];
@@ -780,6 +789,38 @@ extern float32_t EQ_Band11Coeffs[];
 extern float32_t EQ_Band12Coeffs[];
 extern float32_t EQ_Band13Coeffs[];
 extern float32_t EQ_Band14Coeffs[];
+
+
+//Setup for EQ filters
+extern float32_t rec_EQ_Band1_state[] ;
+extern float32_t rec_EQ_Band2_state[] ;
+extern float32_t rec_EQ_Band3_state[] ;
+extern float32_t rec_EQ_Band4_state[] ;
+extern float32_t rec_EQ_Band5_state[] ;
+extern float32_t rec_EQ_Band6_state[] ;
+extern float32_t rec_EQ_Band7_state[] ;
+extern float32_t rec_EQ_Band8_state[] ;
+extern float32_t rec_EQ_Band9_state[] ;
+extern float32_t rec_EQ_Band10_state[] ;
+extern float32_t rec_EQ_Band11_state[] ;
+extern float32_t rec_EQ_Band12_state[] ;
+extern float32_t rec_EQ_Band13_state[] ;
+extern float32_t rec_EQ_Band14_state[] ;
+
+extern float32_t rec_EQ1_float_buffer_L[];
+extern float32_t rec_EQ2_float_buffer_L[];
+extern float32_t rec_EQ3_float_buffer_L[];
+extern float32_t rec_EQ4_float_buffer_L[];
+extern float32_t rec_EQ5_float_buffer_L[];
+extern float32_t rec_EQ6_float_buffer_L[];
+extern float32_t rec_EQ7_float_buffer_L[];
+extern float32_t rec_EQ8_float_buffer_L[];
+extern float32_t rec_EQ9_float_buffer_L[];
+extern float32_t rec_EQ10_float_buffer_L[];
+extern float32_t rec_EQ11_float_buffer_L[];
+extern float32_t rec_EQ12_float_buffer_L[];
+extern float32_t rec_EQ13_float_buffer_L[];
+extern float32_t rec_EQ14_float_buffer_L[];
 
 extern float32_t FIR_Hilbert_coeffs90[];
 extern float32_t FIR_Hilbert_coeffs0[];
@@ -831,6 +872,57 @@ extern float EQBand11Scale ;
 extern float EQBand12Scale ;
 extern float EQBand13Scale;
 extern float EQBand14Scale;
+
+//EQ filter instances
+extern arm_biquad_cascade_df2T_instance_f32 S1_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S2_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S3_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S4_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S5_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S6_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S7_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S8_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S9_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S10_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S11_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S12_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S13_Rec ;
+extern arm_biquad_cascade_df2T_instance_f32 S14_Rec ;
+
+// ================= start  AFP 10-02-22 ===========
+extern arm_biquad_cascade_df2T_instance_f32 S1_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S2_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S3_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S4_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S5_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S6_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S7_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S8_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S9_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S10_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S11_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S12_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S13_Xmt ;
+extern arm_biquad_cascade_df2T_instance_f32 S14_Xmt ;
+
+ extern float32_t xmtEQ_Level[];
+ 
+extern float32_t xmt_EQ1_float_buffer_L [];
+extern float32_t xmt_EQ2_float_buffer_L [];
+extern float32_t xmt_EQ3_float_buffer_L[];
+extern float32_t xmt_EQ4_float_buffer_L [];
+extern float32_t xmt_EQ5_float_buffer_L [];
+extern float32_t xmt_EQ6_float_buffer_L [];
+extern float32_t xmt_EQ7_float_buffer_L [];
+extern float32_t xmt_EQ8_float_buffer_L [];
+extern float32_t xmt_EQ9_float_buffer_L [];
+extern float32_t xmt_EQ10_float_buffer_L [];
+extern float32_t xmt_EQ11_float_buffer_L [];
+extern float32_t xmt_EQ12_float_buffer_L [];
+extern float32_t xmt_EQ13_float_buffer_L [];
+extern float32_t xmt_EQ14_float_buffer_L [];
+
+// ================= end  AFP 10-02-22 ===========
 
 
 extern arm_biquad_cascade_df2T_instance_f32 S1_EXcite ;
@@ -916,8 +1008,8 @@ void ExciterIQData();
 //==================== End Excite Variables ================================
 
 //======================================== Global object declarations ==================================================
-//extern float32_t NCO_FREQ ; // AFP 04-16-22
-extern long NCO_FREQ ; // AFP 04-16-22
+//extern float32_t NCO_Freq ; // AFP 04-16-22
+extern long NCO_Freq ; // AFP 04-16-22
 
 //extern double stepFT;
 //extern double stepFT2;
@@ -938,43 +1030,37 @@ extern float32_t q_temp;
 //======================================
 
 //======================================== Global object declarations ==================================================
-extern AudioMixer4            recMix_3;         // JJP
+extern AudioMixer4              recMix_3;         // JJP
+extern AudioMixer4              CW_AudioOut;      // JJP 9/1/22
+
 //extern AudioSynthWaveformSine sine1;            // JJP Sidetone generator for CW monitoring
 
-extern AudioInputI2SQuad        i2s_quadIn;
-extern AudioOutputI2SQuad       i2s_quadOut;
+//===============  AFP 09-01-22
+extern AudioMixer4          CW_AudioOutR; //AFP 09-01-22
+extern AudioMixer4          CW_AudioOutL; //AFP 09-01-22
 
-extern SPISettings          settingsA;
-extern AudioControlSGTL5000 sgtl5000_1;
-extern AudioControlSGTL5000 sgtl5000_2;
-//extern AudioInputI2S        i2s_in;
+extern AudioMixer4           modeSelectInR;
+extern AudioMixer4           modeSelectInL;
+extern AudioMixer4           modeSelectInExR;
+extern AudioMixer4           modeSelectInExL;
 
-extern AudioMixer4          modeSelectInR;
-extern AudioMixer4          modeSelectInL;
-extern AudioMixer4          modeSelectOutR;
-extern AudioMixer4          modeSelectOutL;
+extern AudioMixer4           modeSelectOutL;
+extern AudioMixer4           modeSelectOutR;
+extern AudioMixer4           modeSelectOutExL;
+extern AudioMixer4           modeSelectOutExR;
 
+extern AudioRecordQueue      Q_in_L;
+extern AudioRecordQueue      Q_in_R;
+extern AudioRecordQueue      Q_in_L_Ex;
+extern AudioRecordQueue      Q_in_R_Ex;
 
-extern AudioMixer4          modeSelectOutL;
-extern AudioMixer4          modeSelectOutR;
+extern AudioPlayQueue        Q_out_L;
+extern AudioPlayQueue        Q_out_R;
+extern AudioPlayQueue        Q_out_L_Ex;
+extern AudioPlayQueue        Q_out_R_Ex;
+extern AudioControlSGTL5000  sgtl5000_1;    // AFP 09-22-22
+//===============  AFP 09-01-22
 
-extern AudioMixer4          modeSelectOutExL;
-extern AudioMixer4          modeSelectOutExR;
-//extern AudioOutputI2S       i2s_out;
-extern AudioPlayQueue       Q_out_L;
-extern AudioPlayQueue       Q_out_R;
-extern AudioRecordQueue     Q_in_L;
-extern AudioRecordQueue     Q_in_R;
-
-//extern AudioPlayQueue       Q_out_L;
-//extern AudioPlayQueue       Q_out_R;
-//extern AudioRecordQueue     Q_in_L;
-//extern AudioRecordQueue     Q_in_R;
-
-//extern AudioRecordQueue     Q_in_L;
-//extern AudioRecordQueue     Q_in_R;
-//extern AudioMixer4          inputleft;
-//extern AudioMixer4          inputright;
 // Added hardware: A pair of 100K resistors connected to the L&R input pins of the Codec.
 // These two resisors are connected together on the other end and go through a 2.2nF cap
 // to the A21 DAC pin on the Teensy 3.6.
@@ -1024,30 +1110,29 @@ struct secondaryMenuConfiguration {
 };
 
 extern struct config_t {
-  char version_of_settings[7] = {'V', '2', '0', '0', '\0'}; // "V200"
+  char version_of_settings[7];         
 
   int8_t AGCMode                        = 1;  // 1 byte
   int8_t auto_IQ_correction             = 1;  // 1 byte
 
   uint8_t dcfParityBit                  = 3;  // 1 byte
   uint8_t rate                          = 4;  // 1 byte
-  uint8_t NR_use_X                      = 5;  // 1 byte
+  uint8_t nrInUse                       = 0;  // 1 byte
   uint8_t show_spectrum_flag            = 1;  // 1 byte
 
-  int16_t pixel_offset[NUM_BANDS];            // 14 bytes
+  int16_t pixel_offset[NUMBER_OF_BANDS];            // 14 bytes
 
   int16_t currentVFO                    = 1;  // 2 bytes
 
   int agc_thresh                        = 0;  // 4 bytes
   int agc_decay                         = 0;  // 4 bytes
   int agc_slope                         = 0;  // 4 bytes
-  int AGC_thresh[NUM_BANDS];                  // 4 bytes
+  int AGC_thresh[NUMBER_OF_BANDS];                  // 4 bytes
   int attenuator;
-  int audioPostProc[AUDIO_POST_PROCESSOR_BANDS];// 32 bytes
   int audioVolume                      = 0;  // 4 bytes
 
-  int bwu[NUM_BANDS];                         // 4 bytes
-  int bwl[NUM_BANDS];                         // 4 bytes
+  int bwu[NUMBER_OF_BANDS];                         // 4 bytes
+  int bwl[NUMBER_OF_BANDS];                         // 4 bytes
 
   int currentBand                       = 1;  // 4 bytes
   int dcfCount                          = 0;  // 4 bytes
@@ -1060,35 +1145,33 @@ extern struct config_t {
   int freqIncrement                     = 0;  // 4 bytes
   int keyType                           = 0;  // straight key = 0, keyer = 1
   int keyerSidetone                     = 700;// Hz
-  int mode[NUM_BANDS];                        // 4 bytes
+  int mode[NUMBER_OF_BANDS];                        // 4 bytes
   int NR_Filter_Value;
   int paddleDah                         = 0;  // 4 bytes
   int paddleDit                         = 1;  // 4 bytes
-  int powerLevel                        = 8;  // 4 bytes
-  int rfg[NUM_BANDS];                         // 4 bytes
-  int rfGain;
+  int powerLevel                        = 20;  // 4 bytes
+  int rfg[NUMBER_OF_BANDS];                         // 4 bytes
+  int rfGainAllBands;
 
   int spectrumNoiseFloor                = SPECTRUM_NOISE_FLOOR;  // 4 bytes
-
   int switchValues[NUMBER_OF_SWITCHES];       // 64 bytes
   int tuneIndex                         = 4;  // 4 bytes, 500Hz
   int wordsPerMinute                    = 15; // 4 bytes
   int xmtMode                           = SSB_MODE;
-  int zetaHelp                          = 65; // 4 bytes
 
   uint16_t crc                          = 100;// 2 bytes, added when saving
   uint16_t currentScale                 = 1;  // 2 bytes,
 
   int32_t spectrum_zoom                 = spectrum_zoom; // 4 bytes
 
-  long calibration_constant             = 0;  // 4 bytes
   long centerFreq                       = 7047700L;// 4 bytes
   long currentFreqA                     = 7047700L;// 4 bytes
   long currentFreqB                     = 7150000L;// 4 bytes
-  long favoriteFreqs[MAX_FAVORITES];          // 40 bytes
-  long frequencyOffset                  = 0L; // 4 bytes
-
-  unsigned long calibration_factor      = 1;  // 8 bytes
+  long cwTransmitDelay                  = 1000L;   // 4 bytes
+  long favoriteFreqs[MAX_FAVORITES];               // 40 bytes
+  long frequencyOffset                  = 0L;      // 4 bytes
+  long lastFrequencies[NUMBER_OF_BANDS][2];
+  unsigned long calibrationFactor      = 1;  // 8 bytes
 
   float bitSamplePeriod                 = 1.0 / 500.0;      // 4 bytes
   float bitSampleTimer                  = 0;  // 4 bytes
@@ -1099,17 +1182,20 @@ extern struct config_t {
 
   float32_t bass                        = 0.0;// 4 bytes
   float32_t LPFcoeff                    = 0.0;// 4 bytes
-  float32_t micCompression              = 0.0;// 4 bytes
+  int micCompression              = -18;// 4 bytes      // AFP 09-22-22  
   float32_t midbass                     = 0.0;// 4 bytes
   float32_t mid                         = 0.0;// 4 bytes
   float32_t midtreble                   = 0.0;// 4 bytes
+  float32_t NR_Filter_Values[3];              // 12 bytes
   float32_t NR_PSI                      = 0.0;// 4 bytes
   float32_t NR_alpha                    = 0.0;// 4 bytes
   float32_t NR_beta                     = 0.0;// 4 bytes
   float32_t offsetDisplayDB             = 0.0;// 4 bytes
   float32_t omegaN                      = 0.0;// 4 bytes
   float32_t pll_fmax                    = 4000.0;  // 4 bytes
+  float32_t powerOut                    = 0.130;   // 4 bytes
   float32_t spectrum_display_scale      = 0.0;// 4 bytes
+  float32_t sidetoneVolume              = 0.001;
   float32_t stereo_factor               = 0.0;// 4 bytes
   float32_t treble                      = 0.0;// 4 bytes
   float32_t IQ_AmpCorFactor             = 1.0;
@@ -1170,7 +1256,7 @@ struct band {
   int FLoCut;
   int RFgain;
   uint8_t band_type;
-  float32_t gainCorrection; // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
+  int gainCorrection; // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
   int AGC_thresh;
   int16_t pixel_offset;
 };
@@ -1217,8 +1303,9 @@ extern bool volumeChangeFlag;
 
 extern char *bigMorseCodeTree;
 extern char decodeBuffer[];
-extern char *morseCodeTree;
+extern const char *labels[];
 extern char letterTable[];
+extern char *morseCodeTree;
 extern char numberTable[];
 extern char punctuationTable[];
 extern char theversion[];
@@ -1266,7 +1353,6 @@ extern uint8_t erase_flag;
 extern uint8_t fade_leveler;
 extern uint8_t FIR_filter_window;
 extern uint8_t flagg;
-extern uint8_t freq_flag[];
 extern uint8_t half_clip;
 extern uint8_t hang_enable;
 extern uint8_t hour10_old;
@@ -1274,6 +1360,8 @@ extern uint8_t hour1_old;
 extern uint8_t IQCalFlag;
 extern uint8_t iFFT_flip;
 extern uint8_t IQ_state;
+extern uint8_t keyPressedOn; //AFP 09-01-22
+extern uint8_t relayLatch;//AFP 09-7-22
 extern uint8_t LastSampleRate;
 extern uint8_t minute10_old;
 extern uint8_t minute1_old;
@@ -1299,7 +1387,7 @@ extern uint8_t show_spectrum_flag;
 extern uint8_t spectrum_mov_average;
 extern uint8_t state;
 extern uint8_t tune_stepper;
-
+extern uint8_t T41State;
 extern uint8_t twinpeaks_tested;                      // initial value --> 2 !!
 extern uint8_t wait_flag;
 extern uint8_t WDSP_SAM;
@@ -1312,7 +1400,6 @@ extern const uint8_t NR_N_frames;
 
 extern int16_t activeVFO;
 extern int16_t currentMode;
-extern int16_t displayMode;
 extern int16_t fineEncoderRead;
 
 extern int16_t  pixelnew[];
@@ -1366,6 +1453,8 @@ extern const uint32_t N_stages_biquad_lowpass1;
 extern const uint16_t n_dec1_taps;
 extern const uint16_t n_dec2_taps;
 
+extern float adjustVolEncoder; //AFP 09-21-22
+extern int adjustIQ;           //AFP 09-21-22
 extern int encoderStepOld;
 extern int resultOldFactor;
 extern float incrFactor;
@@ -1389,7 +1478,6 @@ extern int audioYPixel[];
 extern int bandswitchPins[];
 extern int button9State;
 extern int buttonRead;
-extern int cwSidetone;
 extern int currentBand;
 extern int dahLength;
 extern int dcfCount;
@@ -1399,7 +1487,6 @@ extern int dcfTheSecond;
 extern int dcfPulseTime;
 extern int decoderFlag;
 extern int demodIndex;
-extern int ditLength;
 extern int EEPROMChoice;
 extern int equalizerRecChoice;
 extern int equalizerXmtChoice;
@@ -1424,7 +1511,9 @@ extern int helpyear;
 extern int helpsec;
 extern int idx, idpk;
 extern int IQChoice;
+extern int IQEXChoice;
 extern int lidx, hidx;
+extern int keyType;
 extern int LMS_nr_strength;
 extern int LP_F_help;
 extern int mainTuneEncoder;
@@ -1453,7 +1542,7 @@ extern int pmode;
 extern int pos_centre_f;
 extern int pos_x_frequency;
 extern int pos_y_smeter;
-extern int rfGain;
+extern int rfGainAllBands;
 extern int SAM_AM_Choice;
 extern int secondaryMenuChoiceMade;
 extern int smeterLength;
@@ -1465,9 +1554,10 @@ extern int switchFilterSideband;    //AFP 1-28-21
 //extern int switchThreshholds[];
 extern int termCursorXpos;
 extern int timerFlag;
-extern int transmitPowerLevel;
+extern float transmitPowerLevel;
 extern int tuneIndex;
 extern int x2;                      //AFP
+extern int xrState; 
 extern int zeta_help;
 extern int zoom_sample_ptr;
 extern int zoomIndex;
@@ -1489,8 +1579,9 @@ extern unsigned ring_buffsize;
 extern unsigned tcr5;
 extern unsigned tcr2div;
 
-
 extern int32_t FFT_shift;
+extern int32_t frequencyCorrectionFactor;
+extern int32_t frequencyCorrectionFactorOld; //AFP 09-21-22
 extern int32_t IFFreq;     // IF (intermediate) frequency
 extern int32_t IF_FREQ1;
 extern int32_t O_iiSum19;
@@ -1525,18 +1616,23 @@ extern uint32_t twinpeaks_counter;
 
 extern long averageDit;
 extern long averageDah;
-extern long calibration_constant;
 extern long currentFreq;
 extern long centerFreq;
-extern long TxRxFreq;       // = centerFreq+NCOFreq  NCOFreq from FreqShift2()
-extern long recClockFreq;  //  = TxRxFreq+IFFreq  IFFreq from FreqShift1()=48KHz
-extern long CWRecFreq;     //  = TxRxFreq +/- 700Hz
+extern unsigned long ditLength;
+extern long TxRxFreq;             // = centerFreq+NCOFreq  NCOFreq from FreqShift2()
+extern long recClockFreq;         //  = TxRxFreq+IFFreq  IFFreq from FreqShift1()=48KHz
+extern long CWRecFreq;            //  = TxRxFreq +/- 700Hz
+extern unsigned long cwTimer;
+extern long signalTime;
+extern unsigned long ditTimerOn;
+extern long DahTimer;
+extern unsigned long cwTransmitDelay;      // ms to keep relay on after last atom read
 extern long currentFreqA;;
 extern long currentFreqB;
 extern long currentWPM;
 extern long frequencyCorrection;
 extern long incrementValues[];
-extern long lastWPM;
+extern long lastFrequencies[][2];
 extern long notchCenterBin;
 extern long int n_clear;
 extern long startTime;
@@ -1556,9 +1652,9 @@ extern unsigned long currentFreqs[];
 
 extern uint64_t output12khz;
 
-extern unsigned long long calibration_factor;
-extern unsigned long long hilfsf;
-extern unsigned long long hilfsfEx;
+extern unsigned long long calibrationFactor;
+extern unsigned long long Clk2SetFreq;             // AFP 09-27-22
+extern unsigned long long Clk1SetFreq;             // AFP 09-27-22
 
 float32_t arm_atan2_f32(float32_t y, float32_t x);
 float ApproxAtan(float z);
@@ -1602,6 +1698,7 @@ extern float32_t c1[];
 extern float32_t coefficient_set[];
 extern float32_t corr[];
 extern float32_t Cos;
+extern float32_t cosBuffer2[];  //AFP 08-18-22
 extern float32_t CPU_temperature ;
 extern float32_t cursorIncrementFraction;
 extern float32_t d[];
@@ -1654,6 +1751,8 @@ extern float32_t /*DMAMEM*/ Fir_Zoom_FFT_Decimate_coeffs[];
 extern float32_t fixed_gain;
 extern float32_t float_buffer_L[];
 extern float32_t float_buffer_R[];
+extern float32_t float_buffer_L_CW[]; //AFP 09-01-22
+extern float32_t float_buffer_R_CW[]; //AFP 09-01-22
 extern float32_t float_buffer_L2[];
 extern float32_t float_buffer_R2[];
 extern float32_t g1;
@@ -1710,7 +1809,7 @@ extern float32_t m_AverageMagdbmhz;
 extern float32_t *mag_coeffs[];
 extern float32_t max_gain;
 extern float32_t max_input;
-extern float32_t micCompression;
+extern int micCompression; // AFP 09-22-22
 extern float32_t midbass;
 extern float32_t mid;
 extern float32_t midtreble;
@@ -1776,6 +1875,8 @@ extern float32_t pll_fmax;
 extern float32_t phaseLO;
 extern float32_t phzerror;
 extern float32_t pop_ratio;
+extern float32_t powerOut;          // Sets the drive to PA
+extern float32_t powerOut2;
 extern float32_t Q_old;
 extern float32_t Q_sum;
 extern float32_t R_BufferOffset[];
@@ -1790,6 +1891,7 @@ extern float32_t sample_meanR;
 extern float32_t sample_meanLNew;
 extern float32_t sample_meanRNew;
 extern float32_t save_volts;
+extern float32_t sidetoneVolume;
 extern float32_t slope_constant;
 extern float32_t spectrum_display_scale;          // 30.0
 extern float32_t stereo_factor;
@@ -1858,30 +1960,7 @@ extern double elapsed_micros_idx_t;
 extern double elapsed_micros_mean;
 extern double elapsed_micros_sum;
 
-/*                                        None in the code
 
-  extern const double O_timeStep ;
-  extern const double O_frequency19  ;
-  extern const double O_dPhase19  ;
-  extern const double O_cicR ;
-  extern const double O_gainP ;
-  extern const double O_gainI  ;
-  extern const double O_limit  ;
-  extern double O_phase ;
-  extern double O_frequency ;
-  extern double O_lastPhase ;
-  extern double O_MPXsignal;
-  extern double O_phase19;
-  extern double vco19 ;
-  extern double O_integrate19;
-  extern int32_t O_integrateCount19;
-  extern double O_Pcontrol;
-  extern double O_Icontrol ;
-  extern double O_vco19 ;
-  extern int32_t O_iiSum19  ;
-
-
-*/
 //======================================== Function prototypes =========================================================
 
 void AGC();
@@ -1897,7 +1976,6 @@ void ButtonBandIncrease();
 int  BandOptions();
 int  ButtonDemod();
 void ButtonDemodMode();
-int  ButtonDisplayOptions();
 void ButtonFilter();
 void ButtonFreqIncrement();
 void ButtonMenuIncrease();
@@ -1913,13 +1991,15 @@ void CalcFIRCoeffs(float * coeffs_I, int numCoeffs, float32_t fc, float32_t Asto
 void CalcCplxFIRCoeffs(float * coeffs_I, float * coeffs_Q, int numCoeffs, float32_t FLoCut, float32_t FHiCut, float SampleRate);
 void CalcNotchBins();
 void Calculatedbm();
+int  Xmit_IQ_Cal(); //AFP 09-21-22
+int  CalibrateFrequency();
 void CenterFastTune();
 void CenterFilterOverlay();
 void Codec_gain();
 void ControlFilterF();
-void CWInterrupt();
 int  CWOptions();
 void CW_DecodeLevelDisplay();
+void CW_ExciterIQData();  // AFP 08-18-22
 void Dah();
 void DecodeIQ();
 void DisplayClock();
@@ -1927,7 +2007,10 @@ void DisplaydbM();
 void DisplayDitLength();
 void Dit();
 void DoCWDecoding(int audioValue);
+void DoCWReceiveProcessing(); //AFP 09-19-22
+void DoExciterEQ();
 void DoGapHistogram(long valGap);
+void DoReceiveEQ();
 void DrawSignalPlotFrame();
 void DoSignalHistogram(long val);
 void DoSignalPlot(float val);
@@ -1949,7 +2032,7 @@ void EEPROMStuffFavorites(unsigned long current[]);
 void EEPROMWrite();
 void EncoderFineTune();
 void EncoderFilter();
-void EncoderTune();
+void EncoderCenterTune();
 void EncoderVolume();
 int  EqualizerRecOptions();
 int  EqualizerXmtOptions();
@@ -1978,6 +2061,9 @@ float32_t Izero(float32_t x);
 void JackClusteredArrayMax(int32_t *array, int32_t elements, int32_t *maxCount, int32_t *maxIndex, int32_t *firstDit, int32_t spread);
 
 void Kim1_NR();
+void KeyOn();
+void KeyRingOn();
+void KeyTipOn();
 
 void LetterSpace();
 void LMSNoiseReduction(int16_t blockSize, float32_t *nrbuffer);
@@ -1995,14 +2081,13 @@ void NoActiveMenu();
 void NoiseBlanker(float32_t* inputsamples, float32_t* outputsamples );
 int  NROptions();
 
-int  PostProcessorAudio();
+//int  PostProcessorAudio();
 int  ProcessButtonPress(int valPin);
 void ProcessEqualizerChoices(int16_t MyArray[], char *title);
 void ProcessIQData();
 
 int  ReadSelectedPushButton();
 void RedrawDisplayScreen();
-void RefreshMainDisplay(int displayMode);
 void ResetHistograms();
 int  RFOptions();
 
@@ -2027,8 +2112,9 @@ void SetFavoriteFrequency();
 void SetFreq();
 int  SetI2SFreq(int freq);
 void SetIIRCoeffs(float32_t f0, float32_t Q, float32_t sample_rate, uint8_t filter_type);
-void SetKeyerSidetone();
 void SetKeyType();
+void SetSidetoneVolume();
+long SetTransmitDelay();
 void SetupMode(int sideBand);
 int  SetWPM();
 void ShowAnalogGain();
@@ -2046,6 +2132,7 @@ void ShowNotch();
 void ShowSpectrum();
 void ShowSpectrumdBScale();
 void ShowTempAndLoad();
+void ShowTransmitReceiveStatus();
 void BandInformation();
 float32_t sign(float32_t x);
 void sineTone(long freqSideTone);
@@ -2060,6 +2147,9 @@ int  SubmenuSelect(const char *options[], int numberOfChoices, int defaultStart)
 void T4_rtc_set(unsigned long t);
 float TGetTemp();
 
+int Unused1();                            // Placeholders for array of pointers to function
+int Unused2();
+int Unused3();
 void UpdateAGCField();
 void UpdateCompressionField();
 void UpdateDecoderField();

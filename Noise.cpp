@@ -3,6 +3,42 @@
 #endif
 
 /*****
+  Purpose: Present the noise reduction options
+
+  Parameter list:
+    void
+
+  Return value
+    int           an index into the band array, 0 for off, -1 for cancel
+*****/
+int NROptions() //AFP 09-19-22 Moved here from Menu Proc Revised
+{
+  switch (nrOptionSelect) {
+    case 0:                                 // Off
+      NR_Index=0;
+      break;
+    case 1:                                 // Kim
+      NR_Index=1;
+      break;
+
+    case 2:                                 // Spectral
+      NR_Index=2;
+      break;
+
+    case 3:                                 // LMS
+      NR_Index=3;
+      break;
+
+    default:
+      Serial.print("Error in NROptions");
+      NR_Index = -1;                        // Force hard error
+      break;
+  } 
+  return NR_Index;
+}  //AFP 09-19-22
+
+
+/*****
   Purpose: Kim1_NR()
   Parameter list:
     void

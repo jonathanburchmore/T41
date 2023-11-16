@@ -13,10 +13,11 @@ void sineTone(int numCycles)
 {
   float theta;
   float freqSideTone2;
-  freqSideTone2=numCycles*24000/256;
-  for (int kf = 0; kf < 255; kf++) { //Calc 750 hz sine wave. 
-    theta = kf * 2*PI * freqSideTone2/ 24000;
+  freqSideTone2 = numCycles * 24000 / 256;
+  for (int kf = 0; kf < 256; kf++) { //Calc 750 hz sine wave.
+    theta = kf * 2 * PI * freqSideTone2 / 24000;
     sinBuffer2[kf] = sin(theta);
+    cosBuffer2[kf] = cos(theta);
   }
 }
 
@@ -327,9 +328,9 @@ void Calculatedbm()
     sum_db = sum_db + FFT_spec_old[c];
   }
 
-#ifdef USE_W7PUA
+  //#ifdef USE_W7PUA
   if (sum_db > 0.0) {
-#ifdef USE_LOG10FAST
+    //#ifdef USE_LOG10FAST
     switch (display_dbm) {
       case DISPLAY_S_METER_DBM:
         dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)attenuator +
@@ -341,51 +342,8 @@ void Calculatedbm()
         dbm = 0;
         break;
     }
-#else
-    switch (display_dbm) {
-      case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)attenuator +
-              slope * log10f(sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
-        dbmhz = 0;
-        break;
-      case DISPLAY_S_METER_DBMHZ:
-        dbmhz = dbm - 10.0 * log10f((float32_t)(((int)Ubin - (int)Lbin) * bin_BW));
-        dbm = 0;
-        break;
-    }
-#endif
   }
-#else
-  if (sum_db > 0) {
-#ifdef USE_LOG10FAST
-    switch (display_dbm) {
-      case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + (float32_t)attenuator + slope * log10f_fast (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
-        dbmhz = 0;
-        break;
-      case DISPLAY_S_METER_DBMHZ:
-        dbmhz = (float32_t)attenuator +  - (float32_t)bands[currentBand].RFgain * 1.5 + slope * log10f_fast (sum_db) -  10 * log10f_fast ((float32_t)(((int)Ubin - (int)Lbin) * bin_BW)) + cons;
-        dbm = 0;
-        break;
-    }
-#else
-    switch (display_dbm) {
-      case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + (float32_t)attenuator + slope * log10f (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
-        dbmhz = 0;
-        break;
-      case DISPLAY_S_METER_DBMHZ:
-        dbmhz = (float32_t)attenuator +  - (float32_t)bands[currentBand].RFgain * 1.5 + slope * log10f (sum_db) -  10 * log10f ((float32_t)(((int)Ubin - (int)Lbin) * bin_BW)) + cons;
-        dbm = 0;
-        break;
-    }
-#endif
-  }
-#endif
-  else {
-    dbm = -140.0;
-    dbmhz = -165.0;
-  }
+
 
   // lowpass IIR filter
   // Wheatley 2011: two averagers with two time constants
@@ -396,27 +354,7 @@ void Calculatedbm()
   // Tau = 10ms = 0.01s attack time
   // m_DecayAlpha = 0.0392; // 500ms decay time
   //
-  m_AttackAvedbm    = (1.0 - m_AttackAlpha) * m_AttackAvedbm   + m_AttackAlpha * dbm;
-  m_DecayAvedbm     = (1.0 - m_DecayAlpha)  * m_DecayAvedbm    + m_DecayAlpha  * dbm;
-  m_AttackAvedbmhz  = (1.0 - m_AttackAlpha) * m_AttackAvedbmhz + m_AttackAlpha * dbmhz;
-  m_DecayAvedbmhz   = (1.0 - m_DecayAlpha)  * m_DecayAvedbmhz  + m_DecayAlpha  * dbmhz;
 
-  if (m_AttackAvedbm > m_DecayAvedbm) { // if attack average is larger then it must be an increasing signal
-    m_AverageMagdbm = m_AttackAvedbm; // use attack average value for output
-    m_DecayAvedbm = m_AttackAvedbm; // set decay average to attack average value for next time
-  } else { // signal is decreasing, so use decay average value
-    m_AverageMagdbm = m_DecayAvedbm;
-  }
-
-  if (m_AttackAvedbmhz > m_DecayAvedbmhz) {   // if attack average is larger then it must be an increasing signal
-    m_AverageMagdbmhz = m_AttackAvedbmhz;     // use attack average value for output
-    m_DecayAvedbmhz = m_AttackAvedbmhz;       // set decay average to attack average value for next time
-  } else {                                    // signal is decreasing, so use decay average value
-    m_AverageMagdbmhz = m_DecayAvedbmhz;
-  }
-
-  dbm = m_AverageMagdbm;                      // write average into variable for S-meter display
-  dbmhz = m_AverageMagdbmhz;                  // write average into variable for S-meter display
 }
 
 
@@ -521,7 +459,7 @@ float32_t AlphaBetaMag(float32_t  inphase, float32_t  quadrature)   // (c) AndrÃ
   // Min RMS w/ Avg=0 0.948059448969 0.392699081699
   const float32_t alpha = 0.960433870103; // 1.0; //0.947543636291;
   const float32_t beta =  0.397824734759;
-  /* magnitude ~= alpha * max(|I|, |Q|) + beta * min(|I|, |Q|) */
+
   float32_t abs_inphase = fabs(inphase);
   float32_t abs_quadrature = fabs(quadrature);
   if (abs_inphase > abs_quadrature) {
@@ -572,7 +510,7 @@ void Autotune() {
   // 4.) tune to the estimated carrier frequency with an accuracy of 0.01Hz ;-)
   // --> in reality, we achieve about 0.2Hz accuracy, not bad
 
-  const int posbin         = FFT_length / 2; 
+  const int posbin         = FFT_length / 2;
   const float32_t buff_len = FFT_length * 2.0;
   const float32_t bin_BW   = (float32_t) (SR[SampleRate].rate * 2.0 / DF / (buff_len));
   float32_t bw_LSB         = 0.0;
@@ -624,7 +562,6 @@ void Autotune() {
 
     bands[currentBand].freq = bands[currentBand].freq  + (long long)(delta * NEW_SI5351_FREQ_MULT);
     SetFreq();
-    //    ShowFrequency(bands[currentBand].freq, 1);
     ShowFrequency();
     autotune_flag = 2;
   } else {                                            // and now: fine-tuning:
@@ -678,13 +615,15 @@ void Autotune() {
 *****/
 void SaveAnalogSwitchValues()
 {
-  const char *labels[] = {"Select",       "Menu Up",  "Band Up",
-                          "Zoom",         "Menu Dw",  "Band Dn",
-                          "Filter",       "DeMod",    "Mode",
-                          "NR",           "Notch",    "Display",
-                          "Noise Floor",  "User 1",   "CW Reset",
-                          "Tune incrment","User 2",   "User 2"
-                         };
+  /*                                                                        This list is new with V017
+  const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
+                                 "Zoom",         "Menu Dn",  "Band Dn",
+                                 "Filter",       "DeMod",    "Mode",
+                                 "NR",           "Notch",    "Noise Floor",
+                                 "Fine Tune",    "Decoder",  "Tune incrment",
+                                 "User 1",       "User 2",   "User 2"
+                                };
+  */
   int index;
   int minVal;
   int value;
@@ -693,11 +632,11 @@ void SaveAnalogSwitchValues()
   tft.setFontScale(1);
   tft.setTextColor(RA8875_GREEN);
   tft.setCursor(10, 10);
-  tft.print("Press the button");
+  tft.print("Press button you");
   tft.setCursor(10, 30);
-  tft.print("you have assigned to");
+  tft.print("have assigned to");
   tft.setCursor(10, 50);
-  tft.print("the named switch shown.");
+  tft.print("the switch shown.");
 
   for (index = 0; index < NUMBER_OF_SWITCHES; ) {
     tft.setCursor(20, 100);
@@ -721,14 +660,13 @@ void SaveAnalogSwitchValues()
     }
     if (value == -1) {
       tft.fillRect(20, 100, 300, 40, RA8875_BLACK);
-      tft.setCursor(400, 20 + index * 25);
+      tft.setCursor(350, 20 + index * 25);
       tft.print(index + 1);
       tft.print(". ");
       tft.print(labels[index]);
-      tft.setCursor(650, 20 + index * 25);
+      tft.setCursor(660, 20 + index * 25);
       tft.print(minVal);
       EEPROMData.switchValues[index] = minVal;
-//      switchThreshholds[index] = minVal;
       index++;
       MyDelay(100L);
     }
@@ -812,6 +750,80 @@ void SetupMode(int sideBand)
   ShowBandwidth();
 
   tft.fillRect(pos_x_frequency + 10, pos_y_frequency + 24, 210, 16, RA8875_BLACK);
-  freq_flag[0] = 0;
   old_demod_mode = bands[currentBand].mode; // set old_mode flag for next time, at the moment only used for first time radio is switched on . . .
 } // end void setup_mode
+
+/*****
+  Purpose: This function is used to calibrate the frequency.
+
+  Parameter list:
+    void
+
+  Return value;
+    int                   0 failed, 1 successful
+
+    In small increments, change the number in Line 921 and up-load again to observe the change.
+    Start with increments of 1000000, so the next number should be:
+
+    unsigned long long calibrationFactor     = 1006101000ULL
+
+    Write down the new displayed frequency and slowly change the number, again write down the
+    new displayed frequency.
+    If the change goes too far, reduce the amount of change.
+    As you get closer to 7.150MHz, the incremental change should get smaller until you are at
+    7.150MHz.  This may take several steps to achieve.
+*****/
+int Xmit_IQ_Cal() //AFP 09-21-22
+{
+/*switch (IQEXChoice) {
+      case 0:    //Volume
+        break;
+      case 1:  // IQ Receive Gain Cal
+        spectrum_zoom = 0;
+        //Serial.print("adjustVolEncoder= ");Serial.println(adjustVolEncoder);
+        //Serial.println("case 1: ");
+        tft.setFontScale( (enum RA8875tsize) 1);
+        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
+        tft.setTextColor(RA8875_WHITE);
+        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
+        tft.print("IQGainCal:");
+        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+        tft.print(IQ_amplitude_correction_factor, 3);
+        val = ReadSelectedPushButton();
+        if (val != BOGUS_PIN_READ) {                        // Any button press??
+          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
+            IQChoice = 0;
+            spectrum_zoom = 1;
+            EEPROMWrite();
+            break;
+          }
+        }
+        break;
+      case 2:  // IQ Receive Phase Cal
+        spectrum_zoom = 0;
+        //Serial.print("adjustVolEncoder= ");Serial.println(adjustVolEncoder);
+        //Serial.println("case 1: ");
+        tft.setFontScale( (enum RA8875tsize) 1);
+        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
+        tft.setTextColor(RA8875_WHITE);
+        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
+        tft.print("IQPhaseCal:");
+        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+        tft.print(IQ_phase_correction_factor, 3);
+        val = ReadSelectedPushButton();
+        if (val != BOGUS_PIN_READ) {                        // Any button press??
+          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
+            IQChoice = 0;
+            spectrum_zoom = 1;
+            EEPROMWrite();
+            break;
+          }
+        }
+        break;
+*/
+  return -1;
+}

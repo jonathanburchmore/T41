@@ -34,13 +34,13 @@ void ExciterIQData()
         BUFFER_SIZE*N_BLOCKS = 2024 samples
      **********************************************************************************/
   // are there at least N_BLOCKS buffers in each channel available ?
-  if ( (uint32_t) Q_in_L.available() > N_BLOCKS_EX + 0 && (uint32_t) Q_in_R.available() > N_BLOCKS_EX + 0 ) {
+  if ( (uint32_t) Q_in_L_Ex.available() > N_BLOCKS_EX + 0 && (uint32_t) Q_in_R_Ex.available() > N_BLOCKS_EX + 0 ) {
 
     // get audio samples from the audio  buffers and convert them to float
     // read in 32 blocks á 128 samples in I and Q
     for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
-      sp_L = Q_in_L.readBuffer();
-      sp_R = Q_in_R.readBuffer();
+      sp_L = Q_in_L_Ex.readBuffer();
+      sp_R = Q_in_R_Ex.readBuffer();
 
       /**********************************************************************************  AFP 12-31-20
           Using arm_Math library, convert to float one buffer_size.
@@ -48,11 +48,10 @@ void ExciterIQData()
       **********************************************************************************/
       arm_q15_to_float (sp_L, &float_buffer_L_EX[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
       arm_q15_to_float (sp_R, &float_buffer_R_EX[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
-      Q_in_L.freeBuffer();
-      Q_in_R.freeBuffer();
+      Q_in_L_Ex.freeBuffer();
+      Q_in_R_Ex.freeBuffer();
     }
 
-    //AFP 12-24-21
     float exciteMaxL = 0;
 
     /**********************************************************************************  AFP 12-31-20
@@ -71,11 +70,17 @@ void ExciterIQData()
     arm_fir_decimate_f32(&FIR_dec2_EX_I, float_buffer_L_EX, float_buffer_L_EX, 512);
     arm_fir_decimate_f32(&FIR_dec2_EX_Q, float_buffer_R_EX, float_buffer_R_EX, 512);
 
+    //============================  Transmit EQ  ========================  AFP 10-02-22
+    if (xmitEQFlag == ON ) {
+      DoExciterEQ();
+    }
+    //============================ End Receive EQ  AFP 10-02-22
+
+
     arm_copy_f32 (float_buffer_L_EX, float_buffer_R_EX, 256);
 
+    // =========================    End CW Xmit
     //--------------  Hilbert Transformers
-    //arm_copy_f32 (float_buffer_L_EX, float_buffer_R_EX, 256);
-
 
     /**********************************************************************************
              R and L channels are processed though the two Hilbert Transformers, L at 0 deg and R at 90 deg
@@ -89,8 +94,9 @@ void ExciterIQData()
     /**********************************************************************************
               Additional scaling, if nesessary to compensate for down-stream gain variations
      **********************************************************************************/
+
     if (bands[currentBand].mode == DEMOD_LSB) { //AFP 12-27-21
-      arm_scale_f32 (float_buffer_L_EX, 1.015, float_buffer_L_EX, 256);
+      arm_scale_f32 (float_buffer_L_EX, -1.015, float_buffer_L_EX, 256);
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, .013, 256);
     }
     else if (bands[currentBand].mode == DEMOD_USB) { //AFP 12-27-21
@@ -105,6 +111,7 @@ void ExciterIQData()
         exciteMaxL = float_buffer_L_EX[k];
       }
     }
+
     /**********************************************************************************
               Interpolate (upsample the data streams by 8X to create the 192KHx sample rate for output
               Requires a LPF FIR 48 tap 10KHz and 8KHz
@@ -123,13 +130,14 @@ void ExciterIQData()
     /**********************************************************************************  AFP 12-31-20
       CONVERT TO INTEGER AND PLAY AUDIO
     **********************************************************************************/
-    for (unsigned  i = 0; i < N_BLOCKS_EX; i++) {
-      sp_L = Q_out_L.getBuffer();
-      sp_R = Q_out_R.getBuffer();
+
+    for (unsigned  i = 0; i < N_BLOCKS_EX; i++) {  //N_BLOCKS_EX=16  BUFFER_SIZE=128 16x128=2048
+      sp_L = Q_out_L_Ex.getBuffer();
+      sp_R = Q_out_R_Ex.getBuffer();
       arm_float_to_q15 (&float_buffer_L_EX[BUFFER_SIZE * i], sp_L, BUFFER_SIZE);
       arm_float_to_q15 (&float_buffer_R_EX[BUFFER_SIZE * i], sp_R, BUFFER_SIZE);
-      Q_out_L.playBuffer(); // play it !
-      Q_out_R.playBuffer(); // play it !
+      Q_out_L_Ex.playBuffer(); // play it !
+      Q_out_R_Ex.playBuffer(); // play it !
     }
   }
 }
@@ -147,5 +155,4 @@ void ExciterIQData()
 void SetBandRelay(int state)
 {
   digitalWrite(bandswitchPins[currentBand], state); //Set current band relay "on" AFP 12-16-21
-  digitalWrite(RXTX, state);                        //Set Tx/Rx to HIGH = Rx on    AFP 12-16-21
 }

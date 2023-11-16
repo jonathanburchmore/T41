@@ -1,16 +1,16 @@
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
-  // Useful in understanding menues:
-  //
-  //  const char *topMenus[]    = { "CW", "Display Choices", "Spectrum Set", "AGC", "NR Set",
-  //                                "IQ Manual", "EQ Rec Set", "EQ Xmt Set", "Mic Comp", "Freq Cal",
-  //                                "NB Set", "RF Set", "Audio Post Proc", "VFO Select", "EEPROM"      
-  //                              };
-  /* int (*functionPtr[])()     = {&CWOptions,  &SpectrumOptions, &AGCOptions, &NROptions, 
-                                   &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &FrequencyOptions, 
-                                   &NBOptions, &RFOptions, &PostProcessorAudio, &VFOSelect, &EEPROMOptions
-                                   }; 
+/*
+const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",      "NR Set",   "IQ Manual",
+                               "EQ Rec Set", "EQ Xmt Set",   "Mic Comp", "Calibrate Freq", "Noise Floor",
+                               "RF Set",     "VFO Select",   "EEPROM",   
+                              };
+
+int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions, &IQOptions,
+                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &CalibrateFrequency, &ButtonSetNoiseFloor,
+                               &RFOptions, &VFOSelect, &EEPROMOptions
+                              };
 */
 /*****
   Purpose: void ShowMenu()
@@ -26,16 +26,19 @@ void ShowMenu(const char *menu[], int where)
 {
   tft.setFontScale( (enum RA8875tsize) 1);  
 
-  if (where == PRIMARY_MENU) {                          // Should print on left edge of top line
-    tft.fillRect(0, 0, 300, CHAR_HEIGHT, RA8875_BLUE);        // Top-left of display
+  if (menuStatus == NO_MENUS_ACTIVE)                                        // No menu selected??
+     NoActiveMenu();
+     
+  if (where == PRIMARY_MENU) {                                              // Should print on left edge of top line
+    tft.fillRect(PRIMARY_MENU_X, MENUS_Y, 300, CHAR_HEIGHT, RA8875_BLUE);   // Top-left of display
     tft.setCursor(5, 0);
     tft.setTextColor(RA8875_WHITE);
-    tft.print(*menu);                                      // Primary Menu
+    tft.print(*menu);                                                       // Primary Menu
   } else {
-    tft.fillRect(250, 0, 300, CHAR_HEIGHT, RA8875_GREEN);        // Right of primary display
+    tft.fillRect(SECONDARY_MENU_X, MENUS_Y, 300, CHAR_HEIGHT, RA8875_GREEN);// Right of primary display
     tft.setCursor(35, 0);
     tft.setTextColor(RA8875_WHITE);
-    tft.print(*menu);                                      // Primary Menu
+    tft.print(*menu);                                                       // Secondary Menu
   }
   return;
 }

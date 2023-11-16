@@ -2,6 +2,123 @@
 #include "SDT.h"
 #endif
 
+
+/*****
+  Purpose: void DoReceiveEQ  Parameter list:
+    void
+  Return value;
+    void
+*****/
+void DoReceiveEQ() //AFP 08-09-22
+{
+  for(int i=0;i<14;i++){
+  recEQ_Level[i] = (float)EEPROMData.equalizerRec[i]/100.0;
+  }
+  arm_biquad_cascade_df2T_f32(&S1_Rec, float_buffer_L, rec_EQ1_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S2_Rec, float_buffer_L, rec_EQ2_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S3_Rec, float_buffer_L, rec_EQ3_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S4_Rec, float_buffer_L, rec_EQ4_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S5_Rec, float_buffer_L, rec_EQ5_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S6_Rec, float_buffer_L, rec_EQ6_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S7_Rec, float_buffer_L, rec_EQ7_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S8_Rec, float_buffer_L, rec_EQ8_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S9_Rec, float_buffer_L, rec_EQ9_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S10_Rec, float_buffer_L, rec_EQ10_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S11_Rec, float_buffer_L, rec_EQ11_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S12_Rec, float_buffer_L, rec_EQ12_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S13_Rec, float_buffer_L, rec_EQ13_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S14_Rec, float_buffer_L, rec_EQ14_float_buffer_L, 256);
+    
+  arm_scale_f32(rec_EQ1_float_buffer_L, -recEQ_Level[0], rec_EQ1_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ2_float_buffer_L, recEQ_Level[1], rec_EQ2_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ3_float_buffer_L, -recEQ_Level[2], rec_EQ3_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ4_float_buffer_L, recEQ_Level[3], rec_EQ4_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ5_float_buffer_L, -recEQ_Level[4], rec_EQ5_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ6_float_buffer_L, recEQ_Level[5], rec_EQ6_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ7_float_buffer_L, -recEQ_Level[6], rec_EQ7_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ8_float_buffer_L, recEQ_Level[7], rec_EQ8_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ9_float_buffer_L, -recEQ_Level[8], rec_EQ9_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ10_float_buffer_L, recEQ_Level[9], rec_EQ10_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ11_float_buffer_L, -recEQ_Level[10], rec_EQ11_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ12_float_buffer_L, recEQ_Level[11], rec_EQ12_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ13_float_buffer_L, -recEQ_Level[12], rec_EQ13_float_buffer_L, 256);
+  arm_scale_f32(rec_EQ14_float_buffer_L, recEQ_Level[13], rec_EQ14_float_buffer_L, 256);
+
+  arm_add_f32(rec_EQ1_float_buffer_L , rec_EQ2_float_buffer_L, float_buffer_L , 256 ) ;
+
+  arm_add_f32(float_buffer_L , rec_EQ3_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ4_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ5_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ6_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ7_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ8_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ9_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ10_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ11_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ12_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ13_float_buffer_L, float_buffer_L , 256 ) ;
+  arm_add_f32(float_buffer_L , rec_EQ14_float_buffer_L, float_buffer_L , 256 ) ;
+}
+
+/*****
+  Purpose: void DoExciterEQ  
+  
+  Parameter list:
+    void
+  Return value;
+    void
+*****/
+void DoExciterEQ() //AFP 10-02-22
+{
+  for (int i = 0; i < 14; i++) {
+    xmtEQ_Level[i] = (float)EEPROMData.equalizerXmt[i] / 100.0;
+  }
+  arm_biquad_cascade_df2T_f32(&S1_Xmt,  float_buffer_L_EX, xmt_EQ1_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S2_Xmt,  float_buffer_L_EX, xmt_EQ2_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S3_Xmt,  float_buffer_L_EX, xmt_EQ3_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S4_Xmt,  float_buffer_L_EX, xmt_EQ4_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S5_Xmt,  float_buffer_L_EX, xmt_EQ5_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S6_Xmt,  float_buffer_L_EX, xmt_EQ6_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S7_Xmt,  float_buffer_L_EX, xmt_EQ7_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S8_Xmt,  float_buffer_L_EX, xmt_EQ8_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S9_Xmt,  float_buffer_L_EX, xmt_EQ9_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S10_Xmt, float_buffer_L_EX, xmt_EQ10_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S11_Xmt, float_buffer_L_EX, xmt_EQ11_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S12_Xmt, float_buffer_L_EX, xmt_EQ12_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S13_Xmt, float_buffer_L_EX, xmt_EQ13_float_buffer_L, 256);
+  arm_biquad_cascade_df2T_f32(&S14_Xmt, float_buffer_L_EX, xmt_EQ14_float_buffer_L, 256);
+
+  arm_scale_f32(xmt_EQ1_float_buffer_L,  -xmtEQ_Level[0],  xmt_EQ1_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ2_float_buffer_L,   xmtEQ_Level[1],  xmt_EQ2_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ3_float_buffer_L,  -xmtEQ_Level[2],  xmt_EQ3_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ4_float_buffer_L,   xmtEQ_Level[3],  xmt_EQ4_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ5_float_buffer_L,  -xmtEQ_Level[4],  xmt_EQ5_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ6_float_buffer_L,   xmtEQ_Level[5],  xmt_EQ6_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ7_float_buffer_L,  -xmtEQ_Level[6],  xmt_EQ7_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ8_float_buffer_L,   xmtEQ_Level[7],  xmt_EQ8_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ9_float_buffer_L,  -xmtEQ_Level[8],  xmt_EQ9_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ10_float_buffer_L,  xmtEQ_Level[9],  xmt_EQ10_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ11_float_buffer_L, -xmtEQ_Level[10], xmt_EQ11_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ12_float_buffer_L,  xmtEQ_Level[11], xmt_EQ12_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ13_float_buffer_L, -xmtEQ_Level[12], xmt_EQ13_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ14_float_buffer_L,  xmtEQ_Level[13], xmt_EQ14_float_buffer_L, 256);
+
+  arm_add_f32(xmt_EQ1_float_buffer_L , xmt_EQ2_float_buffer_L, float_buffer_L_EX , 256 ) ;
+
+  arm_add_f32(float_buffer_L_EX , xmt_EQ3_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ4_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ5_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ6_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ7_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ8_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ9_float_buffer_L,  float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ10_float_buffer_L, float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ11_float_buffer_L, float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ12_float_buffer_L, float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ13_float_buffer_L, float_buffer_L_EX , 256 ) ;
+  arm_add_f32(float_buffer_L_EX , xmt_EQ14_float_buffer_L, float_buffer_L_EX , 256 ) ;
+}
+
 /*****
   Purpose: void FilterBandwidth()  Parameter list:
     void
@@ -17,11 +134,12 @@ void FilterBandwidth()
 
   // also adjust IIR AM filter
   int filter_BW_highest = bands[currentBand].FHiCut;
-  if (filter_BW_highest < -bands[currentBand].FLoCut) 
+  if (filter_BW_highest < -bands[currentBand].FLoCut) {
     filter_BW_highest = -bands[currentBand].FLoCut;
+  }
   SetIIRCoeffs((float32_t)filter_BW_highest, 1.3, (float32_t)SR[SampleRate].rate / DF, 0); // 1st stage
-  for (int i = 0; i < 5; i++)
-  {
+  
+  for (int i = 0; i < 5; i++) {
     biquad_lowpass1_coeffs[i] = coefficient_set[i];
   }
 
@@ -52,16 +170,14 @@ void InitFilterMask()
   // in order to produce a FFT_length point input buffer for the FFT
   // copy coefficients into real values of first part of buffer, rest is zero
 
-  for (unsigned i = 0; i < m_NumTaps; i++)
-  {
+  for (unsigned i = 0; i < m_NumTaps; i++) {
     // try out a window function to eliminate ringing of the filter at the stop frequency
     //             sd.FFT_Samples[i] = (float32_t)((0.53836 - (0.46164 * arm_cos_f32(PI*2 * (float32_t)i / (float32_t)(FFT_IQ_BUFF_LEN-1)))) * sd.FFT_Samples[i]);
     FIR_filter_mask[i * 2] = FIR_Coef_I [i];
     FIR_filter_mask[i * 2 + 1] = FIR_Coef_Q [i];
   }
 
-  for (unsigned i = FFT_length + 1; i < FFT_length * 2; i++)
-  {
+  for (unsigned i = FFT_length + 1; i < FFT_length * 2; i++) {
     FIR_filter_mask[i] = 0.0;
   }
 
@@ -80,7 +196,6 @@ void InitFilterMask()
 *****/
 void ControlFilterF() 
 {
-
   // low Fcut must never be larger than high Fcut and vice versa
   if (bands[currentBand].FHiCut < bands[currentBand].FLoCut)
     bands[currentBand].FHiCut = bands[currentBand].FLoCut;
@@ -89,7 +204,7 @@ void ControlFilterF()
     
                                                                 // calculate maximum possible FHiCut
   float32_t sam = (SR[SampleRate].rate / (DF * 2.0)) - 100.0;
-                                                                // clamp FHicut and Flowcut to max / min values
+                                                                // clamp FHicut and FLowcut to max / min values
   if (bands[currentBand].FHiCut > (int)(sam)) {
     bands[currentBand].FHiCut = (int)sam;
   } else {

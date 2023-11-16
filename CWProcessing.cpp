@@ -3,7 +3,7 @@
 #endif
 
 /*****
-  Purpose: to send a Morse code dit
+  Purpose: to process CW specific signals
 
   Paramter list:
     void
@@ -11,42 +11,60 @@
   Return value:
     void
 
-  CAUTION: Assumes that a global named ditLength holds the value for dit spacing
 *****/
-void Dit()
-{
+void DoCWReceiveProcessing() {  // All New AFP 09-19-22
+  float goertzelMagnitude1;
+  float goertzelMagnitude2;
+  arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_R, float_buffer_R_CW, 256);//AFP 09-01-22
+  arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_L, float_buffer_L_CW, 256);//AFP 09-01-22
+  if (decoderFlag == DECODE_ON) {                  // AFP 09-27-22
 
-  //  digitalWrite(OPTO_OUTPUT, HIGH);    // Start dit
-  digitalWrite(MUTE, ON);
-  while (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH) {
-    recMix_3.gain(3, ON);
-  }
+    //=== end CW Filter ===
 
-  //    MyDelay(ditLength);
-  recMix_3.gain(3, OFF);      //Turn off Sine Wave
-  //  digitalWrite(OPTO_OUTPUT, LOW);     // End dit
-  digitalWrite(MUTE, OFF);
-  //    MyDelay(ditLength);
-  digitalWrite(KEYER_DIT_INPUT_TIP, LOW);
+    // ----------------------  Correlation calculation  AFP 02-04-22 -------------------------
 
-}
+    //Calculate correlation between calc sine and incoming signal
 
-/*****
-  Purpose: to send a Morse code dah
-
-  Paramter list:
-  void
-
-  Return value:
-  void
-
-  CAUTION: Assumes that a global named ditLength holds the value for dit spacing
-*****/
-void Dah()
-{
-  // In transistion
-}
-
+    arm_correlate_f32  ( float_buffer_R_CW, 256, sinBuffer, 256, float_Corr_BufferR);    
+    arm_max_f32  ( float_Corr_BufferR, 511, &corrResultR, &corrResultIndexR);               
+                                                                                    //running average of corr coeff. R
+    aveCorrResultR = .7 * corrResultR + .3 * aveCorrResultR;
+    arm_correlate_f32  ( float_buffer_L_CW, 256, sinBuffer, 256, float_Corr_BufferL ) ;    
+                                                                                    //get max value of correlation
+    arm_max_f32  ( float_Corr_BufferL, 511, &corrResultL, &corrResultIndexL);   
+                                                                                    //running average of corr coeff. L
+    aveCorrResultL = .7 * corrResultL + .3 * aveCorrResultL;
+    aveCorrResult = (corrResultR + corrResultL) / 2;
+                                                                                    // Calculate Goertzel Mahnitude of incomming signal
+    goertzelMagnitude1 = goertzel_mag(256, 768, 24000, float_buffer_L_CW);
+    goertzelMagnitude2 = goertzel_mag(256, 768, 24000, float_buffer_R_CW);
+    goertzelMagnitude = (goertzelMagnitude1 + goertzelMagnitude2) / 2;
+                                                                                    //Combine Correlation and Gowetzel Coefficients
+    combinedCoeff = 10 * aveCorrResult * 100 * goertzelMagnitude;
+    combinedCoeff2 = combinedCoeff;
+                                                                                    // ==========  Changed CW decode "lock" indicator
+    if (combinedCoeff > 2) {
+      tft.fillRect(745, 448,  15 , 15, RA8875_GREEN);
+    }
+    else if (combinedCoeff < 2) {
+      CWLevelTimer = millis();
+      if (CWLevelTimer - CWLevelTimerOld > 2000) {
+        CWLevelTimerOld = millis();
+        tft.fillRect(744, 447,  17 , 17, RA8875_BLACK);
+      }
+    }
+    combinedCoeff2Old = combinedCoeff2;
+    tft.drawFastVLine(BAND_INDICATOR_X - 8 + 26, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW lower freq indicator
+    tft.drawFastVLine(BAND_INDICATOR_X - 8 + 33, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW upper freq indicator
+    if (combinedCoeff > 2) { // if  have a reasonable corr coeff, >.15, then we have a keeper.
+      audioTemp = 1;
+    } else {
+      audioTemp = 0;
+    }
+    //==============  acquire data on CW  ================
+    DoCWDecoding(audioTemp);   
+  } 
+} 
 
 /*****
   Purpose: to provide spacing between letters
@@ -219,7 +237,7 @@ void SetKeyType()
 {
   const char *keyChoice[] = {"Straight Key", "Keyer"};
 
-  EEPROMData.keyType = SubmenuSelect(keyChoice, 2, 0);
+  keyType = EEPROMData.keyType = SubmenuSelect(keyChoice, 2, 0);
 }
 
 //==================================== Decoder =================
@@ -327,7 +345,7 @@ void ResetHistograms()
   gapAtom = ditLength       = 80;             // Start with 15wpm ditLength
   gapChar = dahLength       = 240;
   thresholdGeometricMean    = 160;            // Use simple mean for starters so we don't have 0
-  // Clear graph arrays
+                                              // Clear graph arrays
   memset(signalHistogram, 0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
   memset(gapHistogram,    0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
   UpdateWPMField();
@@ -631,8 +649,8 @@ void DoSignalHistogram(long val)
   signalHistogram[val]++;                             // Don't care which half it's in, just put it in
 
   offset = (uint32_t)thresholdGeometricMean - 1;      // Only do cast once
-  // Dit calculation
-  // 2nd parameter means we only look for dits below the geomean.
+                                                      // Dit calculation
+                                                      // 2nd parameter means we only look for dits below the geomean.
 
   for (int32_t j = (int32_t) thresholdGeometricMean; j; j--) {
     if (signalHistogram[j] != 0) {
@@ -642,11 +660,10 @@ void DoSignalHistogram(long val)
   }
 
   JackClusteredArrayMax(signalHistogram, offset, &tempDit,  (int32_t *) &ditLength, &firstNonEmpty, (int32_t) 1);
-  // dah calculation
-  // Elements above the geomean. Note larger spread: higher variance
+                                                      // dah calculation
+                                                      // Elements above the geomean. Note larger spread: higher variance
   JackClusteredArrayMax(&signalHistogram[offset], HISTOGRAM_ELEMENTS - offset, &tempDah, (int32_t *) &dahLength, &firstNonEmpty, (uint32_t) 3);
   dahLength += (uint32_t) offset;
-
 
   if (tempDit > SCALE_CONSTANT && tempDah > SCALE_CONSTANT) {           //Adaptive dit signalHistogram[]
     for (int k = 0; k < HISTOGRAM_ELEMENTS; k++) {
@@ -659,10 +676,10 @@ void DoSignalHistogram(long val)
   Purpose: Calculate Goertzal Algorithn to enable decoding CW
 
   Parameter list:
-    int numSamples,        // number of sample in data array
-    int TARGET_FREQUENCY, // frequency for which the magnitude of the transform is to be found
-    int SAMPLING_RATE,    // Sampling rate in our case 24ksps
-    float* data          // pointer to input data array
+    int numSamples,         // number of sample in data array
+    int TARGET_FREQUENCY,   // frequency for which the magnitude of the transform is to be found
+    int SAMPLING_RATE,      // Sampling rate in our case 24ksps
+    float* data             // pointer to input data array
 
   Return value;
     float magnitude     //magnitude of the transform at the target frequency
@@ -719,38 +736,4 @@ void CW_DecodeLevelDisplay()
 
   tft.drawFastVLine (SMETER_X - levelMtrOffset,       SMETER_Y - 1, 20, RA8875_WHITE);    // charge 8 to 18
   tft.drawFastVLine (SMETER_X + 100 - levelMtrOffset, SMETER_Y - 1, 20, RA8875_WHITE);
-}
-
-/*****
-  Purpose: Read the keyer for closure
-
-  Parameter list:
-    void
-
-  Return value;
-    void
-*****/
-void CWInterrupt()
-{
-  if (KEYER_DIT_INPUT_TIP == 0) {
-    Dit();
-    digitalWrite(KEYER_DIT_INPUT_TIP, HIGH);
-  }
-  if (KEYER_DAH_INPUT_RING) {
-    Dah();
-    digitalWrite(KEYER_DAH_INPUT_RING, HIGH);
-  }
-}
-
-void ShowDecoderMessage()
-{
-  if (decoderFlag == SSB_MODE) {
-    return;
-  }
-  tft.setTextColor(RA8875_WHITE);
-  tft.setFontScale(0);
-  tft.setCursor(683, AUDIO_SPECTRUM_TOP + 5);
-  tft.print("CW Decoder");
-  tft.setCursor(680, AUDIO_SPECTRUM_TOP + 5 + tft.getFontHeight());
-  tft.print("Fine Adjust");
 }

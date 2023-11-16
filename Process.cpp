@@ -9,7 +9,7 @@ char atom, currentAtom;
              Calculate FFT for display
              Process audio into SSB signalF
              Output audio to amplifier
-             
+
    Parameter List:
       void
 
@@ -18,8 +18,11 @@ char atom, currentAtom;
 
    CAUTION: Assumes a spaces[] array is defined
  *****/
-void ProcessIQData() 
+void ProcessIQData()
 {
+  if (keyPressedOn == 1) { //AFP 09-01-22
+    return;
+  }
   /**********************************************************************************  AFP 12-31-20
         Get samples from queue buffers
         Teensy Audio Library stores ADC data in two buffers size=128, Q_in_L and Q_in_R as initiated from the audio lib.
@@ -28,10 +31,10 @@ void ProcessIQData()
         N_BLOCKS = FFT_LENGTH / 2 / BUFFER_SIZE * (uint32_t)DF; // should be 16 with DF == 8 and FFT_LENGTH = 512
         BUFFER_SIZE*N_BLOCKS = 2024 samples
      **********************************************************************************/
-  int audioTemp  = 0;
-
-  float goertzelMagnitude1;
-  float goertzelMagnitude2;
+  float32_t audioMaxSquared;
+  uint32_t AudioMaxIndex;
+  int val;
+  float rfGainValue;
 
   // are there at least N_BLOCKS buffers in each channel available ?
   if ( (uint32_t) Q_in_L.available() > N_BLOCKS + 0 && (uint32_t) Q_in_R.available() > N_BLOCKS + 0 ) {
@@ -39,8 +42,6 @@ void ProcessIQData()
     // get audio samples from the audio  buffers and convert them to float
     // read in 32 blocks á 128 samples in I and Q
     for (unsigned i = 0; i < N_BLOCKS; i++) {
-      //sp_L = Q_in_L.readBuffer();
-      //sp_R = Q_in_R.readBuffer();
       sp_L = Q_in_R.readBuffer();
       sp_R = Q_in_L.readBuffer();
 
@@ -52,9 +53,16 @@ void ProcessIQData()
       arm_q15_to_float (sp_R, &float_buffer_R[BUFFER_SIZE * i], BUFFER_SIZE); // convert int_buffer to float 32bit
       Q_in_L.freeBuffer();
       Q_in_R.freeBuffer();
-      //     blocks_read ++;
     }
-
+    if ( keyPressedOn == 1) { ////AFP 09-01-22
+      return;
+    }
+    /*******************************
+            Set RFGain - for all bands
+    */
+    rfGainValue = pow(10, (float)rfGainAllBands / 20);
+    arm_scale_f32 (float_buffer_L, rfGainValue, float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 09-27-22
+    arm_scale_f32 (float_buffer_R, rfGainValue, float_buffer_R, BUFFER_SIZE * N_BLOCKS); //AFP 09-27-22
     /**********************************************************************************  AFP 12-31-20
         Remove DC offset to reduce centeral spike.  First read the Mean value of
         left and right channels.  Then fill L and R correction arrays with those Means
@@ -62,22 +70,21 @@ void ProcessIQData()
         to manipulate the arrays.  Arrays are all BUFFER_SIZE * N_BLOCKS long
     **********************************************************************************/
     //
-    arm_mean_f32(float_buffer_L, BUFFER_SIZE * N_BLOCKS, &sample_meanL);
-    arm_mean_f32(float_buffer_R, BUFFER_SIZE * N_BLOCKS, &sample_meanR);
+    //================
+    arm_biquad_cascade_df2T_f32(&s1_Receive, float_buffer_L, float_buffer_L, 2048); //AFP 09-23-22
+    arm_biquad_cascade_df2T_f32(&s1_Receive, float_buffer_R, float_buffer_R, 2048); //AFP 09-23-22
 
-    for (uint32_t j = 0; j < BUFFER_SIZE * N_BLOCKS  ; j++) {
-      L_BufferOffset [j] = -sample_meanL;
-      R_BufferOffset [j] = -sample_meanR;
-    }
-    arm_add_f32(float_buffer_L , L_BufferOffset, float_buffer_L2 , BUFFER_SIZE * N_BLOCKS ) ;
-    arm_add_f32(float_buffer_R , R_BufferOffset, float_buffer_R2 , BUFFER_SIZE * N_BLOCKS ) ;
+    //===========================
 
     /**********************************************************************************  AFP 12-31-20
         Scale the data buffers by the RFgain value defined in bands[currentBand] structure
     **********************************************************************************/
-    arm_scale_f32 (float_buffer_L2, bands[currentBand].RFgain + 1.0, float_buffer_L, BUFFER_SIZE * N_BLOCKS);
-    arm_scale_f32 (float_buffer_R2, bands[currentBand].RFgain + 1.0, float_buffer_R, BUFFER_SIZE * N_BLOCKS);
+    arm_scale_f32 (float_buffer_L, bands[currentBand].RFgain, float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 09-23-22
+    arm_scale_f32 (float_buffer_R, bands[currentBand].RFgain, float_buffer_R, BUFFER_SIZE * N_BLOCKS); //AFP 09-23-22
 
+    if ( CW_IRR_on == 1) {
+      return;
+    }
     /**********************************************************************************  AFP 12-31-20
       Clear Buffers
       This is to prevent overfilled queue buffers during each switching event
@@ -86,13 +93,11 @@ void ProcessIQData()
       in that case, we clear the buffers to keep the whole audio chain running smoothly
       **********************************************************************************/
     if (Q_in_L.available() >  25) {
-      AudioNoInterrupts();
       Q_in_L.clear();
       n_clear ++; // just for debugging to check how often this occurs
       AudioInterrupts();
     }
     if (Q_in_R.available() >  25) {
-      AudioNoInterrupts();
       Q_in_R.clear();
       n_clear ++; // just for debugging to check how often this occurs
       AudioInterrupts();
@@ -104,7 +109,9 @@ void ProcessIQData()
 
       IQ amplitude and phase correction
     ***********************************************************************************************/
-
+    if ( CW_IRR_on == 1) {
+      return;
+    }
 
     // Manual IQ amplitude correction
     // to be honest: we only correct the amplitude of the I channel ;-)
@@ -125,6 +132,9 @@ void ProcessIQData()
       CalcZoom1Magn();  //AFP Moved to display function
     }
     display_S_meter_or_spectrum_state++;
+    if ( keyPressedOn == 1) { ////AFP 09-01-22
+      return;
+    }
 
     /**********************************************************************************  AFP 12-31-20
         Frequency translation by Fs/4 without multiplication from Lyons (2011): chapter 13.1.2 page 646
@@ -139,7 +149,10 @@ void ProcessIQData()
            xnew(1) =  - ximag(1) + jxreal(1)
     **********************************************************************************/
     FreqShift1();
+    if ( CW_IRR_on == 1) {
 
+      return;
+    }
     /**********************************************************************************  AFP 12-31-20
         SPECTRUM_ZOOM_2 and larger here after frequency conversion!
         Spectrum zoom displays a magnified display of the data around the translated receive frequency.
@@ -163,15 +176,89 @@ void ProcessIQData()
     /**********************************************************************************  AFP 12-31-20
         S-Meter & dBm-display ?? not usually called
      **********************************************************************************/
+    if ( CW_IRR_on == 1) {
 
-    if (display_S_meter_or_spectrum_state == 2) {
-      Calculatedbm();
-    } else if (display_S_meter_or_spectrum_state == 4) {
-      DisplaydbM();
-      display_S_meter_or_spectrum_state = 0;
-    } else if (display_S_meter_or_spectrum_state == 3) {
-      // ??
+      return;
     }
+    //============================== AFP 09-21-22  Begin new
+    switch (IQChoice) {
+      case 0:    //Volume
+        break;
+      case 1:  // IQ Receive Gain Cal
+        spectrum_zoom = 0;
+
+        tft.setFontScale( (enum RA8875tsize) 1);
+        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
+        tft.setTextColor(RA8875_WHITE);
+        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
+        tft.print("IQGainCal:");
+        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+        tft.print(IQ_amplitude_correction_factor, 3);
+        val = ReadSelectedPushButton();
+        if (val != BOGUS_PIN_READ) {                        // Any button press??
+          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
+            IQChoice = 0;
+            spectrum_zoom = 1;
+            EEPROMWrite();
+            break;
+          }
+        }
+        break;
+      case 2:  // IQ Receive Phase Cal
+        spectrum_zoom = 0;
+        tft.setFontScale( (enum RA8875tsize) 1);
+        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
+        tft.setTextColor(RA8875_WHITE);
+        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
+        tft.print("IQPhaseCal:");
+        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+        tft.print(IQ_phase_correction_factor, 3);
+        val = ReadSelectedPushButton();
+        if (val != BOGUS_PIN_READ) {                        // Any button press??
+          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
+            IQChoice = 0;
+            spectrum_zoom = 1;
+            EEPROMWrite();
+            break;
+          }
+        }
+        break;
+      case 3:
+        break;
+      case 4:
+        break;
+      case 5:  // Calibrate Frequency
+
+        tft.setFontScale( (enum RA8875tsize) 1);
+        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_MAGENTA);
+        tft.setTextColor(RA8875_WHITE);
+        tft.setCursor(SECONDARY_MENU_X + 1, MENUS_Y + 1);
+        tft.print("FreqCal:");
+        tft.setCursor(SECONDARY_MENU_X + 180, MENUS_Y + 1);
+        tft.print(frequencyCorrectionFactor);
+        if (frequencyCorrectionFactor != frequencyCorrectionFactorOld) {
+          si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, frequencyCorrectionFactor);
+          SetFreq();
+          MyDelay(100L);
+          frequencyCorrectionFactorOld = frequencyCorrectionFactor;
+        }
+        val = ReadSelectedPushButton();
+        if (val != BOGUS_PIN_READ) {                        // Any button press??
+          val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
+            tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 20, CHAR_HEIGHT, RA8875_BLACK);
+            IQChoice = 0;
+            EEPROMWrite();
+            break;
+          }
+          break;
+        }
+    }
+    //============================== AFP 09-21-22  End new
 
 
     /*************************************************************************************************
@@ -190,7 +277,9 @@ void ProcessIQData()
      *************************************************************************************************/
 
     FreqShift2();  //AFP 12-14-21
-
+    if ( CW_IRR_on == 1) {
+      return;
+    }
     /**********************************************************************************  AFP 12-31-20
         Decimation
         Resample (Decimate) the shifted time signal, first by 4, then by 2.  Each time the
@@ -202,11 +291,11 @@ void ProcessIQData()
         now 192K/8 = 24K SPS.  The array size is also reduced by 8, making FFT calculations much faster.
         The effective bandwidth (up to Nyquist frequency) is 12KHz.
      **********************************************************************************/
-                                                                                              // decimation-by-4 in-place!
+    // decimation-by-4 in-place!
     arm_fir_decimate_f32(&FIR_dec1_I, float_buffer_L, float_buffer_L, BUFFER_SIZE * N_BLOCKS);
     arm_fir_decimate_f32(&FIR_dec1_Q, float_buffer_R, float_buffer_R, BUFFER_SIZE * N_BLOCKS);
 
-                                                                                              // decimation-by-2 in-place
+    // decimation-by-2 in-place
     arm_fir_decimate_f32(&FIR_dec2_I, float_buffer_L, float_buffer_L, BUFFER_SIZE * N_BLOCKS / (uint32_t)DF1);
     arm_fir_decimate_f32(&FIR_dec2_Q, float_buffer_R, float_buffer_R, BUFFER_SIZE * N_BLOCKS / (uint32_t)DF1);
 
@@ -255,15 +344,7 @@ void ProcessIQData()
        calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
      **********************************************************************************/
     arm_cfft_f32(S, FFT_buffer, 0, 1);
-
-    if (autotune_flag != 0) {                  // AUTOTUNE, slow down process in order for Si5351 to settle
-      if (autotune_counter < autotune_wait)
-        autotune_counter++;
-      else {
-        autotune_counter = 0;
-        Autotune();
-      }
-    }
+   
 
     /**********************************************************************************  AFP 12-31-20
       Continuing FFT Convolution
@@ -276,7 +357,6 @@ void ProcessIQData()
      **********************************************************************************/
 
     arm_cmplx_mult_cmplx_f32 (FFT_buffer, FIR_filter_mask, iFFT_buffer, FFT_length);
-
     if (updateDisplayFlag == 1) {
       for (int k = 0; k < 1024; k++) {
         audioSpectBuffer[1024 - k] = (iFFT_buffer[k] * iFFT_buffer[k]);
@@ -292,8 +372,11 @@ void ProcessIQData()
         if (audioYPixel[k] < 0)
           audioYPixel[k] = 0;
       }
-    }
 
+      arm_max_f32 (audioSpectBuffer, 1024, &audioMaxSquared, &AudioMaxIndex);  // AFP 09-18-22 Max value of squared abin magnitued in audio
+      audioMaxSquaredAve = .5 * audioMaxSquared + .5 * audioMaxSquaredAve;  //AFP 09-18-22Running averaged values
+      DisplaydbM();
+    }
     /**********************************************************************************
           Additional Convolution Processes:
               // filter by just deleting bins - principle of Linrad
@@ -334,7 +417,10 @@ void ProcessIQData()
             our time domain output is a combination of the real part (left channel) AND the imaginary part (right channel) of the second half of the FFT_buffer
             The demod mode is accomplished by selecting/combining the real and imaginary parts of the output of the IFFT process.
        **********************************************************************************/
+    //=====================
 
+
+    //===================
     if (bands[currentBand].mode == DEMOD_SAM ) {
       AMDecodeSAM();                                      //Synchronous AM Detection
     } else if (bands[currentBand].mode == DEMOD_IQ) {
@@ -360,6 +446,14 @@ void ProcessIQData()
         }
       }
     }
+    //============================  Receive EQ  ========================  AFP 08-08-22
+   if(receiveEQFlag == ON ){
+    DoReceiveEQ();
+    arm_copy_f32(float_buffer_L, float_buffer_R, FFT_length / 2);
+    }
+    //============================ End Receive EQ
+
+
     /**********************************************************************************
       Noise Reduction
       3 algorithms working 3-15-22
@@ -401,63 +495,20 @@ void ProcessIQData()
       NoiseBlanker(float_buffer_L, float_buffer_R);
       arm_copy_f32(float_buffer_R, float_buffer_L, FFT_length / 2);
     }
+    //===========================  Receive EQ ==============
+
+
+    //=========================== End EQ ==============
 
     //===========================  Narrow-band CW filter centered on 750Hz  =================
 
     //=== CW Filter ===
     // ----------------------  CW Narrow band filter -------------------------
-    if (xmtMode == CW_MODE) {
-      arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_R, float_buffer_R, 256);
-      arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_L, float_buffer_L, 256);
+    if (T41State == CW_RECEIVE) {
+      DoCWReceiveProcessing(); //AFP 09-19-22
 
-      //=== end CW Filter ===
-
-      // ----------------------  Correlation calculation  AFP 02-04-22 -------------------------
-
-      //Calculate correlation between calc sine and incoming signal
-
-      arm_correlate_f32  ( float_buffer_R, 256, sinBuffer, 256, float_Corr_BufferR ) ;    //AFP 02-02-22
-      arm_max_f32  ( float_Corr_BufferR, 511, &corrResultR, &corrResultIndexR);    //AFP 02-02-22
-      //running average of corr coeff.
-      aveCorrResultR = .7 * corrResultR + .3 * aveCorrResultR;
-      arm_correlate_f32  ( float_buffer_L, 256, sinBuffer, 256, float_Corr_BufferL ) ;    //AFP 02-02-22
-      //get max value of correlation
-      arm_max_f32  ( float_Corr_BufferL, 511, &corrResultL, &corrResultIndexL);    //AFP 02-02-22
-      //running average of corr coeff.
-      aveCorrResultL = .7 * corrResultL + .3 * aveCorrResultL;
-      aveCorrResult = (corrResultR + corrResultL) / 2;
-      // Calculate Goertzel Mahnitude of incomming signal
-      goertzelMagnitude1 = goertzel_mag(256, 768, 24000, float_buffer_L);
-      goertzelMagnitude2 = goertzel_mag(256, 768, 24000, float_buffer_R);
-      goertzelMagnitude = (goertzelMagnitude1 + goertzelMagnitude2) / 2;
-      //Combine Correlation and Gowetzel Coefficients
-
-      combinedCoeff = 10 * aveCorrResult * 100 * goertzelMagnitude;
-      combinedCoeff2 = combinedCoeff;
-      // ==========   AFP 02-10-22  Changed CW decode "lock" indicator
-      if (combinedCoeff > 2) {
-        tft.fillRect(745, 448,  15 , 15, RA8875_GREEN);
-      }
-      else if (combinedCoeff < 2) {
-        CWLevelTimer = millis();
-        if (CWLevelTimer - CWLevelTimerOld > 2000) {
-          CWLevelTimerOld = millis();
-          tft.fillRect(744, 447,  17 , 17, RA8875_BLACK);
-        }
-      }
-      combinedCoeff2Old = combinedCoeff2;
-      tft.drawFastVLine(BAND_INDICATOR_X - 8 + 26, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW lower freq indicator
-      tft.drawFastVLine(BAND_INDICATOR_X - 8 + 33, AUDIO_SPECTRUM_BOTTOM - 118, 118, RA8875_GREEN); //CW upper freq indicator
-      if (combinedCoeff > 2) { // if  have a reasonable corr coeff, >.15, then we have a keeper.
-        audioTemp = 1;
-      } else {
-        audioTemp = 0;
-
-      }
-      //==============  acquire data on CW  ================
-      DoCWDecoding(audioTemp); //AFP 02-02-22  pass audio value. Either 1 or 0
     }
-
+    
     // ======================================Interpolation  ================
 
     arm_fir_interpolate_f32(&FIR_int1_I, float_buffer_L, iFFT_buffer, BUFFER_SIZE * N_BLOCKS / (uint32_t)(DF));   // Interpolatikon
@@ -466,8 +517,6 @@ void ProcessIQData()
     // interpolation-by-4
     arm_fir_interpolate_f32(&FIR_int2_I, iFFT_buffer, float_buffer_L, BUFFER_SIZE * N_BLOCKS / (uint32_t)(DF1));
     arm_fir_interpolate_f32(&FIR_int2_Q, FFT_buffer, float_buffer_R, BUFFER_SIZE * N_BLOCKS / (uint32_t)(DF1));
-
-
 
     /**********************************************************************************  AFP 12-31-20
       Digital Volume Control

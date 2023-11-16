@@ -13,36 +13,42 @@
 *****/
 void EEPROMRead()
 {
-  int incrementValues[] = {10, 50, 100, 250, 1000, 10000};
 
-  EEPROM.get(EEPROM_BASE_ADDRESS, EEPROMData);            // Read as one large chunk
-
-  lastWPM = currentWPM = EEPROMData.wordsPerMinute;       // Now break it up
+  EEPROM.get(EEPROM_BASE_ADDRESS, EEPROMData);                            // Read as one large chunk
+  
+  currentWPM           = EEPROMData.wordsPerMinute;       // AFP 09-26-22
   paddleDit            = EEPROMData.paddleDit;
   paddleDah            = EEPROMData.paddleDah;
-  spectrumNoiseFloor   = EEPROMData.spectrumNoiseFloor;
+  spectrumNoiseFloor   = EEPROMData.spectrumNoiseFloor;    // AFP 09-26-22
+  spectrum_zoom        = EEPROMData.spectrum_zoom; 
   currentBand          = EEPROMData.currentBand;
-  currentFreqA         = EEPROMData.currentFreqA * NEW_SI5351_FREQ_MULT;
-  currentFreqB         = EEPROMData.currentFreqB * NEW_SI5351_FREQ_MULT;
-  activeVFO            = EEPROMData.currentVFO;
-  NR_Filter_Value      = EEPROMData.NR_Filter_Value;
-  micCompression       = EEPROMData.micCompression;
+  activeVFO            = EEPROMData.currentVFO;             // AFP 09-26-22
+  nrOptionSelect       = EEPROMData.nrInUse;                              // The filter selected
+  NR_Filter_Value      = EEPROMData.NR_Filter_Values[nrOptionSelect];     // The filter encoder value
+
+  micCompression       = EEPROMData.micCompression;           // AFP 09-26-22
   transmitPowerLevel   = EEPROMData.powerLevel;
-  xmtMode              = EEPROMData.xmtMode;
-  rfGain               = EEPROMData.rfGain;
-  attenuator           = EEPROMData.attenuator;
-  currentScale         = EEPROMData.currentScale;
+  powerOut             = EEPROMData.powerOut;                  // AFP 09-26-22
+  xmtMode              = EEPROMData.xmtMode;                    // AFP 09-26-22
 
+  rfGainAllBands       = EEPROMData.rfGainAllBands;
+  AGCMode              = EEPROMData.AGCMode;                     // AFP 09-26-22
   tuneIndex            = EEPROMData.tuneIndex;
-  freqIncrement        = incrementValues[tuneIndex];
-
-  frequencyCorrection = EEPROMData.frequencyOffset;
+ 
+  frequencyCorrectionFactor = EEPROMData.calibrationFactor;
+  frequencyCorrection       = EEPROMData.frequencyOffset;
 
   IQ_amplitude_correction_factor  = EEPROMData.IQ_AmpCorFactor;
   IQ_phase_correction_factor      = EEPROMData.IQ_PhaseCorFactor;
   IQ_Xamplitude_correction_factor = EEPROMData.IQ_XAmpCorFactor;
   IQ_Xphase_correction_factor     = EEPROMData.IQ_XPhanseCorFactor;
-
+ 
+  sidetoneVolume        = EEPROMData.sidetoneVolume;
+  cwTransmitDelay       = EEPROMData.cwTransmitDelay;               // AFP 09-27-22
+  for (int i = 0; i < NUMBER_OF_BANDS; i++) {                         
+    lastFrequencies[i][0] = EEPROMData.lastFrequencies[i][0];      
+    lastFrequencies[i][1] = EEPROMData.lastFrequencies[i][1];       
+  }
 }
 
 /*****
@@ -56,6 +62,7 @@ void EEPROMRead()
 *****/
 void EEPROMWrite()
 {
+  strcpy(EEPROMData.version_of_settings, VERSION);        // Save version number
   EEPROMData.attenuator         = attenuator;
   EEPROMData.currentBand        = currentBand;
   EEPROMData.centerFreq         = centerFreq;
@@ -70,16 +77,25 @@ void EEPROMWrite()
   EEPROMData.IQ_XPhanseCorFactor = IQ_Xphase_correction_factor;
   EEPROMData.micCompression     = micCompression;
   EEPROMData.NR_Filter_Value    = NR_Filter_Value;
+  EEPROMData.nrInUse            = nrOptionSelect;
   EEPROMData.paddleDit          = paddleDit;
   EEPROMData.paddleDah          = paddleDah;
-  EEPROMData.rfGain             = rfGain;
+  EEPROMData.powerLevel         = transmitPowerLevel;
+  EEPROMData.powerOut           = powerOut;
+
+  EEPROMData.rfGainAllBands             = rfGainAllBands;
   EEPROMData.spectrumNoiseFloor = spectrumNoiseFloor;
   EEPROMData.powerLevel         = transmitPowerLevel;
   EEPROMData.tuneIndex          = tuneIndex;
-
+  EEPROMData.calibrationFactor = frequencyCorrectionFactor;
   EEPROMData.wordsPerMinute     = currentWPM;
   EEPROMData.xmtMode            = xmtMode;
-
+  EEPROMData.sidetoneVolume     = sidetoneVolume;
+  EEPROMData.cwTransmitDelay    = cwTransmitDelay;
+  for (int i = 0; i < NUMBER_OF_BANDS; i++) {
+    EEPROMData.lastFrequencies[i][0] = lastFrequencies[i][0];
+    EEPROMData.lastFrequencies[i][1] = lastFrequencies[i][1];
+  }
   EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);
 } // end void eeProm SAVE
 
@@ -109,14 +125,16 @@ void EEPROMShow()
   Serial.println(EEPROMData.dcfParityBit);
   Serial.print("rate               = ");
   Serial.println(EEPROMData.rate);
-  Serial.print("NR_use_X           = ");
-  Serial.println(EEPROMData.NR_use_X);
+  Serial.print("nrInUse            = ");
+  Serial.println(EEPROMData.nrInUse);
+  Serial.print("NR Parameter       = ");
+  Serial.println(EEPROMData.NR_Filter_Values[EEPROMData.nrInUse]); 
   Serial.print("show_spectrum_flag = ");
   Serial.println(EEPROMData.show_spectrum_flag);
   Serial.print("xmtMode            = ");
   Serial.println(EEPROMData.xmtMode);
 
-  for (i = 0; i < NUM_BANDS; i++) {
+  for (i = 0; i < NUMBER_OF_BANDS; i++) {
     Serial.print("pixel_offset[");
     Serial.print(i);
     Serial.print("] = ");
@@ -130,7 +148,7 @@ void EEPROMShow()
   Serial.println(EEPROMData.agc_decay);
   Serial.print("agc_slope         = ");
   Serial.println(EEPROMData.agc_slope);
-  for (i = 0; i < NUM_BANDS; i++) {
+  for (i = 0; i < NUMBER_OF_BANDS; i++) {
     Serial.print("AGC_thresh[");
     Serial.print(i);
     Serial.print("] = ");
@@ -138,7 +156,7 @@ void EEPROMShow()
   }
   Serial.print("audioVolume      = ");
   Serial.println(EEPROMData.audioVolume);
-  for (i = 0; i < NUM_BANDS; i++) {
+  for (i = 0; i < NUMBER_OF_BANDS; i++) {
     Serial.print("bwu[");
     Serial.print(i);
     Serial.print("] = ");
@@ -164,7 +182,7 @@ void EEPROMShow()
   Serial.println(EEPROMData.keyType);
   Serial.print("keyerSidetone     = ");
   Serial.println(EEPROMData.keyerSidetone);
-  for (i = 0; i < NUM_BANDS; i++) {
+  for (i = 0; i < NUMBER_OF_BANDS; i++) {
     Serial.print("mode[");
     Serial.print(i);
     Serial.print("] = ");
@@ -176,7 +194,7 @@ void EEPROMShow()
   Serial.println(EEPROMData.paddleDit);
   Serial.print("PowerLevel       = ");
   Serial.println(EEPROMData.powerLevel);
-  for (i = 0; i < NUM_BANDS; i++) {
+  for (i = 0; i < NUMBER_OF_BANDS; i++) {
     Serial.print("rfg[");
     Serial.print(i);
     Serial.print("] = ");
@@ -184,27 +202,20 @@ void EEPROMShow()
   }
   Serial.print("spectrumNoiseFloor = ");
   Serial.println(EEPROMData.spectrumNoiseFloor);
-  for (i = 0; i < NUMBER_OF_SWITCHES; i++) {
-    Serial.print("switchValues[");
-    Serial.print(i);
-    Serial.print("] = ");
-    Serial.println(EEPROMData.switchValues[i]);
-  }
 
   Serial.print("tuneIndex        = ");
   Serial.println(EEPROMData.tuneIndex);
   Serial.print("wordsPerMinute   = ");
   Serial.println(EEPROMData.wordsPerMinute);
-  Serial.print("zetaHelp         = ");
-  Serial.println(EEPROMData.zetaHelp);
   Serial.print("crc              = ");
   Serial.println(EEPROMData.crc);
   Serial.print("currentScale     = ");
   Serial.println(EEPROMData.currentScale);
   Serial.print("spectrum_zoom    = ");
   Serial.println(EEPROMData.spectrum_zoom);
-  Serial.print("calibration_constant = ");
-  Serial.println(EEPROMData.calibration_constant);
+  Serial.print("calibrationFactor = ");
+  Serial.println(EEPROMData.calibrationFactor);
+
   Serial.print("currentFreq      = ");
   Serial.println(EEPROMData.centerFreq);
   Serial.print("currentFreqA      = ");
@@ -218,7 +229,7 @@ void EEPROMShow()
     Serial.println(EEPROMData.favoriteFreqs[i]);
   }
 
-  Serial.print("calibration_factor      = ");
+  Serial.print("centerFreq              = ");
   Serial.println( (long)EEPROMData.centerFreq);
   Serial.print("bitSamplePeriod         = ");
   Serial.println(EEPROMData.bitSamplePeriod);
@@ -258,6 +269,10 @@ void EEPROMShow()
   Serial.println(EEPROMData.omegaN);
   Serial.print("pll_fmax                = ");
   Serial.println(EEPROMData.pll_fmax);
+  Serial.print("powerLevel           =");
+  Serial.println(EEPROMData.powerLevel);
+  Serial.print("powerOut                =");
+  Serial.println(EEPROMData.powerOut);  
   Serial.print("spectrum_display_scale  = ");
   Serial.println(EEPROMData.spectrum_display_scale);
   Serial.print("stereo_factor           = ");
@@ -273,6 +288,10 @@ void EEPROMShow()
   Serial.println(EEPROMData.IQ_XAmpCorFactor);
   Serial.print("IQ_Xphase_correction_factor = ");
   Serial.println(EEPROMData.IQ_XPhanseCorFactor);
+  Serial.print("sidetoneVolume           = ");
+  Serial.println(EEPROMData.sidetoneVolume, 5);
+  Serial.print("cwTransmitDelay          = ");
+  Serial.println(EEPROMData.cwTransmitDelay);
 
   for (i = 0; i < EQUALIZER_CELL_COUNT; i++) {
     Serial.print("equalizerRec[");
@@ -288,12 +307,24 @@ void EEPROMShow()
     Serial.println(EEPROMData.equalizerXmt[i]);
   }
   Serial.println("");
-  for (i = 0; i < AUDIO_POST_PROCESSOR_BANDS; i++) {                // 8 * 4 = 32
-    Serial.print("audioPostProc[");
+
+  for (int i = 0; i < NUMBER_OF_BANDS; i++) {
+    Serial.print("lastFrequencies[");
+    Serial.print(i);
+    Serial.print("][0] ");
+    Serial.print(EEPROMData.lastFrequencies[i][0]);
+    Serial.print("   lastFrequencies[");
+    Serial.print(i);
+    Serial.print("][1] ");
+    Serial.println(EEPROMData.lastFrequencies[i][1]);
+  }
+  
+  for (i = 0; i < NUMBER_OF_SWITCHES; i++) {
+    Serial.print("switchValues[");
     Serial.print(i);
     Serial.print("] = ");
-    Serial.println(EEPROMData.audioPostProc[i]);
-  }
+    Serial.println(EEPROMData.switchValues[i]);
+  }  
 }
 
 
@@ -308,16 +339,16 @@ void EEPROMShow()
 *****/
 void EEPROMSaveDefaults()
 {
-  //  char version_of_settings[7];                // 4 bytes validation string
-  strncpy(EEPROMData.version_of_settings, VERSION, sizeof(EEPROMData.version_of_settings));
+  strncpy(EEPROMData.version_of_settings, VERSION, sizeof(EEPROMData.version_of_settings)); // Update version
   EEPROMData.AGCMode                         = 1;  // 1 byte
   EEPROMData.auto_IQ_correction              = 1;  // 1 byte
   EEPROMData.attenuator                      = 2;  // 1 byte
-  EEPROMData.xmtMode                         = 4;  // 4 byte
+  EEPROMData.xmtMode                         = 0;  // 4 byte  //AFP 09-26-22
 
   EEPROMData.dcfParityBit                    = 3; // 1 byte
   EEPROMData.rate                            = 4; // 1 byte
-  EEPROMData.NR_use_X                        = 5; // 1 byte
+  EEPROMData.NR_Filter_Values[0]              = 0.5; // 4 byte
+  EEPROMData.nrInUse                         = 0;
   EEPROMData.show_spectrum_flag              = 6; // 1 byte
 
   EEPROMData.pixel_offset[0]                 = 7;                     // 14 bytes
@@ -341,7 +372,7 @@ void EEPROMSaveDefaults()
   EEPROMData.AGC_thresh[5]                   = 1;
   EEPROMData.AGC_thresh[6]                   = 1;
 
-  EEPROMData.audioVolume                    = 0;                           // 4 bytes
+  EEPROMData.audioVolume                     = 50;                     // 4 bytes
 
   EEPROMData.bwu[0]                          = 0;                     // 28 bytes
   EEPROMData.bwu[1]                          = 0;
@@ -359,15 +390,21 @@ void EEPROMSaveDefaults()
   EEPROMData.bwl[5]                          = 0;
   EEPROMData.bwl[6]                          = 0;
 
-  EEPROMData.currentBand                     = 1;                     // 4 bytes
+  EEPROMData.currentBand                     = 1;                     // 4 bytes  1 = 40M
   EEPROMData.dcfCount                        = 0;                     // 4 bytes
   EEPROMData.dcfLevel                        = 0;                     // 4 bytes
   EEPROMData.dcfSilenceTimer                 = 0;                     // 4 bytes
   EEPROMData.dcfTheSecond                    = 0;                     // 4 bytes
   EEPROMData.dcfPulseTime                    = 0;                     // 4 bytes
+
+  for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {                    // 14 * 2 * 4 = 112
+    EEPROMData.equalizerRec[i] = 100;
+    EEPROMData.equalizerXmt[i] = 100;
+  }
+  
   EEPROMData.freqIncrement                   = 4;                     // 4 bytes
   EEPROMData.keyType                         = 0;                     // straight key = 0, keyer = 1
-  EEPROMData.keyerSidetone                   = 700;                   // Hz
+  EEPROMData.keyerSidetone                   = 750;                   // Hz
 
   EEPROMData.mode[0]                         = 0;                     // 28 bytes
   EEPROMData.mode[1]                         = 0;
@@ -377,9 +414,10 @@ void EEPROMSaveDefaults()
   EEPROMData.mode[5]                         = 0;
   EEPROMData.mode[6]                         = 0;
 
+  EEPROMData.NR_Filter_Value                 = 0;
   EEPROMData.paddleDah                       = 0;                     // 4 bytes
   EEPROMData.paddleDit                       = 0;                     // 4 bytes
-  EEPROMData.powerLevel                      = 8;                     // 4 bytes
+  EEPROMData.powerLevel                      = 20;                    // 4 bytes (Watts)
 
   EEPROMData.rfg[0]                          = 0;                     // 28 bytes
   EEPROMData.rfg[1]                          = 0;
@@ -391,49 +429,69 @@ void EEPROMSaveDefaults()
 
   EEPROMData.spectrumNoiseFloor              = SPECTRUM_NOISE_FLOOR;  // 4 bytes
 
-  EEPROMData.switchValues[0]                 = 885;
-  EEPROMData.switchValues[1]                 = 830;
-  EEPROMData.switchValues[2]                 = 776;
-  EEPROMData.switchValues[3]                 = 720;
-  EEPROMData.switchValues[4]                 = 670;
-  EEPROMData.switchValues[5]                 = 609;
-  EEPROMData.switchValues[6]                 = 559;
-  EEPROMData.switchValues[7]                 = 501;
-  EEPROMData.switchValues[8]                 = 438;
-  EEPROMData.switchValues[9]                 = 382;
-  EEPROMData.switchValues[10]                = 324;
-  EEPROMData.switchValues[11]                = 266;
-  EEPROMData.switchValues[12]                = 107;
-  EEPROMData.switchValues[13]                = 142;
-  EEPROMData.switchValues[14]                =  76;
-  EEPROMData.switchValues[15]                =  10;
+  EEPROMData.switchValues[0]                 = 919;      // Your values will likely be different
+  EEPROMData.switchValues[1]                 = 868;
+  EEPROMData.switchValues[2]                 = 816;
+  EEPROMData.switchValues[3]                 = 767;
+  EEPROMData.switchValues[4]                 = 715;
+  EEPROMData.switchValues[5]                 = 665;
+  EEPROMData.switchValues[6]                 = 614;
+  EEPROMData.switchValues[7]                 = 562;
+  EEPROMData.switchValues[8]                 = 511;
+  EEPROMData.switchValues[9]                 = 461;
+  EEPROMData.switchValues[10]                = 406;
+  EEPROMData.switchValues[11]                = 353;
+  EEPROMData.switchValues[12]                = 298;
+  EEPROMData.switchValues[13]                = 243;
+  EEPROMData.switchValues[14]                = 185;
+  EEPROMData.switchValues[15]                = 126;
+  EEPROMData.switchValues[16]                = 65;
+  EEPROMData.switchValues[17]                = 4;
 
+  EEPROMData.tuneIndex                       = 4;                     // $ bytes
   EEPROMData.wordsPerMinute                  = 15;                    // 4 bytes
-  EEPROMData.zetaHelp                        = 65;                    // 4 bytes
+  EEPROMData.xmtMode                         = 0;                     // 4 bytes
 
   EEPROMData.crc                             = 0;                     // 2 bytes, added when saving
-  EEPROMData.currentScale                    = 0;                     // 2 bytes,
+  EEPROMData.currentScale                    = 1;                     // 2 bytes,
 
-  EEPROMData.spectrum_zoom                   = spectrum_zoom;         // 4 bytes
+  EEPROMData.spectrum_zoom                   = 1;         // 4 bytes AFP 09-26-22
 
-  EEPROMData.calibration_constant            = 0L;                    // 4 bytes
-  EEPROMData.centerFreq                     =  7030000L;              // 4 bytes
-  EEPROMData.currentFreqA                    = 7030000L;              // 4 bytes
-  EEPROMData.currentFreqB                    = 7150000L;              // 4 bytes
-
-  EEPROMData.favoriteFreqs[0]                =  3560000L;
+  EEPROMData.calibrationFactor               = 230000LL;              // 8 bytes
+  EEPROMData.centerFreq                      = 7150000L;              // 4 bytes
+  EEPROMData.currentFreqA                    = 7150000L;              // 4 bytes
+  EEPROMData.currentFreqB                    = 7030000L;              // 4 bytes
+  EEPROMData.cwTransmitDelay                 = 1500L;                 // 4 bytes, how long between Morse atoms before relay kicks off
+  
+  EEPROMData.favoriteFreqs[0]                =  3560000L;             // These are CW/SSB calling frequencies for HF bands
   EEPROMData.favoriteFreqs[1]                =  3690000L;
   EEPROMData.favoriteFreqs[2]                =  7030000L;
   EEPROMData.favoriteFreqs[3]                =  7285000L;
   EEPROMData.favoriteFreqs[4]                = 14060000L;
-  EEPROMData.favoriteFreqs[5]                = 14285000L;
+  EEPROMData.favoriteFreqs[5]                = 14200000L;
   EEPROMData.favoriteFreqs[6]                = 21060000L;
   EEPROMData.favoriteFreqs[7]                = 21285000L;
   EEPROMData.favoriteFreqs[8]                = 28060000L;
   EEPROMData.favoriteFreqs[9]                = 28365000L;
 
-  EEPROMData.calibration_factor              = 0LL;                   // 8 bytes
+  EEPROMData.frequencyOffset                 = 0L;                    // 4 bytes
 
+  EEPROMData.lastFrequencies[0][0] =  3700000L;  // 80
+  EEPROMData.lastFrequencies[1][0] =  7150000L;  // 40
+  EEPROMData.lastFrequencies[2][0] = 14200000L;  // 50
+  EEPROMData.lastFrequencies[3][0] = 18100000L;  // 17
+  EEPROMData.lastFrequencies[4][0] = 21200000L;  // 15
+  EEPROMData.lastFrequencies[5][0] = 24900000L;  // 12
+  EEPROMData.lastFrequencies[6][0] = 28300000L;  // 10
+
+  EEPROMData.lastFrequencies[0][1] =  3530000L;  // 80
+  EEPROMData.lastFrequencies[1][1] =  7060000L;  // 40
+  EEPROMData.lastFrequencies[2][1] = 14030000L;  // 20
+  EEPROMData.lastFrequencies[3][1] = 18100000L;  // 17
+  EEPROMData.lastFrequencies[4][1] = 21060000L;  // 15
+  EEPROMData.lastFrequencies[5][1] = 24900000L;  // 12
+  EEPROMData.lastFrequencies[6][1] = 28060000L;  // 10
+  
   EEPROMData.bitSamplePeriod                 = 0.002;                 // 4 bytes 1.0 / 500.0;
   EEPROMData.bitSampleTimer                  = 0.0;                   // 4 bytes
   EEPROMData.dcfMean                         = 0.0;                   // 4 bytes
@@ -443,7 +501,7 @@ void EEPROMSaveDefaults()
 
   EEPROMData.bass                            = 0.0;                   // 4
   EEPROMData.LPFcoeff                        = 0.0;                   // 4
-  EEPROMData.micCompression                  = 0.7;                   // 4 bytes
+  EEPROMData.micCompression                  = -18;                   // 4 bytes // AFP 09-22-22
   EEPROMData.midbass                         = 0.0;                   // 4
   EEPROMData.mid                             = 0.0;                   // 4
   EEPROMData.midtreble                       = 0.0;                   // 4
@@ -453,27 +511,23 @@ void EEPROMSaveDefaults()
   EEPROMData.offsetDisplayDB                 = 0.0;                   // 4
   EEPROMData.omegaN                          = 0.0;                   // 4
   EEPROMData.pll_fmax                        = 4000.0;                // 4 bytes
+  EEPROMData.powerLevel                      = 20;
+  EEPROMData.powerOut                        = 0.130;                 // 4 bytes, 20W
+
   EEPROMData.spectrum_display_scale          = 0.0;                   // 4
   EEPROMData.stereo_factor                   = 0.0;                   // 4
   EEPROMData.tuneIndex                       = 4;                     // 4
   EEPROMData.treble                          = 0.0;                   // 4
-  EEPROMData.frequencyOffset                 = 0L;                    // 4
+
   EEPROMData.IQ_AmpCorFactor                 = 1.0;                   // 4
   EEPROMData.IQ_PhaseCorFactor               = 0.0;                   // 4
   EEPROMData.IQ_XAmpCorFactor                = 1.0;                   // 4
   EEPROMData.IQ_XPhanseCorFactor             = 0.0;                   // 4
-
-  for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {                    // 14 * 2 * 4 = 112
-    EEPROMData.equalizerRec[i] = 100;
-    EEPROMData.equalizerXmt[i] = 100;
-  }
-  for (int i = 0; i < AUDIO_POST_PROCESSOR_BANDS; i++) {              // 8 * 4 = 32
-    EEPROMData.audioPostProc[i] = 100;
-  }
+  EEPROMData.sidetoneVolume                  = 0.001;                 // 4
 
   EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);                        // Write as one large chunk
 }                        //                                     -----------
-//              Total:                                            604 bytes
+//              Total:                                            608 bytes   (need to confirm this number)
 
 
 
@@ -518,7 +572,7 @@ void SetFavoriteFrequency()
 
   index = 0;
   tft.setTextColor(RA8875_WHITE);
-  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, MENU_WIDTHS, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_MAGENTA);
   tft.setCursor(SECONDARY_MENU_X, MENUS_Y);
   tft.print(EEPROMData.favoriteFreqs[index]);
   while (true) {
@@ -530,7 +584,7 @@ void SetFavoriteFrequency()
         if (index > MAX_FAVORITES)
           index = 0;                                // Wrap to first one
       }
-      tft.fillRect(SECONDARY_MENU_X, MENUS_Y, MENU_WIDTHS, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setCursor(SECONDARY_MENU_X, MENUS_Y);
       tft.print(EEPROMData.favoriteFreqs[index]);
       filterEncoderMove = 0;
@@ -541,11 +595,11 @@ void SetFavoriteFrequency()
     MyDelay(150L);
     if (val == MENU_OPTION_SELECT) {                              // Make a choice??
       EraseMenus();
-      centerFreq = EEPROMData.favoriteFreqs[index] = TxRxFreq;
+      EEPROMData.favoriteFreqs[index] = TxRxFreq;
       if (activeVFO == VFO_A) {
-        currentFreqA = centerFreq;
+        currentFreqA = TxRxFreq;
       } else {
-        currentFreqB = centerFreq;
+        currentFreqB = TxRxFreq;
       }
       EEPROMWrite();
       SetFreq();
@@ -574,7 +628,7 @@ void GetFavoriteFrequency()
   tft.setFontScale( (enum RA8875tsize) 1);
 
   tft.setTextColor(RA8875_WHITE);
-  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, MENU_WIDTHS, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_MAGENTA);
   tft.setCursor(SECONDARY_MENU_X, MENUS_Y);
   tft.print(EEPROMData.favoriteFreqs[index]);
   while (true) {
@@ -586,7 +640,7 @@ void GetFavoriteFrequency()
         if (index > MAX_FAVORITES)
           index = 0;                                // Wrap to first one
       }
-      tft.fillRect(SECONDARY_MENU_X, MENUS_Y, MENU_WIDTHS, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setCursor(SECONDARY_MENU_X, MENUS_Y);
       tft.print(EEPROMData.favoriteFreqs[index]);
       filterEncoderMove = 0;
@@ -597,11 +651,11 @@ void GetFavoriteFrequency()
     MyDelay(150L);
     if (val == MENU_OPTION_SELECT) {                              // Make a choice??
       EraseMenus();
-      TxRxFreq = centerFreq = EEPROMData.favoriteFreqs[index];    // current frequency
+      TxRxFreq = EEPROMData.favoriteFreqs[index];    // current frequency  AFP 09-27-22
       if (activeVFO == VFO_A) {
-        currentFreqA = centerFreq;
+        currentFreqA = TxRxFreq;    //AFP 09-27-22
       } else {
-        currentFreqB = centerFreq;
+        currentFreqB = TxRxFreq;  //AFP 09-27-22
       }
       SetFreq();
       BandInformation();
