@@ -519,10 +519,10 @@ void EEPROMSaveDefaults()
   EEPROMData.tuneIndex                       = 4;                     // 4
   EEPROMData.treble                          = 0.0;                   // 4
 
-  EEPROMData.IQ_AmpCorFactor                 = 1.0;                   // 4
-  EEPROMData.IQ_PhaseCorFactor               = 0.0;                   // 4
-  EEPROMData.IQ_XAmpCorFactor                = 1.0;                   // 4
-  EEPROMData.IQ_XPhanseCorFactor             = 0.0;                   // 4
+  EEPROMData.IQ_AmpCorFactor                 = 1.0;                   // 4  0.73
+  EEPROMData.IQ_PhaseCorFactor               = 0.0;                   // 4 -0.14
+  EEPROMData.IQ_XAmpCorFactor                = 1.0;                   // 4  1.04
+  EEPROMData.IQ_XPhanseCorFactor             = 0.0;                   // 4  1.01
   EEPROMData.sidetoneVolume                  = 0.001;                 // 4
 
   EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);                        // Write as one large chunk

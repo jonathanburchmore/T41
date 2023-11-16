@@ -856,7 +856,7 @@ int audioPostProcessorCells[AUDIO_POST_PROCESSOR_BANDS];
 int bandswitchPins[]                      = {30,   // 80M
                                              31,   // 40M
                                              28,   // 20M
-                                             0,   // 17M
+                                             29,   // 17M
                                              29,   // 15M
                                              0,   // 12M
                                              0    // 10M
@@ -2150,8 +2150,8 @@ void loop()
 
       modeSelectOutL.gain(0, 0);
       modeSelectOutR.gain(0, 0);
-      modeSelectOutExL.gain(0, .3);
-      modeSelectOutExR.gain(0, .3 );
+      modeSelectOutExL.gain(0, powerOut);
+      modeSelectOutExR.gain(0,powerOut );
       ShowTransmitReceiveStatus();
 
       while (digitalRead(PTT) == LOW) {
@@ -2189,26 +2189,37 @@ void loop()
         omitOutputFlag      = false;
         SetFineTuneFrequency();
         ShowSpectrum();  // if removed CW signal on is 2 mS
+        
       } else {
         if (keyPressedOn == 1 && xmtMode == CW_MODE) {
-          xrState = TRANSMIT_STATE;
-          SetFreq();
+ 
                           //================  CW Transmit Mode Straight Key ===========
           if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW && xmtMode == CW_MODE && keyType == 0) { //Straight Key
+            CW_ExciterIQData();
             xrState = TRANSMIT_STATE;
-            SetFreq();
+            ShowTransmitReceiveStatus();
+            SetFreq();                    //  AFP 10-02-22
+            digitalWrite(MUTE, HIGH);   //   Mute Audio  (HIGH=Mute)
+            modeSelectInR.gain(0, 0);
+            modeSelectInL.gain(0, 0);
+            modeSelectInExR.gain(0, 0);
+            modeSelectInExL.gain(0, 0);
+            modeSelectOutL.gain(0, 0);
+            modeSelectOutR.gain(0, 0);
+            modeSelectOutExL.gain(0, 0);
+            modeSelectOutExR.gain(0, 0);
             cwTimer = millis();
-            while (millis() - cwTimer <= cwTransmitDelay) {            //Start CW transmit timer on
+           while (millis() - cwTimer <= cwTransmitDelay) {            //Start CW transmit timer on
               digitalWrite(RXTX, HIGH);
               if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW  && keyType == 0) { // AFP 09-25-22  Turn on CW signal
-                CW_ExciterIQData();
                 cwTimer = millis();                                           //Reset timer
                 modeSelectOutExL.gain(0, powerOut);
-                modeSelectOutExR.gain(0, powerOut);
+                modeSelectOutExL.gain(0, powerOut);
                 digitalWrite(MUTE, LOW);                // unmutes audio
-                modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone AFP 10-03-22
-                modeSelectOutR.gain(1, sidetoneVolume);          // Sidetone AFP 10-03-22
-              } else {
+               modeSelectOutL.gain(1, sidetoneVolume);          // Sidetone  AFP 10-01-22
+               modeSelectOutR.gain(1, sidetoneVolume);          // Sidetone  AFP 10-01-22
+              }
+              else {
                 if (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH  && keyType == 0) {  //Turn off CW signal
                   keyPressedOn = 0;
                   digitalWrite(MUTE, HIGH);                // mutes audio

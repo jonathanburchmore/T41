@@ -382,7 +382,7 @@ int RFOptions()
     case 0:                                 // Power
       // Argument:  min  max  start,                 increment    prompt
       transmitPowerLevel = (float)GetEncoderValue(1,   20,  transmitPowerLevel, 1, (char *) "Power: ");
-      powerOut = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * .01; // Needs to be acalibration variable
+      powerOut = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * .015; // Needs to be a calibration variable
       EEPROMData.powerLevel = transmitPowerLevel;
       EEPROMData.powerOut   = powerOut;
       EEPROMWrite();

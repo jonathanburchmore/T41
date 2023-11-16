@@ -28,7 +28,7 @@
 //======================================== Symbolic Constants for Debugging and Version Control ========================
 #define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
 
-#define VERSION                     "V025"
+#define VERSION                     "V026a"
 #define RIGNAME                     "T41-EP SDT"
 #define NUMBER_OF_SWITCHES          18            // Number of push button switches. 16 on older boards
 #define TOP_MENU_COUNT              11            // Menus to process AFP 09-27-22
@@ -368,7 +368,7 @@ const char *labels[]        = {"Select",       "Menu Up",  "Band Up",
 #define FILTERPIN80M                30    // 80M filter relay
 #define FILTERPIN40M                31    // 40M filter relay
 #define FILTERPIN20M                28    // 20M filter relay
-#define FILTERPIN15M                27    // 15M filter relay
+#define FILTERPIN15M                29    // 15M filter relay
 #define RXTX                        22    // Transmit/Receive
 #define PTT                         37    // Transmit/Receive
 #define MUTE                        38    // Mute Audio,  HIGH = "On" Audio available from Audio PA, LOW = Mute audio

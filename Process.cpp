@@ -177,7 +177,6 @@ void ProcessIQData()
         S-Meter & dBm-display ?? not usually called
      **********************************************************************************/
     if ( CW_IRR_on == 1) {
-
       return;
     }
     //============================== AFP 09-21-22  Begin new
