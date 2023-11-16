@@ -260,11 +260,11 @@ void ButtonZoom() {
     spectrum_zoom = 0;
   else
     spectrum_zoom = zoomIndex;
-
   ZoomFFTPrep();
   UpdateZoomField();
   tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
   tft.clearMemory();
+  tft.writeTo(L1);  // Always exit function in L1.  KF5N August 15, 2023
   DrawBandWidthIndicatorBar();
   ShowSpectrumdBScale();
   DrawFrequencyBarValue();
@@ -564,6 +564,16 @@ void ResetZoom(int zoomIndex1) {
     void
     Base Code courtesy of Harry  GM3RVL
 *****/
+/*****
+  Purpose: Direct Frequency Entry
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+    Base Code courtesy of Harry  GM3RVL
+*****/
 void ButtonFrequencyEntry() {
   TxRxFreqOld = TxRxFreq;
 
@@ -576,10 +586,12 @@ void ButtonFrequencyEntry() {
   int key;
   int numdigits = 0;  // number of digits entered
   int pushButtonSwitchIndex;
-  lastFrequencies[currentBand][VFO_A] = TxRxFreq;
+  lastFrequencies[currentBand][activeVFO] = TxRxFreq;
   //save_last_frequency = false;                    // prevents crazy frequencies when you change bands/save_last_frequency = true;
   // Arrays for allocating values associated with keys and switches - choose whether USB keypad or analogue switch matrix
   // USB keypad and analogue switch matrix
+  const char *DE_Band[] = {"80m","40m","20m","17m","15m","12m","10m"};
+  const char *DE_Flimit[] = {"4.5","9","16","26","26","30","30"};
   int numKeys[] = { 0x0D, 0x7F, 0x58,  // values to be allocated to each key push
                     0x37, 0x38, 0x39,
                     0x34, 0x35, 0x36,
@@ -650,7 +662,19 @@ void ButtonFrequencyEntry() {
   tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 160);
   tft.print("D   Delete last digit");
   tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 190);
-  tft.print("S   Save Direct to Last Freq. (On/Off)");
+  tft.print("S   Save Direct to Last Freq. ");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 240);
+  tft.print("Direct Entry was called from "); 
+  tft.print(DE_Band[currentBand]);
+  tft.print(" band");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 270);
+  tft.print("Frequency response limited above "); 
+  tft.print(DE_Flimit[currentBand]);
+  tft.print("MHz");
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 300);
+  tft.print("For widest direct entry frequency range"); 
+  tft.setCursor(WATERFALL_LEFT_X + 20, SPECTRUM_TOP_Y + 330);
+  tft.print("call from 12m or 10m band"); 
 
 #endif
 
@@ -669,7 +693,7 @@ void ButtonFrequencyEntry() {
   tft.setFontScale((enum RA8875tsize)0);
   tft.setCursor(WATERFALL_LEFT_X + 50, SPECTRUM_TOP_Y + 260);
   tft.print("Save Direct to Last Freq.= ");
-  tft.setCursor(WATERFALL_LEFT_X + 270, SPECTRUM_TOP_Y + 260);
+  tft.setCursor(WATERFALL_LEFT_X + 270, SPECTRUM_TOP_Y + 190);
   if (save_last_frequency == 0) {
     tft.setTextColor(RA8875_MAGENTA);
     tft.print("Off");
@@ -715,8 +739,8 @@ void ButtonFrequencyEntry() {
         case 0x99:
           save_last_frequency = !save_last_frequency;
           tft.setFontScale((enum RA8875tsize)0);
-          tft.fillRect(WATERFALL_LEFT_X + 269, SPECTRUM_TOP_Y + 255, 50, CHAR_HEIGHT, RA8875_BLACK);
-          tft.setCursor(WATERFALL_LEFT_X + 270, SPECTRUM_TOP_Y + 260);
+          tft.fillRect(WATERFALL_LEFT_X + 269, SPECTRUM_TOP_Y + 190, 50, CHAR_HEIGHT, RA8875_BLACK);
+          tft.setCursor(WATERFALL_LEFT_X + 260, SPECTRUM_TOP_Y + 190);
           if (save_last_frequency == 0) {
             tft.setTextColor(RA8875_MAGENTA);
             tft.print("Off");
@@ -757,10 +781,10 @@ void ButtonFrequencyEntry() {
   SetFreq();  // Used here instead of centerTuneFlag.  KF5N July 22, 2023
   //}
   if (save_last_frequency == 1) {
-    lastFrequencies[currentBand][VFO_A] = enteredF;
+    lastFrequencies[currentBand][activeVFO] = enteredF;
   } else {
     if (save_last_frequency == 0) {
-      lastFrequencies[currentBand][VFO_A] = TxRxFreqOld;
+      lastFrequencies[currentBand][activeVFO] = TxRxFreqOld;
     }
   }
   tft.fillRect(0, 0, 799, 479, RA8875_BLACK);   // Clear layer 2  JJP 7/23/23

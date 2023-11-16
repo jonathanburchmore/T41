@@ -13,6 +13,36 @@
   Any and all other uses, written or implied, by the GPLv3 license are forbidden without written 
   permission from from Jack Purdum, W8TEE, and Al Peter, AC8GY.
 
+V049.1 Aug 21, 2023, 2023 Greg Raven (KF5N)
+  1. Changed 3 instances of VFO_A to activeVFO in function ButtonFrequencyEntry().
+  2. Added TxRxFreq = centerFreq to EEPROMRead() to fix frequency related bugs.
+  3. Added clean-up code to CopySDtoEEPROM() in function EEPROMOptions().
+  4. Fixes for calibration graphics.
+  5. Changed 2 instances of currentFreqA to currentFreq in ResetTuning() function.
+  6. Previous fix to CopySDToEEPROM() accidentally overwritten.  This puts it back.
+  7. Reactivated text in Direct Frequency Entry.
+  8. Replaced keyer symbolic constants with appropriate global variables.
+  9. Removed call to CopyEEPROMToSD() from EEPROMStartup().
+ 10. Bypass paddle flip in the case of a straight key.
+ 11. Frequency overwrite, Bearing, exit, and Direct Entry updates.
+ 12. Fixed receive cal not saving, cal graphics, SSB power cal.
+ 13. Revised RX cal again because it was saving 1X zoom.
+ 14. Restored option for KD0RC switch matrix calibration code.
+ 15. A significant refactoring of calibration.
+ 16. Fix for keyer click-clack.
+ 17. Keyer lower limit 5 WPM.
+ 18. Decoder was modifying keyer WPM.
+
+V049a Aug 06, 2023, 2023 Jack Purdum (W8TEE)
+  1. Corrected paddle flip issue
+  2. Made several changes to set sdCardPresent to the proper value when tested.
+  3. Changed frequency display to account for new font.
+  4. Raised the frequencies by 2 pixels as the new font made then display too low and affect band info
+  5. If only 1 map file found, no longer asks you to pick. It selects automatically the one file.
+  FLASH: code:244340, data:123488, headers:8996   free for files:7749640
+   RAM1: variables:206304, code:240792, padding:21352   free for local variables:55840
+   RAM2: variables:342944  free for malloc/new:181344
+
 V049 Aug 03, 2023, 2023 Jack Purdum (W8TEE)
   1. Numerous UI and formating fixes
   FLASH: code:243636, data:123488, headers:8676   free for files:7750664
@@ -423,15 +453,15 @@ struct maps {
 }; 
 */
 struct maps myMapFiles[10] = {
-  {"Cincinnati.bmp",                    39.07466, -84.42677},   // Map name and coordinates for QTH
-  {"Denver.bmp",                        39.61331, -105.01664},
-  {"Honolulu.bmp",                      21.31165, -157.89291},
-  {"SiestaKey.bmp",                     27.26657, -82.54197},
-  {"",                                  0.0,        0.0},
-  {"",                                  0.0,        0.0},
-  {"",                                  0.0,        0.0},
-  {"",                                  0.0,        0.0},
-  {"",                                  0.0,        0.0}                                  
+  { "Cincinnati.bmp", 39.07466, -84.42677 },  // Map name and coordinates for QTH
+  { "Denver.bmp", 39.61331, -105.01664 },
+  { "Honolulu.bmp", 21.31165, -157.89291 },
+  { "SiestaKey.bmp", 27.26657, -82.54197 },
+  { "", 0.0, 0.0 },
+  { "", 0.0, 0.0 },
+  { "", 0.0, 0.0 },
+  { "", 0.0, 0.0 },
+  { "", 0.0, 0.0 }
 };
 
 
@@ -448,16 +478,15 @@ struct band bands[NUMBER_OF_BANDS] = {  //AFP Changed 1-30-21
   28350000, 28000000, 29700000, "10M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 1, 30, 20
 };
 
-const char *topMenus[] = {"CW Options", "RF Set", "VFO Select",
+const char *topMenus[] = { "CW Options", "RF Set", "VFO Select",
                            "EEPROM", "AGC", "Spectrum Options",
                            "Noise Floor", "Mic Gain", "Mic Comp",
-                           "EQ Rec Set", "EQ Xmt Set", "Calibrate","Bearing"};
+                           "EQ Rec Set", "EQ Xmt Set", "Calibrate", "Bearing" };
 const char *CWFilter[] = { "0.8kHz", "1.0kHz", "1.3kHz", "1.8kHz", "2.0kHz", " Off " };
-int (*functionPtr[])() = {&CWOptions, &RFOptions, &VFOSelect,
+int (*functionPtr[])() = { &CWOptions, &RFOptions, &VFOSelect,
                            &EEPROMOptions, &AGCOptions, &SpectrumOptions,
                            &ButtonSetNoiseFloor, &MicGainSet, &MicOptions,
-                           &EqualizerRecOptions, &EqualizerXmtOptions, &IQOptions, &BearingMaps
-                         };
+                           &EqualizerRecOptions, &EqualizerXmtOptions, &IQOptions, &BearingMaps };
 const char *labels[] = { "Select", "Menu Up", "Band Up",
                          "Zoom", "Menu Dn", "Band Dn",
                          "Filter", "DeMod", "Mode",
@@ -593,7 +622,7 @@ Metro encoder_check = Metro(100);  // Set up a Metro
 
 Si5351 si5351;
 
-int radioState, lastState;      // KF5N
+int radioState, lastState;  // KF5N
 int resetTuningFlag = 0;
 #ifndef RA8875_DISPLAY
 ILI9488_t3 tft = ILI9488_t3(&SPI, TFT_CS, TFT_DC, TFT_RST);
@@ -844,11 +873,11 @@ struct dispSc
 */
 dispSc displayScale[] =  //r *dbText,dBScale, pixelsPerDB, baseOffset, offsetIncrement
   {
-    {"20 dB/", 10.0,   2,  24, 1.00},
-    {"10 dB/", 20.0,   4,  10, 0.50},  //  JJP 7/14/23
-    {"5 dB/",  40.0,   8,  58, 0.25},
-    {"2 dB/",  100.0, 20, 120, 0.10},
-    {"1 dB/",  200.0, 40, 200, 0.05}
+    { "20 dB/", 10.0, 2, 24, 1.00 },
+    { "10 dB/", 20.0, 4, 10, 0.50 },  //  JJP 7/14/23
+    { "5 dB/", 40.0, 8, 58, 0.25 },
+    { "2 dB/", 100.0, 20, 120, 0.10 },
+    { "1 dB/", 200.0, 40, 200, 0.05 }
   };
 
 //======================================== Global variables declarations for Quad Oscillator 2 ===============================================
@@ -1266,25 +1295,25 @@ int bandswitchPins[] = {
   0    // 10M
 };
 int button9State;
-int buttonRead      = 0;
-int calibrateFlag   = 0;
-int calTypeFlag     = 0;
-int calOnFlag       = 0;
-int chipSelect      = BUILTIN_SDCARD;
-int countryIndex    = -1;
-int currentBand     = BAND_40M;
-int currentBandA    = BAND_40M;
-int currentBandB    = BAND_40M;
-int CWFilterIndex   = 5;  //AFP10-18-22
+int buttonRead = 0;
+int calibrateFlag = 0;
+int calTypeFlag = 0;
+int calOnFlag = 0;
+int chipSelect = BUILTIN_SDCARD;
+int countryIndex = -1;
+int currentBand = BAND_40M;
+int currentBandA = BAND_40M;
+int currentBandB = BAND_40M;
+int CWFilterIndex = 5;  //AFP10-18-22
 int dahLength;
 int dcfCount;
 int dcfLevel;
 int dcfSilenceTimer;
 int dcfTheSecond;
 int dcfPulseTime;
-int decoderFlag     = DECODER_STATE;              // Startup state for decoder
-int demodIndex      = 0;  //AFP 2-10-21
-int directFreqFlag  = 0;
+int decoderFlag = DECODER_STATE;  // Startup state for decoder
+int demodIndex = 0;               //AFP 2-10-21
+int directFreqFlag = 0;
 int EEPROMChoice;
 int encoderStepOld;
 int equalizerRecChoice;
@@ -1332,17 +1361,17 @@ int NR_VAD_delay = 0;
 int NR_VAD_duration = 0;
 int oldCursorPosition = 256;
 int operatingMode;
-int old_demod_mode  = -99;
-int oldnotchF       = 10000;
-int out_index       = -1;
-int paddleDah       = KEYER_DAH_INPUT_RING;
-int paddleDit       = KEYER_DIT_INPUT_TIP;
-int paddleFlip      = PADDLE_FLIP;
-int pmode           = 1;
-int pos_centre_f    = 64;
+int old_demod_mode = -99;
+int oldnotchF = 10000;
+int out_index = -1;
+int paddleDah = KEYER_DAH_INPUT_RING;
+int paddleDit = KEYER_DIT_INPUT_TIP;
+int paddleFlip = PADDLE_FLIP;
+int pmode = 1;
+int pos_centre_f = 64;
 int pos_x_frequency = 12;
-int pos_y_smeter    = (spectrum_y - 12);
-int rfGainAllBands  = 1;
+int pos_y_smeter = (spectrum_y - 12);
+int rfGainAllBands = 1;
 
 int sdCardPresent = 0;  // Do they have an micro SD card installed?
 int secondaryMenuChoiceMade;
@@ -1452,6 +1481,7 @@ uint64_t output12khz;
 unsigned long long Clk2SetFreq;                  // AFP 09-27-22
 unsigned long long Clk1SetFreq = 1000000000ULL;  // AFP 09-27-22
 unsigned long ditLength;
+unsigned long transmitDitLength;                  // JJP 8/19/23
 float dcfRefLevel;
 float CPU_temperature = 0.0;
 
@@ -1460,8 +1490,8 @@ float help;
 float s_hotT_ROOM; /*!< The value of s_hotTemp minus room temperature(25¡æ).*/
 float lastII = 0;
 float lastQQ = 0;
-float myLat     = MY_LAT;
-float myLong    = MY_LON;
+float myLat = MY_LAT;
+float myLong = MY_LON;
 
 float RXbit = 0;
 float bitSampleTimer = 0;
@@ -2309,15 +2339,15 @@ void Splash() {
   tft.print("By");
   tft.setFontScale(1);
   tft.setTextColor(RA8875_WHITE);
-  tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 15, YPIXELS / 4 + 80);    // 38 = letters in string
+  tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 15, YPIXELS / 4 + 80);  // 38 = letters in string
   tft.print("Al Peter, AC8GY     Jack Purdum, W8TEE");
 
-  tft.setCursor((XPIXELS / 2) - (12 * tft.getFontWidth()) / 2, YPIXELS / 2 + 110);    // 12 = letters in "Property of:"
+  tft.setCursor((XPIXELS / 2) - (12 * tft.getFontWidth()) / 2, YPIXELS / 2 + 110);  // 12 = letters in "Property of:"
   tft.print("Property of:");
   tft.setFontScale(2);
   tft.setTextColor(RA8875_GREEN);
   centerCall = (XPIXELS - strlen(MY_CALL) * tft.getFontWidth()) / 2;
-  tft.setCursor(centerCall, YPIXELS / 2 + 160); 
+  tft.setCursor(centerCall, YPIXELS / 2 + 160);
   tft.print(MY_CALL);
 
   MyDelay(SPLASH_DELAY);
@@ -2341,7 +2371,7 @@ void setup() {
   Serial.begin(9600);
 
   //  while (!Serial) ;                     // Wait for Serial object to initialize
-  setSyncProvider(getTeensy3Time);          // get TIME from real time clock with 3V backup battery
+  setSyncProvider(getTeensy3Time);  // get TIME from real time clock with 3V backup battery
   setTime(now());
   Teensy3Clock.set(now());  // set the RTC
   T4_rtc_set(Teensy3Clock.get());
@@ -2355,7 +2385,7 @@ void setup() {
   sgtl5000_1.micGain(20);
   sgtl5000_1.lineInLevel(0);
   sgtl5000_1.lineOutLevel(20);
-  sgtl5000_1.adcHighPassFilterDisable();    //reduces noise.  https://forum.pjrc.com/threads/27215-24-bit-audio-boards?p=78831&viewfull=1#post78831
+  sgtl5000_1.adcHighPassFilterDisable();  //reduces noise.  https://forum.pjrc.com/threads/27215-24-bit-audio-boards?p=78831&viewfull=1#post78831
 
   sgtl5000_2.setAddress(HIGH);
   sgtl5000_2.enable();
@@ -2441,40 +2471,39 @@ void setup() {
 
   Splash();
 
-   sdCardPresent = InitializeSDCard();        // Is there an SD card that can be initialized?
+  sdCardPresent = InitializeSDCard();  // Is there an SD card that can be initialized?
 
   // =============== Into EEPROM section =================
 
-//       EEPROMSaveDefaults2();   
+  //       EEPROMSaveDefaults2();
   EEPROMStartup();
 
-  syncEEPROM = 1;                             // We've read current EEPROM values
+  syncEEPROM = 1;  // We've read current EEPROM values
 #ifdef DEBUG
   EEPROMShow();
 #endif
- 
-  /*    // KD0RC
-      minPinRead = analogRead(BUSY_ANALOG_PIN);
-      if (minPinRead < NOTHING_TO_SEE_HERE)
-      {
-        tft.fillWindow(RA8875_BLACK);
-        tft.setFontScale(1);
-        tft.setTextColor(RA8875_GREEN);
-        tft.setCursor(10, 10);
-        tft.print("Release button to start calibration.");
-        MyDelay(2000);
-        EEPROMSaveDefaults2();               // Use default values so things will work
-        EEPROMRead();                        // Call to reset switch matrix values
-      }
-    }
-    // KD0RC end
-  */
 
-  spectrum_x      = 10;
-  spectrum_y      = 150;
-  xExpand         = 1.4;
-  h               = 135;
-  nrOptionSelect  = 0;
+  // Push and hold a button at power up to activate switch matrix calibration.
+  // Uncomment this code block to enable this feature.  Len KD0RC
+  /* Remove this line and the matching block comment line below to activate.
+  minPinRead = analogRead(BUSY_ANALOG_PIN);
+  if (minPinRead < NOTHING_TO_SEE_HERE) {
+    tft.fillWindow(RA8875_BLACK);
+    tft.setFontScale(1);
+    tft.setTextColor(RA8875_GREEN);
+    tft.setCursor(10, 10);
+    tft.print("Release button to start calibration.");
+    MyDelay(2000);
+    SaveAnalogSwitchValues();
+    EEPROMRead();  // Call to reset switch matrix values
+  }                // KD0RC end
+  Remove this line and the matching block comment line above to activate. */
+
+  spectrum_x = 10;
+  spectrum_y = 150;
+  xExpand = 1.4;
+  h = 135;
+  nrOptionSelect = 0;
 
   Q_in_L.begin();  //Initialize receive input buffers
   Q_in_R.begin();
@@ -2491,29 +2520,29 @@ void setup() {
   NCOFreq = 0L;
 
 
-  activeVFO    = EEPROMData.activeVFO;        // 2 bytes
-  audioVolume  = EEPROMData.audioVolume;    // 4 bytes
-  currentBand  = EEPROMData.currentBand;    // 4 bytes
+  activeVFO = EEPROMData.activeVFO;        // 2 bytes
+  audioVolume = EEPROMData.audioVolume;    // 4 bytes
+  currentBand = EEPROMData.currentBand;    // 4 bytes
   currentBandA = EEPROMData.currentBandA;  // 4 bytes
   currentBandB = EEPROMData.currentBandB;
 
   // ========================  End set up of paramters from EEPROM data ===============
   NCOFreq = 0;
 
-/****************************************************************************************
+  /****************************************************************************************
      start local oscillator Si5351
   ****************************************************************************************/
-  si5351.reset();  // KF5N.  Moved Si5351 start-up to setup. JJP  7/14/23
-  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, freqCorrectionFactor); //JJP  7/14/23
-  si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA);  //AFP 10-13-22
-  si5351.drive_strength(SI5351_CLK2, SI5351_DRIVE_8MA);  //CWP AFP 10-13-22
- 
+  si5351.reset();                                                                // KF5N.  Moved Si5351 start-up to setup. JJP  7/14/23
+  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, freqCorrectionFactor);  //JJP  7/14/23
+  si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA);                          //AFP 10-13-22
+  si5351.drive_strength(SI5351_CLK2, SI5351_DRIVE_8MA);                          //CWP AFP 10-13-22
+
   if (xmtMode == CW_MODE && decoderFlag == DECODE_OFF) {
     decoderFlag = DECODE_OFF;  // JJP 7/1/23
   } else {
     decoderFlag = DECODE_ON;  // Turns decoder on JJP 7/1/23
   }
-/*
+  /*
   if (activeVFO == VFO_A) {  // VFO A
     if (xmtMode == SSB_MODE) {
       centerFreq = currentFreqA = EEPROMData.lastFrequencies[currentBandA][0];  // SSB
@@ -2542,30 +2571,31 @@ void setup() {
   splitOn = 0;  // Split VFO not active
   SetupMode(bands[currentBand].mode);
 
-  ditLength  = STARTING_DITLENGTH;  // 80 = 1200 / 15 wpm
+  ditLength = STARTING_DITLENGTH;  // 80 = 1200 / 15 wpm
   averageDit = ditLength;
   averageDah = ditLength * 3L;
 
   float32_t theta = 0.0;              //AFP 10-25-22
   for (int kf = 0; kf < 255; kf++) {  //Calc sine wave
-     theta        = kf * 0.19634950849362;         // Simplify terms: theta = kf * 2 * PI * freqSideTone / 24000  JJP 6/28/23
+    theta = kf * 0.19634950849362;    // Simplify terms: theta = kf * 2 * PI * freqSideTone / 24000  JJP 6/28/23
     sinBuffer[kf] = sin(theta);
   }
-  currentWPM   = EEPROMData.currentWPM;
+  currentWPM = EEPROMData.currentWPM;
   SetDitLength(currentWPM);
-  CWFreqShift  = 750;
+  SetTransmitDitLength(currentWPM);
+  CWFreqShift = 750;
   calFreqShift = 0;
   //AFP 10-25-22
   sineTone(BUFFER_SINE_COUNT);  // Set to 8
-  filterEncoderMove   = 0;
+  filterEncoderMove = 0;
   fineTuneEncoderMove = 0L;
   UpdateInfoWindow();
   DrawSpectrumDisplayContainer();
   RedrawDisplayScreen();
 
-  mainMenuIndex = 0;              // Changed from middle to first. Do Menu Down to get to Calibrate quickly
+  mainMenuIndex = 0;  // Changed from middle to first. Do Menu Down to get to Calibrate quickly
 
-  menuStatus    = NO_MENUS_ACTIVE;  // Blank menu field
+  menuStatus = NO_MENUS_ACTIVE;  // Blank menu field
   ShowName();
 
   // ================  Excite AutoVolume (Compressor) =========== AFP 08-11-22
@@ -2587,24 +2617,25 @@ void setup() {
   //powerOutSSB[currentBandA] = EEPROMData.powerOutSSB[currentBandA];                              //  AFP 10-28-22
   //zoomIndex     = 1;   Removed, use value from EEPROM.
   //spectrum_zoom = 1;   Removed, use value from EEPROM.
-  xrState       = RECEIVE_STATE;   // Go into receive state.  KF5N July 22, 2023
+  xrState = RECEIVE_STATE;  // Go into receive state.  KF5N July 22, 2023
   ShowBandwidth();
   FilterBandwidth();
   ShowFrequency();
   SetFreq();
-  zoomIndex = spectrum_zoom -1;  // ButtonZoom() increments zoomIndex, so this cancels it so the read from EEPROM is accurately restored.  KF5N August 3, 2023
-  ButtonZoom();                  // Restore zoom settings.  KF5N August 3, 2023
-  knee_dBFS   = -15.0;
-  comp_ratio  = 5.0;
-  attack_sec  = .1;
+  zoomIndex = spectrum_zoom - 1;  // ButtonZoom() increments zoomIndex, so this cancels it so the read from EEPROM is accurately restored.  KF5N August 3, 2023
+  ButtonZoom();                   // Restore zoom settings.  KF5N August 3, 2023
+  knee_dBFS = -15.0;
+  comp_ratio = 5.0;
+  attack_sec = .1;
   release_sec = 2.0;
   comp1.setPreGain_dB(-10);  //set the gain of the Left-channel gain processor
   comp2.setPreGain_dB(-10);  //set the gain of the Right-channel gain processor
 
   // centerTuneFlag = 1;  Not required with revised tuning scheme.  KF5N July 22, 2023
 
-  sdCardPresent = SDPresentCheck();         // JJP 7/18/23
-/*
+  sdCardPresent = SDPresentCheck();  // JJP 7/18/23
+
+  /*
 #ifndef SD_CARD_PRESENT
   sdCardPresent = 0;
 #else
@@ -2637,7 +2668,8 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
   Return value:
     void
 *****/
-void loop()                       // Replaced entire loop() with Greg's code  JJP  7/14/23
+  void
+  loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
 {
   int pushButtonSwitchIndex = -1;
   int valPin;
@@ -2652,8 +2684,8 @@ void loop()                       // Replaced entire loop() with Greg's code  JJ
   //  State detection
   if (xmtMode == SSB_MODE && digitalRead(PTT) == HIGH) radioState = SSB_RECEIVE_STATE;
   if (xmtMode == SSB_MODE && digitalRead(PTT) == LOW) radioState = SSB_TRANSMIT_STATE;
-  if (xmtMode == CW_MODE && (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH && digitalRead(KEYER_DAH_INPUT_RING) == HIGH)) radioState = CW_RECEIVE_STATE;
-  if (xmtMode == CW_MODE && (digitalRead(KEYER_DIT_INPUT_TIP) == LOW && xmtMode == CW_MODE && keyType == 0)) radioState = CW_TRANSMIT_STRAIGHT_STATE;
+  if (xmtMode == CW_MODE && (digitalRead(paddleDit) == HIGH && digitalRead(paddleDah) == HIGH)) radioState = CW_RECEIVE_STATE;  // Was using symbolic constants. Also changed in code below.  KF5N August 8, 2023
+  if (xmtMode == CW_MODE && (digitalRead(paddleDit) == LOW && xmtMode == CW_MODE && keyType == 0)) radioState = CW_TRANSMIT_STRAIGHT_STATE;
   if (xmtMode == CW_MODE && (keyPressedOn == 1 && xmtMode == CW_MODE && keyType == 1)) radioState = CW_TRANSMIT_KEYER_STATE;
   if (lastState != radioState) {
     SetFreq();  // Update frequencies if the radio state has changed.
@@ -2773,15 +2805,15 @@ void loop()                       // Replaced entire loop() with Greg's code  JJ
       cwTimer = millis();
       while (millis() - cwTimer <= cwTransmitDelay) {  //Start CW transmit timer on
         digitalWrite(RXTX, HIGH);
-        if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW && keyType == 0) {  // AFP 09-25-22  Turn on CW signal
-          cwTimer = millis();                                           //Reset timer
-          modeSelectOutExL.gain(0, powerOutCW[currentBand]);           //AFP 10-21-22
-          modeSelectOutExR.gain(0, powerOutCW[currentBand]);           //AFP 10-21-22
-          digitalWrite(MUTE, LOW);                                      // unmutes audio
-          modeSelectOutL.gain(1, sidetoneVolume);                       // Sidetone  AFP 10-01-22
-          modeSelectOutR.gain(1, sidetoneVolume);                       // Sidetone  AFP 10-01-22
+        if (digitalRead(paddleDit) == LOW && keyType == 0) {  // AFP 09-25-22  Turn on CW signal
+          cwTimer = millis();                                 //Reset timer
+          modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
+          modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
+          digitalWrite(MUTE, LOW);                            // unmutes audio
+          modeSelectOutL.gain(1, sidetoneVolume);             // Sidetone  AFP 10-01-22
+          modeSelectOutR.gain(1, sidetoneVolume);             // Sidetone  AFP 10-01-22
         } else {
-          if (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH && keyType == 0) {  //Turn off CW signal
+          if (digitalRead(paddleDit) == HIGH && keyType == 0) {  //Turn off CW signal
             keyPressedOn = 0;
             digitalWrite(MUTE, HIGH);     // mutes audio
             modeSelectOutExL.gain(0, 0);  //Power = 0
@@ -2820,20 +2852,22 @@ void loop()                       // Replaced entire loop() with Greg's code  JJ
         modeSelectOutL.gain(0, 0);
         modeSelectOutR.gain(0, 0);
 
-        if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW) {  // Keyer Dit
+        if (digitalRead(paddleDit) == LOW) {                    // Keyer Dit
           cwTimer = millis();
           ditTimerOn = millis();
-          while (millis() - ditTimerOn <= ditLength) {
+//          while (millis() - ditTimerOn <= ditLength) {
+          while (millis() - ditTimerOn <= transmitDitLength) {  // JJP 8/19/23
             modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
             modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-            digitalWrite(MUTE, LOW);                             // unmutes audio
-            modeSelectOutL.gain(1, sidetoneVolume);              // Sidetone
+            digitalWrite(MUTE, LOW);                            // unmutes audio
+            modeSelectOutL.gain(1, sidetoneVolume);             // Sidetone
             modeSelectOutR.gain(1, sidetoneVolume);
             CW_ExciterIQData();  // Creates CW output signal
             keyPressedOn = 0;
           }
           ditTimerOff = millis();
-          while (millis() - ditTimerOff <= ditLength - 10) {  //Time between
+//          while (millis() - ditTimerOff <= ditLength - 10) {  //Time between
+          while (millis() - ditTimerOff <= transmitDitLength - 10L) {  // JJP 8/19/23
             modeSelectOutExL.gain(0, 0);                      //Power =0
             modeSelectOutExR.gain(0, 0);
             modeSelectOutL.gain(1, 0);  // Sidetone off
@@ -2842,20 +2876,22 @@ void loop()                       // Replaced entire loop() with Greg's code  JJ
             keyPressedOn = 0;
           }
         } else {
-          if (digitalRead(KEYER_DAH_INPUT_RING) == LOW) {  //Keyer DAH
+          if (digitalRead(paddleDah) == LOW) {  //Keyer DAH
             cwTimer = millis();
             dahTimerOn = millis();
-            while (millis() - dahTimerOn <= 3UL * ditLength) {
+//            while (millis() - dahTimerOn <= 3UL * ditLength) {
+            while (millis() - dahTimerOn <= 3UL * transmitDitLength) {  // JJP 8/19/23
               modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
               modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-              digitalWrite(MUTE, LOW);                             // unmutes audio
-              modeSelectOutL.gain(1, 0.002);                       // Sidetone
+              digitalWrite(MUTE, LOW);                            // unmutes audio
+              modeSelectOutL.gain(1, 0.002);                      // Sidetone
               modeSelectOutR.gain(1, 0.002);
               CW_ExciterIQData();  // Creates CW output signal
               keyPressedOn = 0;
             }
             ditTimerOff = millis();
-            while (millis() - ditTimerOff <= ditLength - 10UL) {  //Time between characters                         // mutes audio
+//            while (millis() - ditTimerOff <= ditLength - 10UL) {  //Time between characters                         // mutes audio
+            while (millis() - ditTimerOff <= transmitDitLength - 10UL) {  // JJP 8/19/23
               modeSelectOutExL.gain(0, 0);                        //Power =0
               modeSelectOutExR.gain(0, 0);
               modeSelectOutL.gain(1, 0);  // Sidetone off
@@ -2865,6 +2901,7 @@ void loop()                       // Replaced entire loop() with Greg's code  JJ
           }
         }
         CW_ExciterIQData();
+        keyPressedOn = 0;  // Fix for keyer click-clack.  KF5N August 16, 2023
       }  //End Relay timer
 
       modeSelectOutExL.gain(0, 0);  //Power = 0 //AFP 10-11-22
@@ -2880,10 +2917,7 @@ void loop()                       // Replaced entire loop() with Greg's code  JJ
 
   //  End radio state machine
 
-  //        RedrawDisplayScreen();
-  //        DrawFrequencyBarValue();
   ShowTransmitReceiveStatus();
-
 
 #ifdef DEBUG1
   if (elapsed_micros_idx_t > (SR[SampleRate].rate / 960)) {

@@ -47,12 +47,9 @@ void SetFreqCal(void)
 *****/
 void ResetTuning()
 {
-
-  //centerFreq = TxRxFreq;
-
-  currentFreqA = centerFreq + NCOFreq;
+  currentFreq = centerFreq + NCOFreq;  // currentFreqA changed to currentFreq.  KF5N August 7, 2023
   NCOFreq = 0L;
-  centerFreq = TxRxFreq = currentFreqA ;  //AFP 10-28-22
+  centerFreq = TxRxFreq = currentFreq ;  //AFP 10-28-22  // currentFreqA changed to currentFreq.  KF5N August 7, 2023
   tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
   tft.clearMemory();
   SetFreq();  // For new tuning scheme.  KF5N July 22, 2023

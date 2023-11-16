@@ -143,6 +143,7 @@ void EEPROMRead() {
   lastFrequencies[6][1] = EEPROMData.lastFrequencies[6][1];
 
   centerFreq = EEPROMData.lastFrequencies[currentBand][activeVFO];  // 4 bytes
+  TxRxFreq = centerFreq;  // Need to assign TxRxFreq here or numerous subtle frequency bugs will happen.  KF5N August 7, 2023
 
   //strncpy(EEPROMData.mapFileName, MAP_FILE_NAME, 50);  KF5N
   strncpy(mapFileName, EEPROMData.mapFileName, 50);     // KF5N
@@ -150,7 +151,7 @@ void EEPROMRead() {
   strncpy(myTimeZone, EEPROMData.myTimeZone, 10);       // KF5N
   freqSeparationChar = EEPROMData.separationCharacter;  //   JJP  7/25/23  KF5N
 
-  paddleFlip = EEPROMData.paddleFlip = PADDLE_FLIP;  //   JJP  7/27/23
+  paddleFlip = EEPROMData.paddleFlip;  //   JJP  7/27/23.  Was setting to symbolic constant PADDLE_FLIP.  KF5N August 8, 2023
   sdCardPresent = EEPROMData.sdCardPresent = 0;      //   JJP  7/27/23
 
   myLat = EEPROMData.myLat;
@@ -3212,9 +3213,9 @@ void EEPROMStartup() {
   EEPROM.put(0, EEPROMData);  // This rewrites the entire EEPROM struct as defined in SDT.h
   EEPROMRead();               // Read the EEPROM data, including new switch values. This also resets working variables
 
-  if (sdCardPresent) {  // If there's an SD card present...
-    CopyEEPROMToSD();   // ...copy the EEPROM data to the SD card, otherwise we're done
-  }
+//  if (sdCardPresent) {  // If there's an SD card present...
+//    CopyEEPROMToSD();   // ...copy the EEPROM data to the SD card, otherwise we're done  // Don't do this.  It could overwrite an existing file.  KF5N August 9, 2023
+//  }
 #ifdef DEBUG1
   SDEEPROMDump();  // Call this to observe EEPROM struct data
 #endif

@@ -3,7 +3,7 @@
 
 //======================================== User section that might need to be changed ===================================
 #include "MyConfigurationFile.h"                                          // This file name should remain unchanged
-#define VERSION                     "V049"                               // Change this for updates. If you make this longer than 9 characters, brace yourself for surprises
+#define VERSION                     "V049.1"                               // Change this for updates. If you make this longer than 9 characters, brace yourself for surprises
 #define UPDATE_SWITCH_MATRIX        0                                     // 1 = Yes, redo the switch matrix values, 0 = leave switch matrix values as is from the last change
 struct maps {
   char mapNames[50];
@@ -1616,6 +1616,7 @@ extern long averageDah;
 extern long currentFreq;
 extern long centerFreq;
 extern unsigned long ditLength;
+extern unsigned long transmitDitLength;   // JJP 8/19/23
 extern long TxRxFreq;             // = centerFreq+NCOFreq  NCOFreq from FreqShift2()
 extern long TxRxFreqOld;
 extern long TxRxFreqDE;
@@ -2047,6 +2048,8 @@ void CalcNotchBins();
 void Calculatedbm();
 void CaptureKeystrokes();
 int  CalibrateOptions(int IQChoice); // AFP 10-22-22, changed JJP 2/3/23
+void CalibratePreamble();   // KF5N August 14, 2023
+void CalibratePrologue();   // KF5N August 14, 2023
 int  CalibrateFrequency();
 void CenterFastTune();
 void ClearEEPROM();
@@ -2207,6 +2210,7 @@ void SetIIRCoeffs(float32_t f0, float32_t Q, float32_t sample_rate, uint8_t filt
 void SetKeyType();
 void SetSidetoneVolume();
 long SetTransmitDelay();
+void SetTransmitDitLength(int wpm);     // JJP 8/19/23
 void SetupMode(int sideBand);
 void SetupMyCompressors(boolean use_HP_filter, float knee_dBFS, float comp_ratio, float attack_sec, float release_sec); //AFP 11-01-22 in DSP.cpp
 int  SetWPM();

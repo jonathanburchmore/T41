@@ -257,6 +257,20 @@ void SetDitLength(int wpm)
   ditLength = 1200 / wpm;
 }
 
+/*****
+  Purpose: establish the dit length for code transmission. Crucial since
+    all spacing is done using dit length
+
+  Parameter list:
+    int wpm
+
+  Return value:
+    void
+*****/
+void SetTransmitDitLength(int wpm)
+{
+  transmitDitLength = 1200 / wpm;         // JJP 8/19/23
+}
 
 /*****
   Purpose: Select straight key or keyer
@@ -272,6 +286,12 @@ void SetKeyType()
   const char *keyChoice[] = {"Straight Key", "Keyer"};
 
   keyType = EEPROMData.keyType = SubmenuSelect(keyChoice, 2, 0);
+  // Make sure the paddleDit and paddleDah variables are set correctly for straight key.
+  // Paddle flip can reverse these, making the straight key inoperative.  KF5N August 9, 2023
+  if(keyType == 0) {
+    paddleDit = KEYER_DIT_INPUT_TIP;
+    paddleDah = KEYER_DAH_INPUT_RING;
+  }
 }
 
 //==================================== Decoder =================

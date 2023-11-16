@@ -571,14 +571,14 @@ void DrawKeyboard() {
   tft.clearScreen(RA8875_BLACK);
 
   tft.setFontScale((enum RA8875tsize)1);
-  tft.drawRect(30, 150, 730, 280, RA8875_WHITE);                  // Draw frame
+  tft.drawRect(30, 150, 730, 280, RA8875_WHITE);  // Draw frame
   tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
 
   MyDelay(100L);
   row = 160;
   xOffset = 50;
   keyCell = 0;
-  for (i = 0; i < 10; i++) {                                      // Numeric keys
+  for (i = 0; i < 10; i++) {  // Numeric keys
     horizontalSpacer = xOffset + keyCell * (keyWidth + keySpace);
     tft.drawRect(horizontalSpacer, row, keyWidth, keyHeight, RA8875_YELLOW);
     tft.setCursor(horizontalSpacer + 24, row + 5);
@@ -589,7 +589,7 @@ void DrawKeyboard() {
   row = 240;
   xOffset = 70;
   keyCell = 0;
-  for (i = 0; i < 27; i++) {                                        // Alpha keys
+  for (i = 0; i < 27; i++) {  // Alpha keys
     horizontalSpacer = xOffset + keyCell * (keyWidth + keySpace);
     tft.drawRect(horizontalSpacer, row + 5, keyWidth, keyHeight, RA8875_YELLOW);
     tft.setCursor(horizontalSpacer + 24, row + 7);
@@ -640,7 +640,6 @@ void DrawKeyboard() {
   tft.printf(" User3: Done");
   tft.setCursor(10, 100);
   tft.printf("Enter call prefix: ");
-
 }
 
 
@@ -672,7 +671,7 @@ void CaptureKeystrokes() {
   xOffset = 0;
   keyCell = 5;
   whichLetterIndex = 14;
-  keyboardBuffer[0] = '\0';                       // Clear buffer
+  keyboardBuffer[0] = '\0';  // Clear buffer
   tft.setTextColor(RA8875_WHITE, RA8875_BLUE);
   DrawActiveLetter(row, spacing[keyCell], whichLetterIndex, keyWidth, keyHeight);
   while (true) {
@@ -907,8 +906,7 @@ void DrawActiveLetter(int row, int horizontalSpacer, int whichLetterIndex, int k
     double               the bearing heading to DX in degrees
 
  *****/
-float BearingHeading(char *dxCallPrefix) 
-{
+float BearingHeading(char *dxCallPrefix) {
   float deltaLong;  // For radians conversion
   float x, y;       // Temporary variables
 
@@ -918,16 +916,16 @@ float BearingHeading(char *dxCallPrefix)
 
   if (countryIndex != -1) {              // Did we find prefix??
     dxLat = dxCities[countryIndex].lat;  //Yep, but I entered the
-    dxLon = dxCities[countryIndex].lon;  
+    dxLon = dxCities[countryIndex].lon;
   } else {
     return -1.0;
   }
 
-  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setFontScale((enum RA8875tsize)1);
   deltaLong = (homeLon - dxLon);
 
-  x = cos(dxLat   * DEGREES2RADIANS) * sin(deltaLong * DEGREES2RADIANS);
-  y = cos(homeLat * DEGREES2RADIANS) * sin(dxLat     * DEGREES2RADIANS) - sin(homeLat * DEGREES2RADIANS) * cos(dxLat * DEGREES2RADIANS) * cos((deltaLong)*DEGREES2RADIANS);
+  x = cos(dxLat * DEGREES2RADIANS) * sin(deltaLong * DEGREES2RADIANS);
+  y = cos(homeLat * DEGREES2RADIANS) * sin(dxLat * DEGREES2RADIANS) - sin(homeLat * DEGREES2RADIANS) * cos(dxLat * DEGREES2RADIANS) * cos((deltaLong)*DEGREES2RADIANS);
   bearingDistance = HaversineDistance(dxLat, dxLon);
 
 
@@ -960,7 +958,7 @@ int FindCountry(char *prefix) {
       len,
       match;
   len = strlen(prefix);
-  if (len == 1 && prefix[0] != 'B') {               // Only single letter prefix is China
+  if (len == 1 && prefix[0] != 'B') {  // Only single letter prefix is China
     return -1;
   }
 
@@ -997,9 +995,8 @@ int FindCountry(char *prefix) {
 
 From: https://stackoverflow.com/questions/27928/calculate-distance-between-two-latitude-longitude-points-haversine-formula
 *****/
-float HaversineDistance(float lat2, float lon2) 
-{
-  const float r = 6371;         // Earth's radius in km
+float HaversineDistance(float lat2, float lon2) {
+  const float r = 6371;  // Earth's radius in km
   const float p = PI_BY_180;
   float lat1, lon1;
 
@@ -1007,11 +1004,9 @@ float HaversineDistance(float lat2, float lon2)
   lon1 = homeLon;
 
   const float a = 0.5 - cos((lat2 - lat1) * p) / 2
-                + cos(lat1 * p) * cos(lat2 * p) *
-                  (1 - cos((lon2 - lon1) * p)) / 2;
+                  + cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
 
   return 2.0 * r * asin(sqrt(a));
-
 }
 //======================================
 
@@ -1075,7 +1070,7 @@ void bmpDraw(const char *filename, int x, int y) {
       if ((bmpDepth == 24) && (read32(bmpFile) == 0)) {  // 0 = uncompressed
         goodBmp = true;                                  // Supported BMP format -- proceed!
 
-//                                                      BMP rows are padded (if needed) to 4-byte boundary
+        //                                                      BMP rows are padded (if needed) to 4-byte boundary
         rowSize = (bmpWidth * 3 + 3) & ~3;
 
         // If bmpHeight is negative, image is in top-down order.
@@ -1153,8 +1148,8 @@ void bmpDraw(const char *filename, int x, int y) {
   }
 
   //======================================
-  homeLatRadians  = homeLat  * DEGREES2RADIANS;
-  dxLatRadians    = dxLat    * DEGREES2RADIANS;
+  homeLatRadians = homeLat * DEGREES2RADIANS;
+  dxLatRadians = dxLat * DEGREES2RADIANS;
   deltaLonRadians = deltaLon * DEGREES2RADIANS;
 
   float yR = sin(deltaLonRadians) * cos(dxLatRadians);
@@ -1169,7 +1164,7 @@ void bmpDraw(const char *filename, int x, int y) {
   y2 = CENTER_SCREEN_Y * cos(bearingRadians) - CENTER_SCREEN_Y;
 
   rayStart = displayBearing - 8.0;
-  rayEnd   = displayBearing + 8.0;
+  rayEnd = displayBearing + 8.0;
 
   if (displayBearing > 16 && displayBearing < 345) {  // Check for end-point mapping issues
     rayStart = -8;
@@ -1181,7 +1176,7 @@ void bmpDraw(const char *filename, int x, int y) {
     } else {
       if (displayBearing > 344) {
         rayStart = displayBearing - 8;
-        rayEnd   = displayBearing + 8;
+        rayEnd = displayBearing + 8;
       }
     }
   }
@@ -1441,55 +1436,56 @@ void WaitforWRComplete() {
   Return value;
     int                   0 if cannot initialize, 1 otherwise
 *****/
-int BearingMaps() 
-{
-   char ptrMaps[10][50];
+int BearingMaps() {
+  char ptrMaps[10][50];
   int count;
 
-  tft.clearMemory();  // Need to clear overlay too
-  tft.writeTo(L2);
-  tft.fillWindow();
-
-  tft.setFontScale((enum RA8875tsize)1);
-  tft.drawRect(30, 50, 730, 400, RA8875_WHITE);  // Outline
-  tft.setTextColor(RA8875_GREEN, RA8875_BLACK);
-  tft.setCursor(50, 15);
-  tft.print("Select map file:");
-  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
-
-  if (!SD.begin(chipSelect)) {
-    tft.setCursor(200, 200);
+  if (sdCardPresent == 0) {  // JJP 8/11/23
+    tft.setCursor(200, 300);
     tft.setTextColor(RA8875_RED, RA8875_BLACK);
-    tft.println("initialization failed!");
-    MyDelay(5000L);
+    tft.println("No SD card.");
+    MyDelay(SDCARD_MESSAGE_LENGTH);
+    tft.fillRect(200, 300, tft.getFontWidth() * 12, tft.getFontHeight(), RA8875_BLACK);
     tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
-    return -1;
+    return 0;
   }
-
   count = CreateMapList(ptrMaps, &count);  // Reads the SD card for BMP files and returns ptrMaps filled in with names and return the count
-  if (count > 0) {
-    selectedMapIndex = WhichOneToUse(ptrMaps, count);
+
+  if (count == 0) {  // They have a card, but no maps
+    tft.setCursor(300, 300);
+    tft.print("No Maps found");
+    selectedMapIndex = -1;
+    return -1;  // Didn't find any
+  }
+  if (count == 1) {
+    selectedMapIndex = 0;
   } else {
-    if (count == 0) {
-      tft.setCursor(300, 300);
-      tft.print("No Maps found");
-      selectedMapIndex = -1;
-      return -1;  // Didn't find any
+    tft.clearMemory();  // Need to clear overlay too
+    tft.writeTo(L2);
+    tft.fillWindow();
+
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.drawRect(30, 50, 730, 400, RA8875_WHITE);  // Outline
+    tft.setTextColor(RA8875_GREEN, RA8875_BLACK);
+    tft.setCursor(50, 15);
+    tft.print("Select map file:");
+    tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+
+    if (!SD.begin(chipSelect)) {
+      tft.setCursor(200, 200);
+      tft.setTextColor(RA8875_RED, RA8875_BLACK);
+      tft.println("initialization failed!");
+      MyDelay(5000L);
+      tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+      return -1;
     }
-    if (count == 1) {
-      selectedMapIndex = 0;
-    }
+    selectedMapIndex = WhichOneToUse(ptrMaps, count);
   }
   homeLat = myMapFiles[selectedMapIndex].lat;
   homeLon = myMapFiles[selectedMapIndex].lon;  // your QTH longitude
 
-  strcpy(mapFileName, (const char *)myMapFiles[selectedMapIndex].mapNames); 
-/*
-  tft.clearMemory();  // Need to clear overlay too
-  tft.fillWindow();
-  tft.writeTo(L1);
-  tft.fillWindow();
-*/
+  strcpy(mapFileName, (const char *)myMapFiles[selectedMapIndex].mapNames);
+
   RedrawDisplayScreen();
   ShowFrequency();
   DrawFrequencyBarValue();
@@ -1562,7 +1558,7 @@ int WhichOneToUse(char ptrMaps[][50], int count) {
   tft.print(ptrMaps[0]);
 
   while (true) {
-    if (filterEncoderMove != 0) {  // Did they move the encoder?
+    if (filterEncoderMove != 0) {         // Did they move the encoder?
       tft.setCursor(50, 55 + temp * 30);  // Restore old highlighted name
       tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
       tft.print(ptrMaps[temp]);
@@ -1578,13 +1574,12 @@ int WhichOneToUse(char ptrMaps[][50], int count) {
       tft.setTextColor(RA8875_BLACK, RA8875_GREEN);
       tft.print(ptrMaps[temp]);
       filterEncoderMove = 0;
-
     }
-    val = ReadSelectedPushButton();                           // Read pin that controls all switches
+    val = ReadSelectedPushButton();  // Read pin that controls all switches
     val = ProcessButtonPress(val);
     MyDelay(100L);
-    if (val == MENU_OPTION_SELECT) {                          // Make a choice??
-      break;                                                  // Yep.
+    if (val == MENU_OPTION_SELECT) {  // Make a choice??
+      break;                          // Yep.
     }
   }
   tft.setTextColor(RA8875_WHITE, RA8875_BLACK);

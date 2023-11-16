@@ -3,31 +3,44 @@
 #endif
 
 // Updates to DoReceiveCalibration() and DoXmitCalibrate() functions by KF5N.  July 20, 2023
+// Updated PlotCalSpectrum() function to clean up graphics.  KF5N August 3, 2023
+// Major clean-up of calibration.  KF5N August 16, 2023
 
+int val;
+int corrChange;
+float correctionIncrement;  //AFP 2-7-23
+int userScale, userZoomIndex, userXmtMode;
+int transmitPowerLevelTemp;
 /*****
-  Purpose: Combined input/ output for the purpose of calibrating the receive IQ
-
+  Purpose: Set up prior to IQ calibrations.  New function.  KF5N August 14, 2023
+  These things need to be saved here and restored in the prologue function:
+  Vertical scale in dB  (set to 10 dB during calibration)
+  Zoom, set to 1X in receive and 4X in transmit calibrations.
+  Transmitter power, set to 5W during both calibrations.
    Parameter List:
-      void
+      int setZoom   (This parameter should be 0 for receive (1X) and 2 (4X) for transmit)
 
    Return value:
       void
-
-   CAUTION: Assumes a spaces[] array is defined
  *****/
-void DoReceiveCalibrate() {
-  float correctionIncrement = 0.01;  //AFP 2-7-23
-  int corrChange = 0;
-  int userScale;
-  int task = -1;
-  int lastUsedTask = -2;
-  int val;
-  int userFloor = currentNoiseFloor[currentBand];  // Store the user's floor setting.  KF5N July 22, 2023
-  currentNoiseFloor[currentBand] = 0;
-  if (bands[currentBandA].mode == DEMOD_LSB) calFreqShift = 24000 - 2000;  //  LSB offset.  KF5N
-  if (bands[currentBandA].mode == DEMOD_USB) calFreqShift = 24000 + 2250;  //  USB offset.  KF5N
-  SetFreqCal();                                                            //  Set Si5351 outputs for calibration.  KF5N
-  calTypeFlag = 0;                                                         // Global indicates receive calibrate.  KF5N
+void CalibratePreamble(int setZoom) {
+  calOnFlag = 1;
+  corrChange = 0;
+  correctionIncrement = 0.01;  //AFP 2-7-23
+  IQCalType = 0;
+  radioState = CW_TRANSMIT_STRAIGHT_STATE;      // KF5N
+  transmitPowerLevelTemp = transmitPowerLevel;  //AFP 05-11-23
+  transmitPowerLevel = 5;                       //AFP 02-09-23
+  powerOutCW[currentBand] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBand];
+  modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
+  modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
+  userXmtMode = xmtMode;          // Store the user's mode setting.  KF5N July 22, 2023
+  userZoomIndex = spectrum_zoom;  // Save the zoom index so it can be reset at the conclusion.  KF5N August 12, 2023
+  zoomIndex = setZoom - 1;
+  ButtonZoom();
+  tft.writeTo(L2);  // Erase the bandwidth bar.  KF5N August 16, 2023
+  tft.clearMemory();
+  tft.writeTo(L1);
   tft.setFontScale((enum RA8875tsize)0);
   tft.setTextColor(RA8875_GREEN);
   tft.setCursor(350, 160);
@@ -36,16 +49,16 @@ void DoReceiveCalibrate() {
   tft.print("User2 - Incr");
   tft.setTextColor(RA8875_CYAN);
   tft.fillRect(350, 125, 100, tft.getFontHeight(), RA8875_BLACK);
+  tft.fillRect(0, 272, 517, 399, RA8875_BLACK);  // Erase waterfall.  KF5N August 14, 2023
   tft.setCursor(400, 125);
   tft.print("dB");
   tft.setCursor(350, 110);
   tft.print("Incr= ");
   tft.setCursor(400, 110);
   tft.print(correctionIncrement, 3);
-  currentBand = currentBandA;
   userScale = currentScale;  //  Remember user preference so it can be reset when done.  KF5N
-  currentScale = 1;          //  Set vertical scale to 10 dB during calibration.  KF5N 
-  updateDisplayFlag = 1;
+  currentScale = 1;          //  Set vertical scale to 10 dB during calibration.  KF5N
+  updateDisplayFlag = 0;
   digitalWrite(MUTE, LOW);  //turn off mute
   xrState = RECEIVE_STATE;
   T41State = CW_RECEIVE;
@@ -59,28 +72,86 @@ void DoReceiveCalibrate() {
   modeSelectOutR.gain(1, 0);
   modeSelectOutExL.gain(0, 1);
   modeSelectOutExR.gain(0, 1);
-  //centerTuneFlag = 1;  Not required during calibration.  KF5N July 22, 2023
+  centerFreq = TxRxFreq;
+  NCOFreq = 0L;
   xrState = TRANSMIT_STATE;
   digitalWrite(MUTE, HIGH);  //  Mute Audio  (HIGH=Mute)
   digitalWrite(RXTX, HIGH);  // Turn on transmitter.
   ShowTransmitReceiveStatus();
   ShowSpectrumdBScale();
+}
 
+/*****
+  Purpose: Shut down and clean up after IQ calibrations.  New function.  KF5N August 14, 2023
+
+   Parameter List:
+      void
+
+   Return value:
+      void
+ *****/
+void CalibratePrologue() {
+  digitalWrite(RXTX, LOW);  // Turn off the transmitter.
+  updateDisplayFlag = 0;
+  xrState = RECEIVE_STATE;
+  ShowTransmitReceiveStatus();
+  T41State = CW_RECEIVE;
+  // Clear queues to reduce transient.
+  Q_in_L.clear();
+  Q_in_R.clear();
+  centerFreq = TxRxFreq;
+  NCOFreq = 0L;
+  xrState = RECEIVE_STATE;
+  calibrateFlag = 0;  // KF5N
+  calFreqShift = 0;
+  currentScale = userScale;                     //  Restore vertical scale to user preference.  KF5N
+  ShowSpectrumdBScale();
+  xmtMode = userXmtMode;   // Restore the user's floor setting.  KF5N July 27, 2023
+  transmitPowerLevel = transmitPowerLevelTemp;  // Restore the user's transmit power level setting.  KF5N August 15, 2023
+  EEPROMWrite();                                // Save calibration numbers and configuration.  KF5N August 12, 2023
+  zoomIndex = userZoomIndex - 1;
+  ButtonZoom();     // Restore the user's zoom setting.  Note that this function also modifies spectrum_zoom.
+  EEPROMWrite();                                // Save calibration numbers and configuration.  KF5N August 12, 2023
+  tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
+  tft.clearMemory();
+  tft.writeTo(L1);  // Exit function in layer 1.  KF5N August 3, 2023
+  RedrawDisplayScreen();
+  IQChoice = 5;
+  calOnFlag = 0;
+  radioState = CW_RECEIVE_STATE;  // KF5N
+  SetFreq();                      // Return Si5351 to normal operation mode.  KF5N
+  return;
+}
+
+/*****
+  Purpose: Combined input/ output for the purpose of calibrating the receive IQ
+
+   Parameter List:
+      void
+
+   Return value:
+      void
+ *****/
+void DoReceiveCalibrate() {
+  int task = -1;
+  int lastUsedTask = -2;
+  CalibratePreamble(0);                                                   // Set zoom to 1X.
+  if (bands[currentBand].mode == DEMOD_LSB) calFreqShift = 24000 - 2000;  //  LSB offset.  KF5N
+  if (bands[currentBand].mode == DEMOD_USB) calFreqShift = 24000 + 2250;  //  USB offset.  KF5N
+  SetFreqCal();
+  calTypeFlag = 0;  // RX cal
   // Receive calibration loop
-  while (1) {
-
+  while (true) {
     ShowSpectrum2();
-
     val = ReadSelectedPushButton();
     if (val != BOGUS_PIN_READ) {
       val = ProcessButtonPress(val);
       if (val != lastUsedTask && task == -100) task = val;
       else task = BOGUS_PIN_READ;
     }
-
     switch (task) {
         // Toggle gain and phase
-      case (UNUSED_1):
+      case UNUSED_1:
         IQCalType = !IQCalType;
         break;
         // Toggle increment value
@@ -98,48 +169,23 @@ void DoReceiveCalibrate() {
         break;
       case MENU_OPTION_SELECT:
         tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-        EEPROMData.IQAmpCorrectionFactor[currentBandA] = IQAmpCorrectionFactor[currentBandA];
-        EEPROMData.IQPhaseCorrectionFactor[currentBandA] = IQPhaseCorrectionFactor[currentBandA];
+        EEPROMData.IQAmpCorrectionFactor[currentBand] = IQAmpCorrectionFactor[currentBand];
+        EEPROMData.IQPhaseCorrectionFactor[currentBand] = IQPhaseCorrectionFactor[currentBand];
         IQChoice = 6;
         break;
       default:
         break;
     }  // End switch
-
     if (task != -1) lastUsedTask = task;  //  Save the last used task.
     task = -100;                          // Reset task after it is used.
-
     if (IQCalType == 0) {  // AFP 2-11-23
-      IQAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain");
+      IQAmpCorrectionFactor[currentBand] = GetEncoderValueLive(-2.0, 2.0, IQAmpCorrectionFactor[currentBand], correctionIncrement, (char *)"IQ Gain");
     } else {
-      IQPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase");
+      IQPhaseCorrectionFactor[currentBand] = GetEncoderValueLive(-2.0, 2.0, IQPhaseCorrectionFactor[currentBand], correctionIncrement, (char *)"IQ Phase");
     }
-
     if (IQChoice == 6) break;  // Exit the while loop.
   }                            // End while loop
-
-  //  Clean up and return to normal operation.  KF5N
-  digitalWrite(RXTX, LOW);  // Turn off the transmitter.
-  updateDisplayFlag = 1;
-  xrState = RECEIVE_STATE;
-  ShowTransmitReceiveStatus();
-  T41State = CW_RECEIVE;
-  // Clear queues to reduce transient.
-  Q_in_L.clear();
-  Q_in_R.clear();
-  // centerTuneFlag = 1;  Not required during calibration.  KF5N July 22, 2023
-  centerFreq = TxRxFreq;
-  NCOFreq = 0L;
-  xrState = RECEIVE_STATE;
-  calOnFlag = 0;
-  calibrateFlag = 0;  // KF5N
-  calFreqShift = 0;
-  currentScale = userScale;       //  Restore vertical scale to user preference.  KF5N
-  currentNoiseFloor[currentBand] = userFloor;  // Restore the user's floor setting.  KF5N July 27, 2023
-  radioState = CW_RECEIVE_STATE;  // KF5N
-  tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
-  tft.clearMemory();
-  return;
+  CalibratePrologue();
 }
 
 /*****
@@ -150,75 +196,31 @@ void DoReceiveCalibrate() {
 
    Return value:
       void
-
-   CAUTION: Assumes a spaces[] array is defined
  *****/
 void DoXmitCalibrate() {
-  float correctionIncrement = 0.01;  // AFP 2-11-23
-  int corrChange = 0;
-  int val;
-  int userScale;
   int task = -1;
   int lastUsedTask = -2;
-  int userFloor = currentNoiseFloor[currentBand];  // Store the user's floor setting.  KF5N July 22, 2023
-  currentNoiseFloor[currentBand] = 0;
-  tft.setFontScale((enum RA8875tsize)0);
-  tft.setTextColor(RA8875_GREEN);
-  tft.setCursor(350, 160);
-  tft.print("user1 - Gain/Phase");
-  tft.setCursor(350, 175);
-  tft.print("User2 - Incr");
-  tft.setTextColor(RA8875_CYAN);
-  tft.fillRect(350, 125, 100, tft.getFontHeight(), RA8875_BLACK);
-  tft.setCursor(400, 125);
-  tft.print("dB");
-  tft.setCursor(350, 110);
-  tft.print("Incr= ");
-  tft.setCursor(400, 110);
-  tft.print(correctionIncrement, 3);
-  currentBand = currentBandA;
-  userScale = currentScale;  //  Remember user preference so it can be reset when done.  KF5N
-  currentScale = 1;          //  Set vertical scale to 10 dB during calibration.  KF5N
-  T41State = CW_RECEIVE;
-  modeSelectInR.gain(0, 1);
-  modeSelectInL.gain(0, 1);
-  modeSelectInExR.gain(0, 0);
-  modeSelectInExL.gain(0, 0);
-  modeSelectOutL.gain(0, 1);
-  modeSelectOutR.gain(0, 1);
-  modeSelectOutL.gain(1, 0);
-  modeSelectOutR.gain(1, 0);
-  modeSelectOutExL.gain(0, 1);
-  modeSelectOutExR.gain(0, 1);
-
-  //centerTuneFlag = 1;  Not required during calibration.  KF5N July 22, 2023
-  centerFreq = TxRxFreq;
-  NCOFreq = 0L;
-  xrState = TRANSMIT_STATE;
-  digitalWrite(MUTE, HIGH);  //  Mute Audio  (HIGH=Mute)
-  digitalWrite(RXTX, HIGH);  // Turn on transmitter.
-  ShowTransmitReceiveStatus();
-  ShowSpectrumdBScale();
-
+  CalibratePreamble(2);  // Set zoom to 4X.
+  calTypeFlag = 1;       // TX cal
+  calFreqShift = 750;
+  SetFreqCal();
+  tft.writeTo(L1);
   // Transmit Calibration Loop
   while (true) {
-
     ShowSpectrum2();
-
     val = ReadSelectedPushButton();
     if (val != BOGUS_PIN_READ) {
       val = ProcessButtonPress(val);
       if (val != lastUsedTask && task == -100) task = val;
       else task = BOGUS_PIN_READ;
     }
-
     switch (task) {
       // Toggle gain and phase
-      case (UNUSED_1):
-        IQEXChoice = !IQEXChoice;
+      case UNUSED_1:
+        IQCalType = !IQCalType;
         break;
       // Toggle increment value
-      case (BEARING):  // UNUSED_2 is now called BEARING
+      case BEARING:  // UNUSED_2 is now called BEARING
         corrChange = !corrChange;
         if (corrChange == 1) {          // Toggle increment value
           correctionIncrement = 0.001;  // AFP 2-11-23
@@ -232,64 +234,35 @@ void DoXmitCalibrate() {
         break;
       case (MENU_OPTION_SELECT):  // Save values and exit calibration.
         tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-        EEPROMData.IQXAmpCorrectionFactor[currentBandA] = IQAmpCorrectionFactor[currentBandA];
-        EEPROMData.IQXPhaseCorrectionFactor[currentBandA] = IQPhaseCorrectionFactor[currentBandA];
-        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
+        EEPROMData.IQXAmpCorrectionFactor[currentBand] = IQAmpCorrectionFactor[currentBand];
+        EEPROMData.IQXPhaseCorrectionFactor[currentBand] = IQPhaseCorrectionFactor[currentBand];
         IQChoice = 6;  // AFP 2-11-23
         break;
       default:
         break;
     }  // end switch
-
-    //  Need to remember the last used task;
     if (task != -1) lastUsedTask = task;  //  Save the last used task.
     task = -100;                          // Reset task after it is used.
-
     //  Read encoder and update values.
-    if (IQEXChoice == 0) {
-      IQXAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain X");
+    if (IQCalType == 0) {
+      IQXAmpCorrectionFactor[currentBand] = GetEncoderValueLive(-2.0, 2.0, IQXAmpCorrectionFactor[currentBand], correctionIncrement, (char *)"IQ Gain X");
     } else {
-      IQXPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase X");
+      IQXPhaseCorrectionFactor[currentBand] = GetEncoderValueLive(-2.0, 2.0, IQXPhaseCorrectionFactor[currentBand], correctionIncrement, (char *)"IQ Phase X");
     }
-
     if (IQChoice == 6) break;  //  Exit the while loop.
   }                            // end while
-
-  // Clean up and exit to normal operation.  KF5N
-  digitalWrite(RXTX, LOW);  // Turn off the transmitter.
-  updateDisplayFlag = 1;
-  xrState = RECEIVE_STATE;
-  ShowTransmitReceiveStatus();
-  T41State = CW_RECEIVE;
-  // Clear queues to reduce transient.
-  Q_in_L.clear();
-  Q_in_R.clear();
-  // centerTuneFlag = 1;  Not required during calibration.  July 22, 2023
-  centerFreq    = TxRxFreq;
-  NCOFreq       = 0L;
-  xrState       = RECEIVE_STATE;
-  calOnFlag     = 0;
-  calibrateFlag = 0;  // KF5N
-  calFreqShift  = 0;
-  currentScale  = userScale;       //  Restore vertical scale to user preference.  KF5N
-  currentNoiseFloor[currentBand] = userFloor;  // Restore the user's floor setting.  KF5N July 27, 2023
-  radioState    = CW_RECEIVE_STATE;  // KF5N
-  tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
-  tft.clearMemory();
-  return;
+  CalibratePrologue();
 }
 
 
 /*****
-  Purpose: Combined input/ output for the purpose of calibrating the transmit IQ
+  Purpose: Signal processing for th purpose of calibrating the transmit IQ
 
    Parameter List:
       void
 
    Return value:
       void
-
-   CAUTION: Assumes a spaces[] array is defined
  *****/
 void ProcessIQData2() {
   float bandCouplingFactor[7] = { 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 };  // AFP 2-11-23  KF5N uniform values
@@ -305,7 +278,7 @@ void ProcessIQData2() {
         BUFFER_SIZE*N_BLOCKS = 2024 samples
      **********************************************************************************/
 
-  bandOutputFactor = bandCouplingFactor[currentBandA] * CWPowerCalibrationFactor[currentBandA] / CWPowerCalibrationFactor[1];  //AFP 2-7-23
+  bandOutputFactor = bandCouplingFactor[currentBand] * CWPowerCalibrationFactor[currentBand] / CWPowerCalibrationFactor[1];  //AFP 2-7-23
 
   // Generate I and Q for the transmit or receive calibration.  KF5N
   if (IQChoice == 2 || IQChoice == 3) {                                   // KF5N
@@ -313,13 +286,13 @@ void ProcessIQData2() {
     arm_scale_f32(sinBuffer3, bandOutputFactor, float_buffer_R_EX, 256);  // AFP 2-11-23 Sidetone = 3000
   }
 
-  if (bands[currentBandA].mode == DEMOD_LSB) {
-    arm_scale_f32(float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);       //Adjust level of L buffer // AFP 2-11-23
-    IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);  // Adjust phase
+  if (bands[currentBand].mode == DEMOD_LSB) {
+    arm_scale_f32(float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBand], float_buffer_L_EX, 256);       //Adjust level of L buffer // AFP 2-11-23
+    IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBand], 256);  // Adjust phase
   } else {
-    if (bands[currentBandA].mode == DEMOD_USB) {
-      arm_scale_f32(float_buffer_L_EX, IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);  // AFP 2-11-23
-      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
+    if (bands[currentBand].mode == DEMOD_USB) {
+      arm_scale_f32(float_buffer_L_EX, IQXAmpCorrectionFactor[currentBand], float_buffer_L_EX, 256);  // AFP 2-11-23
+      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBand], 256);
     }
   }
   //24KHz effective sample rate here
@@ -362,11 +335,6 @@ void ProcessIQData2() {
       Q_in_R.freeBuffer();
     }
 
-    // Set frequency here only to minimize interruption to signal stream during tuning
-    //if (centerTuneFlag == 1) { //AFP 10-04-22
-    //  SetFreq();            //AFP 10-04-22
-    //}                       //AFP 10-04-22
-    //  centerTuneFlag = 0;  Not required during calibration.  KF5N July 22, 2023
     rfGainValue = pow(10, (float)rfGainAllBands / 20);                                   //AFP 2-11-23
     arm_scale_f32(float_buffer_L, rfGainValue, float_buffer_L, BUFFER_SIZE * N_BLOCKS);  //AFP 2-11-23
     arm_scale_f32(float_buffer_R, rfGainValue, float_buffer_R, BUFFER_SIZE * N_BLOCKS);  //AFP 2-11-23
@@ -378,13 +346,13 @@ void ProcessIQData2() {
     arm_scale_f32(float_buffer_R, recBandFactor[currentBand], float_buffer_R, BUFFER_SIZE * N_BLOCKS);  //AFP 2-11-23
 
     // Manual IQ amplitude correction
-    if (bands[currentBandA].mode == DEMOD_LSB) {
-      arm_scale_f32(float_buffer_L, -IQAmpCorrectionFactor[currentBandA], float_buffer_L, BUFFER_SIZE * N_BLOCKS);  //AFP 04-14-22
-      IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBandA], BUFFER_SIZE * N_BLOCKS);
+    if (bands[currentBand].mode == DEMOD_LSB) {
+      arm_scale_f32(float_buffer_L, -IQAmpCorrectionFactor[currentBand], float_buffer_L, BUFFER_SIZE * N_BLOCKS);  //AFP 04-14-22
+      IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBand], BUFFER_SIZE * N_BLOCKS);
     } else {
-      if (bands[currentBandA].mode == DEMOD_USB) {
-        arm_scale_f32(float_buffer_L, -IQAmpCorrectionFactor[currentBandA], float_buffer_L, BUFFER_SIZE * N_BLOCKS);  //AFP 04-14-22 KF5N changed sign
-        IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBandA], BUFFER_SIZE * N_BLOCKS);
+      if (bands[currentBand].mode == DEMOD_USB) {
+        arm_scale_f32(float_buffer_L, -IQAmpCorrectionFactor[currentBand], float_buffer_L, BUFFER_SIZE * N_BLOCKS);  //AFP 04-14-22 KF5N changed sign
+        IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBand], BUFFER_SIZE * N_BLOCKS);
       }
     }
     FreqShift1();  // Why done here? KF5N
@@ -400,8 +368,6 @@ void ProcessIQData2() {
       // does not work for magnifications > 8
     }
 
-    //============================== AFP 10-22-22  Begin new
-
     if (auto_codec_gain == 1) {
       Codec_gain();
     }
@@ -409,12 +375,9 @@ void ProcessIQData2() {
 }
 
 /*****
-  Purpose: Show Spectrum display
-            Note that this routine calls the Audio process Function during each display cycle,
-            for each of the 512 display frequency bins.  This means that the audio is refreshed at the maximum rate
-            and does not have to wait for the display to complete drawinf the full spectrum.
-            However, the display data are only updated ONCE during each full display cycle,
-            ensuring consistent data for the erase/draw cycle at each frequency point.
+  Purpose: Show Spectrum display modified for IQ calibration.
+           This is similar to the function used for normal reception, however, it has
+           been simplified and streamlined for calibration.
 
   Parameter list:
     void
@@ -428,7 +391,7 @@ void ShowSpectrum2()  //AFP 2-10-23
   float adjdB = 0.0;
   int capture_bins = 10;  // Sets the number of bins to scan for signal peak.
   //=========== // AFP 2-11-23
-  tft.drawFastVLine(centerLine, SPECTRUM_TOP_Y, h, RA8875_GREEN);  // Draws centerline on spectrum display
+//  tft.drawFastVLine(centerLine, SPECTRUM_TOP_Y, h + 14, RA8875_GREEN);  // Centerline not required for calibration.  KF5N August 16, 2023
 
   pixelnew[0] = 0;
   pixelnew[1] = 0;
@@ -441,22 +404,22 @@ void ShowSpectrum2()  //AFP 2-10-23
   //  All calibrations use a 0 dB reference signal and an "undesired sideband" signal which is to be minimized relative to the reference.
   //  Thus there is a target "bin" for the reference signal and another "bin" for the undesired sideband.
   //  The target bin locations are used by the for-loop to sweep a small range in the FFT.  A maximum finding function finds the peak signal strength.
-  int cal_bins[2];
-  if (calTypeFlag == 0 && bands[currentBandA].mode == DEMOD_LSB) {
+  int cal_bins[2] = {0, 0};
+  if (calTypeFlag == 0 && bands[currentBand].mode == DEMOD_LSB) {
     cal_bins[0] = 310;
     cal_bins[1] = 460;
   }  // Receive calibration, LSB.  KF5N
-  if (calTypeFlag == 0 && bands[currentBandA].mode == DEMOD_USB) {
-    cal_bins[0] = 64;
+  if (calTypeFlag == 0 && bands[currentBand].mode == DEMOD_USB) {
+    cal_bins[0] = 65;
     cal_bins[1] = 192;
   }  // Receive calibration, USB.  KF5N
-  if (calTypeFlag == 1 && bands[currentBandA].mode == DEMOD_LSB) {
+  if (calTypeFlag == 1 && bands[currentBand].mode == DEMOD_LSB) {
     cal_bins[0] = 240;
     cal_bins[1] = 305;
   }  // Transmit calibration, LSB.  KF5N
-  if (calTypeFlag == 1 && bands[currentBandA].mode == DEMOD_USB) {
-    cal_bins[0] = 210;
-    cal_bins[1] = 275;
+  if (calTypeFlag == 1 && bands[currentBand].mode == DEMOD_USB) {
+    cal_bins[0] = 209;
+    cal_bins[1] = 273;
   }  // Transmit calibration, USB.  KF5N
 
   // Draw vertical markers for the reference and undesired sideband locations.  For debugging only!
@@ -476,13 +439,10 @@ void ShowSpectrum2()  //AFP 2-10-23
   tft.setCursor(350, 125);  // 350, 125
   tft.print(adjdB, 1);
 
-
+  //  At least a partial waterfall is necessary.  It seems to provide some important timing function.  KF5N August 14, 2023
   tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
   while (tft.readStatus())
     ;
-  tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 2);
-  while (tft.readStatus())
-    ;  // Make sure it's done.
 }
 
 /*****
@@ -517,11 +477,11 @@ float PlotCalSpectrum(int x1, int cal_bins[2], int capture_bins) {
   y_old2 = pixelold[x1 - 1];
 
   // Find the maximums of the desired and undesired signals.
-  if (bands[currentBandA].mode == DEMOD_LSB) {
+  if (bands[currentBand].mode == DEMOD_LSB) {
     arm_max_q15(&pixelnew[(cal_bins[0] - capture_bins)], capture_bins * 2, &refAmplitude, &index_of_max);
     arm_max_q15(&pixelnew[(cal_bins[1] - capture_bins)], capture_bins * 2, &adjAmplitude, &index_of_max);
   }
-  if (bands[currentBandA].mode == DEMOD_USB) {
+  if (bands[currentBand].mode == DEMOD_USB) {
     arm_max_q15(&pixelnew[(cal_bins[0] - capture_bins)], capture_bins * 2, &adjAmplitude, &index_of_max);
     arm_max_q15(&pixelnew[(cal_bins[1] - capture_bins)], capture_bins * 2, &refAmplitude, &index_of_max);
   }
@@ -542,25 +502,26 @@ float PlotCalSpectrum(int x1, int cal_bins[2], int capture_bins) {
   tft.drawLine(x1, spectrumNoiseFloor - y1_new, x1, spectrumNoiseFloor - y_new, RA8875_YELLOW);  // Draw new
   pixelCurrent[x1] = pixelnew[x1];                                                               //  This is the actual "old" spectrum!  This is required due to CW interrupts.  Copied to pixelold by the FFT function.
 
-  //===  AFP 2-11-23
   if (calTypeFlag == 0) {  // Receive Cal
     adjdB = ((float)adjAmplitude - (float)refAmplitude) / 1.95;
     tft.writeTo(L2);
-    if (bands[currentBandA].mode == DEMOD_LSB) {
-      tft.fillRect(450, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
-      tft.fillRect(300, SPECTRUM_TOP_Y, 20, h + 10, RA8875_BLUE);
-    } else {
-      tft.fillRect(54, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
-      tft.fillRect(182, SPECTRUM_TOP_Y, 20, h + 10, RA8875_BLUE);
+    if (bands[currentBand].mode == DEMOD_LSB) {
+      tft.fillRect(450, SPECTRUM_TOP_Y + 20, 20, h - 6, DARK_RED);     // SPECTRUM_TOP_Y = 100
+      tft.fillRect(300, SPECTRUM_TOP_Y + 20, 20, h - 6, RA8875_BLUE);  // h = SPECTRUM_HEIGHT + 3
+    } else {                                                           // SPECTRUM_HEIGHT = 150 so h = 153
+      tft.fillRect(55, SPECTRUM_TOP_Y + 20, 20, h - 6, DARK_RED);
+      tft.fillRect(182, SPECTRUM_TOP_Y + 20, 20, h - 6, RA8875_BLUE);
     }
   } else {                                                       //Transmit Cal
     adjdB = ((float)adjAmplitude - (float)refAmplitude) / 1.95;  // Cast to float and calculate the dB level.  KF5N
     tft.writeTo(L2);
-    if (bands[currentBandA].mode == DEMOD_LSB) {
-      tft.fillRect(295, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
+    if (bands[currentBand].mode == DEMOD_LSB) {
+      tft.fillRect(295, SPECTRUM_TOP_Y + 20, 20, h - 6, DARK_RED);  // Adjusted height due to other graphics changes.  KF5N August 3, 2023
+      tft.fillRect(230, SPECTRUM_TOP_Y + 20, 20, h - 6, RA8875_BLUE);      
     } else {
-      if (bands[currentBandA].mode == DEMOD_USB) {  //mode == DEMOD_LSB
-        tft.fillRect(200, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
+      if (bands[currentBand].mode == DEMOD_USB) {  //mode == DEMOD_LSB
+        tft.fillRect(199, SPECTRUM_TOP_Y + 20, 20, h - 6, DARK_RED);
+        tft.fillRect(263, SPECTRUM_TOP_Y + 20, 20, h - 6, RA8875_BLUE);
       }
     }
   }

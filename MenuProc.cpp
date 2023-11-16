@@ -3,6 +3,7 @@
 #endif
 
 // Updates by KF5N to CalibrateOptions() function. July 20, 2023
+// Updated receive calibration code to clean up graphics.  KF5N August 3, 2023
 
 // ==============  AFP 10-22-22 ==================
 /*****
@@ -18,7 +19,7 @@ int CalibrateOptions(int IQChoice) {
   int val;
   int32_t increment = 100L;
   tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 30, CHAR_HEIGHT, RA8875_BLACK);
-  float transmitPowerLevelTemp;  //AFP 05-11-23
+  //  float transmitPowerLevelTemp;  //AFP 05-11-23
   switch (IQChoice) {
 
     case 0:  // Calibrate Frequency  - uses WWV
@@ -48,7 +49,7 @@ int CalibrateOptions(int IQChoice) {
       if (keyPressedOn == 1 && xmtMode == CW_MODE) {
         //================  CW Transmit Mode Straight Key ===========
         if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW && xmtMode == CW_MODE && keyType == 0) {  //Straight Key
-          powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA];
+          powerOutCW[currentBand] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBand];
           CW_ExciterIQData();
           xrState = TRANSMIT_STATE;
           ShowTransmitReceiveStatus();
@@ -63,88 +64,32 @@ int CalibrateOptions(int IQChoice) {
           modeSelectOutExR.gain(0, 0);
         }
       }
-      CWPowerCalibrationFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, CWPowerCalibrationFactor[currentBandA], 0.001, (char *)"CW PA Cal: ");
-      powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA];  // AFP 10-21-22
+      CWPowerCalibrationFactor[currentBand] = GetEncoderValueLive(-2.0, 2.0, CWPowerCalibrationFactor[currentBand], 0.001, (char *)"CW PA Cal: ");
+      powerOutCW[currentBand] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBand];  // AFP 10-21-22
       val = ReadSelectedPushButton();
       if (val != BOGUS_PIN_READ) {        // Any button press??
         val = ProcessButtonPress(val);    // Use ladder value to get menu choice
         if (val == MENU_OPTION_SELECT) {  // Yep. Make a choice??
           tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-          EEPROMData.CWPowerCalibrationFactor[currentBandA] = CWPowerCalibrationFactor[currentBandA];
+          EEPROMData.CWPowerCalibrationFactor[currentBand] = CWPowerCalibrationFactor[currentBand];
           EEPROMWrite();
           calibrateFlag = 0;
           IQChoice = 5;
           return IQChoice;
         }
       }
-      break;   
-
-    case 2:  // IQ Receive Cal - Gain and Phase
-      calOnFlag = 1;
-      calTypeFlag = 0;
-      zoomIndex = 0;
-      ResetZoom(zoomIndex);
-      radioState = CW_TRANSMIT_STRAIGHT_STATE;      // KF5N
-      transmitPowerLevelTemp = transmitPowerLevel;  //AFP 05-11-23
-      transmitPowerLevel = 5;                       //AFP 02-09-23
-      powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA];
-      modeSelectOutExL.gain(0, powerOutCW[currentBandA]);  //AFP 10-21-22
-      modeSelectOutExR.gain(0, powerOutCW[currentBandA]);  //AFP 10-21-22
-      DoReceiveCalibrate();
-      IQChoice = 5;
-      calFreqShift = 0;
-      //centerTuneFlag = 1;  Not used in revised tuning scheme.  KF5N July 22, 2023
-      zoomIndex = 1;
-      transmitPowerLevel = transmitPowerLevelTemp;  // KF5N
-      ResetZoom(zoomIndex);
-      calOnFlag = 0;
-      radioState = CW_RECEIVE_STATE;  // KF5N
-      SetFreq();                      // Return Si5351 to normal operation mode.  KF5N
-      calibrateFlag = 0;  // KF5N
       break;
-
-    case 3:                            // IQ Transmit Cal - Gain and Phase  //AFP 2-21-23
-      int spectrumSet, tempZoomIndex;  // tempXmitMode;  KF5N
-
-      calTypeFlag = 1;
-      calOnFlag = 1;
-      tempZoomIndex = zoomIndex;
-      zoomIndex = 2;
-      spectrumSet = currentScale;  // Save current value
-      currentScale = 1;            // 10dB
-      ShowSpectrumdBScale();
-      ResetZoom(zoomIndex);
-      if (bands[currentBandA].mode == DEMOD_LSB) {
-        calFreqShift = 750;  //  Emperically determined to center up sidebands in desired FFT bins.  KF5N  Optimum for 40M -280
-      } else {
-        if (bands[currentBandA].mode == DEMOD_USB) {  // KF5N Optimum for 40M -1180
-          calFreqShift = 750;
-        }
-      }
-      SetFreqCal();                                 //  Set Si5351 outputs for calibration.  KF5N
-      transmitPowerLevelTemp = transmitPowerLevel;  //AFP 05-11-23
-      transmitPowerLevel = 5;                       // AFP 2-11-23
-      powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA];
-      modeSelectOutExL.gain(0, powerOutCW[currentBandA]);
-      modeSelectOutExR.gain(0, powerOutCW[currentBandA]);
-      
-      DoXmitCalibrate();
+    case 2:                  // IQ Receive Cal - Gain and Phase
+      DoReceiveCalibrate();  // This function was significantly revised.  KF5N August 16, 2023
       IQChoice = 5;
-      //  centerTuneFlag = 1;  Not used in revised tuning scheme.  KF5N July 22, 2023
-      currentScale = spectrumSet;  // Restore user's preferences
-      zoomIndex = tempZoomIndex;
-      transmitPowerLevel = transmitPowerLevelTemp;  //AFP 05-11-23
-      ResetZoom(zoomIndex);
-      RedrawDisplayScreen();
-      EEPROMData.IQXAmpCorrectionFactor[currentBandA] = IQXAmpCorrectionFactor[currentBandA];
-      EEPROMData.IQXPhaseCorrectionFactor[currentBandA] = IQXPhaseCorrectionFactor[currentBandA];
-      EEPROMWrite();
-      //delay(5000);
       break;
-
+    case 3:               // IQ Transmit Cal - Gain and Phase  //AFP 2-21-23
+      DoXmitCalibrate();  // This function was significantly revised.  KF5N August 16, 2023
+      IQChoice = 5;
+      break;
     case 4:  // SSB PA Cal
-      SSBPowerCalibrationFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, SSBPowerCalibrationFactor[currentBandA], 0.001, (char *)"SSB PA Cal: ");
-      powerOutSSB[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * SSBPowerCalibrationFactor[currentBandA];  // AFP 10-21-22
+      SSBPowerCalibrationFactor[currentBand] = GetEncoderValueLive(-2.0, 2.0, SSBPowerCalibrationFactor[currentBand], 0.001, (char *)"SSB PA Cal: ");
+      powerOutSSB[currentBand] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * SSBPowerCalibrationFactor[currentBand];  // AFP 10-21-22
       val = ReadSelectedPushButton();
       if (val != BOGUS_PIN_READ) {        // Any button press??
         val = ProcessButtonPress(val);    // Use ladder value to get menu choice
@@ -156,14 +101,12 @@ int CalibrateOptions(int IQChoice) {
           return IQChoice;
         }
       }
-      break;
-
-
+      break;  // Missing break.  KF5N August 12, 2023
 
     case 5:
       //EraseMenus();
       RedrawDisplayScreen();
-      currentFreqA = TxRxFreq = centerFreq + NCOFreq;
+      currentFreq = TxRxFreq = centerFreq + NCOFreq;
       DrawBandWidthIndicatorBar();  // AFP 10-20-22
       ShowFrequency();
       BandInformation();
@@ -200,7 +143,7 @@ int CWOptions()  // new option for Sidetone and Delay JJP 9/1/22
   switch (CWChoice) {
     case 0:  // WPM
       SetWPM();
-      SetDitLength(currentWPM);  //Afp 09-22-22
+      SetTransmitDitLength(currentWPM);  //Afp 09-22-22     // JJP 8/19/23
       break;
 
     case 1:          // Type of key:
@@ -660,15 +603,15 @@ int RFOptions() {
   switch (rfSet) {
     case 0:  // AFP 10-21-22
       transmitPowerLevel = (float)GetEncoderValue(1, 20, transmitPowerLevel, 1, (char *)"Power: ");
-      if (xmtMode == CW_MODE) {                                                                                                                                        //AFP 10-13-22
-        powerOutCW[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBandA];  //  afp 10-21-22
+      if (xmtMode == CW_MODE) {                                                                                                                                      //AFP 10-13-22
+        powerOutCW[currentBand] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * CWPowerCalibrationFactor[currentBand];  //  afp 10-21-22
 
-        EEPROMData.powerOutCW[currentBandA] = powerOutCW[currentBandA];  //AFP 10-21-22
+        EEPROMData.powerOutCW[currentBand] = powerOutCW[currentBand];  //AFP 10-21-22
         //EEPROMWrite();//AFP 10-21-22
       } else {  //AFP 10-13-22
         if (xmtMode == SSB_MODE) {
-          powerOutSSB[currentBandA] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * SSBPowerCalibrationFactor[currentBandA];  // afp 10-21-22
-          EEPROMData.powerOutSSB[currentBandA] = powerOutSSB[currentBandA];                                                                                                //AFP 10-21-22
+          powerOutSSB[currentBand] = (-.0133 * transmitPowerLevel * transmitPowerLevel + .7884 * transmitPowerLevel + 4.5146) * SSBPowerCalibrationFactor[currentBand];  // afp 10-21-22
+          EEPROMData.powerOutSSB[currentBand] = powerOutSSB[currentBand];                                                                                                //AFP 10-21-22
         }
       }
       EEPROMData.powerLevel = transmitPowerLevel;  //AFP 10-21-22
@@ -734,6 +677,11 @@ void DoPaddleFlip() {
         }
         EEPROMData.paddleDit = paddleDit;
         EEPROMData.paddleDah = paddleDah;
+        // Override if straight key is selected.  KF5N August 9, 2023
+        if (keyType == 0) {
+          paddleDit = KEYER_DIT_INPUT_TIP;
+          paddleDah = KEYER_DAH_INPUT_RING;
+        }
         EraseMenus();
         return;
       }
@@ -751,51 +699,50 @@ void DoPaddleFlip() {
   Return value
     int             // the currently active VFO, A = 1, B = 0
 *****/
-int VFOSelect()
-{
-  const char *VFOOptions[] = {"VFO A", "VFO B", "Split", "Cancel"};
+int VFOSelect() {
+  const char *VFOOptions[] = { "VFO A", "VFO B", "Split", "Cancel" };
   int toggle;
   int choice, lastChoice;
 
-  choice  = lastChoice = toggle = activeVFO;
+  choice = lastChoice = toggle = activeVFO;
   splitOn = 0;
 
   tft.setTextColor(RA8875_BLACK);
   tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_GREEN);
   tft.setCursor(SECONDARY_MENU_X + 7, MENUS_Y + 1);
-  tft.print(VFOOptions[choice]);                    // Show the default (right paddle = dah
+  tft.print(VFOOptions[choice]);  // Show the default (right paddle = dah
 
-  choice = SubmenuSelect(VFOOptions, 4 , 0);
+  choice = SubmenuSelect(VFOOptions, 4, 0);
   MyDelay(10);
   NCOFreq = 0L;
   switch (choice) {
-    case VFO_A:                                     // VFO A
+    case VFO_A:  // VFO A
       centerFreq = TxRxFreq = currentFreqA;
       activeVFO = VFO_A;
       currentBand = currentBandA;
-      tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);      // Erase split message
+      tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);  // Erase split message
       splitOn = 0;
       break;
 
-    case VFO_B:                                     // VFO B
+    case VFO_B:  // VFO B
       centerFreq = TxRxFreq = currentFreqB;
       activeVFO = VFO_B;
       currentBand = currentBandB;
-      tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);      // Erase split message
+      tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);  // Erase split message
       splitOn = 0;
       break;
 
-    case VFO_SPLIT:                                 // Split
+    case VFO_SPLIT:  // Split
       DoSplitVFO();
       splitOn = 1;
       break;
 
-    default:                                        // Cancel
+    default:  // Cancel
       return activeVFO;
       break;
   }
   bands[currentBand].freq = TxRxFreq;
-  SetBand();  // KF5N July 12, 2023
+  SetBand();           // KF5N July 12, 2023
   SetBandRelay(HIGH);  // Required when switching VFOs. KF5N July 12, 2023
   SetFreq();
   RedrawDisplayScreen();
@@ -804,13 +751,13 @@ int VFOSelect()
   FilterBandwidth();
   EEPROMData.activeVFO = activeVFO;
 
-  tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit
-  tft.fillRect(FREQUENCY_X,       FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK); // delete old digit  tft.setFontScale( (enum RA8875tsize) 0);
+  tft.fillRect(FREQUENCY_X_SPLIT, FREQUENCY_Y - 12, VFOB_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK);  // delete old digit
+  tft.fillRect(FREQUENCY_X, FREQUENCY_Y - 12, VFOA_PIXEL_LENGTH, FREQUENCY_PIXEL_HI, RA8875_BLACK);        // delete old digit  tft.setFontScale( (enum RA8875tsize) 0);
   ShowFrequency();
-    // Draw or not draw CW filter graphics to audio spectrum area.  KF5N July 30, 2023
+  // Draw or not draw CW filter graphics to audio spectrum area.  KF5N July 30, 2023
   tft.writeTo(L2);
   tft.clearMemory();
-  if(xmtMode == CW_MODE) BandInformation(); 
+  if (xmtMode == CW_MODE) BandInformation();
   DrawBandWidthIndicatorBar();
   DrawFrequencyBarValue();
   return activeVFO;
@@ -834,7 +781,7 @@ int EEPROMOptions() {
   switch (defaultOpt) {
     case 0:  // Save current values
       EEPROMWrite();
-      UpdateEEPROMSyncIndicator(1);   //  JJP 7/25/23
+      UpdateEEPROMSyncIndicator(1);  //  JJP 7/25/23
       break;
 
     case 1:
@@ -854,9 +801,12 @@ int EEPROMOptions() {
       break;
 
     case 5:
-      CopySDToEEPROM(); // Copy from SD to EEPROM
-
-      EEPROMRead();  // KF5N
+      CopySDToEEPROM();  // Copy from SD to EEPROM
+      EEPROMRead();      // KF5N
+      tft.writeTo(L2);   // This is specifically to clear the bandwidth indicator bar.  KF5N August 7, 2023
+      tft.clearMemory();
+      tft.writeTo(L1);
+      RedrawDisplayScreen();  // Assume there are lots of changes and do a heavy-duty refresh.  KF5N August 7, 2023
       break;
 
     case 6:

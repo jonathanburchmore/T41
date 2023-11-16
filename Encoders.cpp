@@ -194,7 +194,7 @@ float GetEncoderValueLive(float minValue, float maxValue, float startValue, floa
   float currentValue = startValue;
   tft.setFontScale((enum RA8875tsize)1);
   tft.setTextColor(RA8875_WHITE);
-  tft.fillRect(250, 0, 280, CHAR_HEIGHT, RA8875_BLACK);
+  tft.fillRect(250, 0, 285, CHAR_HEIGHT, RA8875_BLACK); // Increased rectangle size to full erase value.  KF5N August 12, 2023
   tft.setCursor(257, 1);
   tft.print(prompt);
   tft.setCursor(440, 1);
@@ -211,7 +211,7 @@ float GetEncoderValueLive(float minValue, float maxValue, float startValue, floa
     else if (currentValue > maxValue)
       currentValue = maxValue;
 
-    tft.fillRect(449, 0, 80, CHAR_HEIGHT, RA8875_BLACK);
+  //  tft.fillRect(449, 0, 90, CHAR_HEIGHT, RA8875_BLACK);  // This is not required. KF5N August 12, 2023
     tft.setCursor(440, 1);
     if (abs(startValue) > 2) {
       tft.print(startValue, 0);
@@ -302,7 +302,7 @@ int SetWPM() {
     if (filterEncoderMove != 0) {       // Changed encoder?
       currentWPM += filterEncoderMove;  // Yep
       lastWPM = currentWPM;
-      if (lastWPM < 0)
+      if (lastWPM < 5)    // Set minimum keyer speed to 5 wpm.  KF5N August 20, 2023
         lastWPM = 5;
       else if (lastWPM > MAX_WPM)
         lastWPM = MAX_WPM;
