@@ -13,8 +13,8 @@ void sineTone(int numCycles)
 {
   float theta;
   float freqSideTone2;
-  float freqSideTone3 = 300;         // Refactored 32 * 24000 / 256;
-  
+  float freqSideTone3 = 3000;         // Refactored 32 * 24000 / 256; //AFP 2-7-23
+  float freqSideTone4 = 375;   
   freqSideTone2 = numCycles * 24000 / 256;
   for (int kf = 0; kf < 256; kf++) { //Calc: numCycles=8, 750 hz sine wave.
     theta = kf * 2 * PI * freqSideTone2 / 24000;
@@ -23,6 +23,9 @@ void sineTone(int numCycles)
     theta = kf * 2.0 * PI * freqSideTone3 / 24000;
     sinBuffer3[kf] = sin(theta);
     cosBuffer3[kf] = cos(theta);
+    theta = kf * 2.0 * PI * freqSideTone4 / 24000;
+    sinBuffer4[kf] = sin(theta);
+    cosBuffer4[kf] = cos(theta);
   }
 }
 
@@ -457,7 +460,7 @@ void SaveAnalogSwitchValues()
                                  "Filter",       "DeMod",    "Mode",
                                  "NR",           "Notch",    "Noise Floor",
                                  "Fine Tune",    "Decoder",  "Tune incrment",
-                                 "User 1",       "User 2",   "User 2"
+                                 "User 1",       "User 2",   "User 3"
                                 };
   */
   int index;
@@ -502,11 +505,12 @@ void SaveAnalogSwitchValues()
       tft.setCursor(660, 20 + index * 25);
       tft.print(minVal);
       EEPROMData.switchValues[index] = minVal;
+      switchThreshholds[index] = minVal;
       index++;
       MyDelay(100L);
     }
   }
-  EEPROM.put(0, EEPROMData);                        // Save values to EEPROM
+//  EEPROM.put(0, EEPROMData);                        // Save values to EEPROM
 }
 
 // ================== Clock stuff
@@ -600,6 +604,22 @@ void SetupMode(int sideBand)
 
 int Xmit_IQ_Cal() //AFP 09-21-22
 {
-
   return -1;
+}
+
+
+/*****
+  Purpose: set Band
+  Parameter list:
+    void
+  Return value;
+    void
+*****/
+void SetBand()
+{
+  old_demod_mode = -99; // used in setup_mode and when changing bands, so that LoCut and HiCut are not changed!
+  SetupMode(bands[currentBand].mode);
+  SetFreq();
+  ShowFrequency();
+  FilterBandwidth();
 }

@@ -15,9 +15,10 @@
    CAUTION: Assumes a spaces[] array is defined
  *****/
 void DoReceiveCalibrate() {
-  float correctionIncrement = 0.001;
+  float correctionIncrement = 0.01; //AFP 2-7-23
   int corrChange = 0;
-  IQChoice = 0;
+
+  //IQChoice = 0;  // AFP 02-09-23
   calFreqShift = -24000;
   tft.setFontScale( (enum RA8875tsize) 0);
   tft.setTextColor(RA8875_GREEN);
@@ -42,55 +43,48 @@ void DoReceiveCalibrate() {
     val = ReadSelectedPushButton();
     if (val != BOGUS_PIN_READ) {                        // Any button press??
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
-      if (val == UNUSED_1 ) {
-        IQChoice = !IQChoice;
+      if (val == UNUSED_1) {
+        IQCalType = !IQCalType;
       }
     }
     if (val == UNUSED_2) {
       corrChange = !corrChange;
-      if (corrChange == 1) correctionIncrement = 0.01;
-      else if (corrChange == 0) correctionIncrement = 0.001;
+      if (corrChange == 1) {
+        correctionIncrement = 0.001; //AFP 2-7-23
+      } else { //if (corrChange == 0)                   // corrChange is a toggle, so if not needed JJP 2/5/23
+        correctionIncrement = 0.01; //AFP 2-7-23
+      }
       tft.setFontScale( (enum RA8875tsize) 0);
       tft.fillRect(400, 110, 50, tft.getFontHeight(), RA8875_BLACK);
       tft.setCursor(400, 110);
       tft.print(correctionIncrement, 3);
     }
-    if (IQChoice == 0) {
-      if (bands[currentBandA].mode == DEMOD_LSB) {
-        IQAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain");
-        EEPROMData.IQAmpCorrectionFactor[currentBandA]             = IQAmpCorrectionFactor[currentBandA] ;
-        EEPROMData.IQPhaseCorrectionFactor[currentBandA]           = IQPhaseCorrectionFactor[currentBandA];
-        EEPROMWrite();
-      } else {
-        IQAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain");
-      }
+    // ========== // AFP 2-11-23
+    if (IQCalType == 0) { // AFP 2-11-23
+      IQAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain");
     } else {
-      if (IQChoice == 1) {
-        if (bands[currentBandA].mode == DEMOD_LSB) {
-          IQPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase");
-        } else {
-          IQPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase");
-        }
-      }
+      IQPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase");
     }
-
     val = ReadSelectedPushButton();
     if (val != BOGUS_PIN_READ) {                        // Any button press??
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
       if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??  I don't have that any more.
         tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-        // EEPROMWrite();
+        //IQAmpCorrectionFactor[currentBandA]   = IQAmpCorrectionFactor[currentBandA];//AFP 02-09-23
+        //IQPhaseCorrectionFactor[currentBandA] = IQPhaseCorrectionFactor[currentBandA];//AFP 02-09-23
       }
     }
     //==
     updateDisplayFlag = 1;
-    int pushButtonSwitchIndex = -1;
-    int valPin;
-    valPin = ReadSelectedPushButton();                        // Poll UI push buttons
-    if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
-      pushButtonSwitchIndex = ProcessButtonPress(valPin);
-      ExecuteButtonPress(pushButtonSwitchIndex);
-    }
+//    int pushButtonSwitchIndex = -1;
+//    int valPin;
+    //    valPin = ReadSelectedPushButton();                        // Poll UI push buttons
+    //    if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
+    //      pushButtonSwitchIndex = ProcessButtonPress(valPin);
+    //      ExecuteButtonPress(pushButtonSwitchIndex);
+    //    }
+    // ================= // AFP 2-11-23
+    //===// AFP 2-11-23
     digitalWrite(MUTE, LOW);                //turn off mute
     xrState = RECEIVE_STATE;
     ShowTransmitReceiveStatus();
@@ -107,8 +101,7 @@ void DoReceiveCalibrate() {
 
     modeSelectOutExL.gain(0, 1);
     modeSelectOutExR.gain(0, 1);
-
-
+    //==== // AFP 2-11-23
     centerTuneFlag = 1;
     //activeVFO = VFO_A;
     //centerFreq = lastFrequencies[currentBandA][1];
@@ -123,16 +116,18 @@ void DoReceiveCalibrate() {
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
       if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
         tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-        EEPROMData.IQAmpCorrectionFactor[currentBandA]             = IQAmpCorrectionFactor[currentBandA] ;
-        EEPROMData.IQPhaseCorrectionFactor[currentBandA]           = IQPhaseCorrectionFactor[currentBandA];
-        EEPROMWrite();
+        EEPROMData.IQAmpCorrectionFactor[currentBandA]   = IQAmpCorrectionFactor[currentBandA] ;
+        EEPROMData.IQPhaseCorrectionFactor[currentBandA] = IQPhaseCorrectionFactor[currentBandA];
+        //EEPROMWrite();
         IQChoice = 6;
         break;
       }
     }
   }
   calOnFlag = 0;
+
   return;
+
   centerTuneFlag = 1;
   RedrawDisplayScreen();
 }
@@ -149,9 +144,11 @@ void DoReceiveCalibrate() {
    CAUTION: Assumes a spaces[] array is defined
  *****/
 void DoXmitCalibrate() {
-  float correctionIncrement = 0.001;
+  float correctionIncrement = 0.01; // AFP 2-11-23
   int corrChange = 0;
-  IQEXChoice = 0;
+  int val;
+
+  //IQEXChoice = 0;
 
   tft.setFontScale( (enum RA8875tsize) 0);
   tft.setTextColor(RA8875_GREEN);
@@ -168,10 +165,10 @@ void DoXmitCalibrate() {
   tft.setCursor(400, 110);
   tft.print(correctionIncrement, 3);
   currentBand = currentBandA;
-  while (1) {
+  while (true) {
+
+
     ShowSpectrum2();
-    // ============
-    int val;
     val = ReadSelectedPushButton();
     if (val != BOGUS_PIN_READ) {                        // Any button press??
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
@@ -181,55 +178,46 @@ void DoXmitCalibrate() {
     }
     if (val == UNUSED_2) {
       corrChange = !corrChange;
-      if (corrChange == 1) correctionIncrement = 0.01;
-      else if (corrChange == 0) correctionIncrement = 0.001;
+      if (corrChange == 1) {                            // Toggle increment value
+        correctionIncrement = 0.001;  // AFP 2-11-23
+      } else {
+        correctionIncrement = 0.01;  // AFP 2-11-23
+      }
       tft.setFontScale( (enum RA8875tsize) 0);
       tft.fillRect(400, 110, 50, tft.getFontHeight(), RA8875_BLACK);
       tft.setCursor(400, 110);
       tft.print(correctionIncrement, 3);
     }
-    if (IQEXChoice == 0) {
-      if (bands[currentBandA].mode == DEMOD_LSB) {
-        IQXAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain X");
-      } else {
-        IQXAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain X");
-      }
-    } else {
-      if (IQEXChoice == 1) {
-        if (bands[currentBandA].mode == DEMOD_LSB) {
-          IQXPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase X");
-        } else {
-          IQXPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase X");
-        }
-      }
-    }
 
+    //============ // AFP 2-11-23
+    if (IQEXChoice == 0) {
+      IQXAmpCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXAmpCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Gain X");
+    } else {
+      IQXPhaseCorrectionFactor[currentBandA] = GetEncoderValueLive(-2.0, 2.0, IQXPhaseCorrectionFactor[currentBandA], correctionIncrement, (char *)"IQ Phase X");
+    }
     val = ReadSelectedPushButton();
     if (val != BOGUS_PIN_READ) {                        // Any button press??
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
       if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??  I don't have that any more.
         tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
-
-        spectrum_zoom = 1;
-        EEPROMWrite();
-        //calibrateFlag = 0;
-
+        EEPROMData.IQXAmpCorrectionFactor[currentBandA]   = IQAmpCorrectionFactor[currentBandA];
+        EEPROMData.IQXPhaseCorrectionFactor[currentBandA] = IQPhaseCorrectionFactor[currentBandA];
       }
     }
-    //==
-    updateDisplayFlag = 1;
-    int pushButtonSwitchIndex = -1;
-    int valPin;
-    //long ditTimerOff; //AFP 09-22-22
-    //long dahTimerOn;
-    valPin = ReadSelectedPushButton();                        // Poll UI push buttons
-    if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
-      pushButtonSwitchIndex = ProcessButtonPress(valPin);
-      ExecuteButtonPress(pushButtonSwitchIndex);
+    // ================
+    val = ReadSelectedPushButton();
+    if (val != BOGUS_PIN_READ) {                        // Any button press??
+      val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+      if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??  I don't have that any more.
+        tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
+        spectrum_zoom = 1;
+        EEPROMData.IQXPhaseCorrectionFactor[currentBandA] = IQXPhaseCorrectionFactor[currentBandA];
+        EEPROMData.IQXAmpCorrectionFactor[currentBandA]   = IQXAmpCorrectionFactor[currentBandA];
+      }
     }
-    //ProcessIQData2();
-
-
+    //== // AFP 2-11-23
+    updateDisplayFlag = 1;
+    //========== //AFP 2-7-23
     digitalWrite(MUTE, LOW);                //turn off mute
     xrState = RECEIVE_STATE;
     ShowTransmitReceiveStatus();
@@ -247,7 +235,7 @@ void DoXmitCalibrate() {
     modeSelectOutExL.gain(0, 1);
     modeSelectOutExR.gain(0, 1);
 
-
+    //============  //AFP 2-7-23
     centerTuneFlag = 1;
     centerFreq = TxRxFreq;
     NCOFreq = 0L;
@@ -260,8 +248,8 @@ void DoXmitCalibrate() {
       if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
         tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH + 35, CHAR_HEIGHT, RA8875_BLACK);
 
-        EEPROMWrite();
-        IQChoice = 6;
+        //        EEPROMWrite();
+        IQChoice = 6; // AFP 2-11-23
         break;
       }
     }
@@ -271,9 +259,6 @@ void DoXmitCalibrate() {
   centerTuneFlag = 1;
   RedrawDisplayScreen();
 }
-
-
-
 
 /*****
   Purpose: Combined input/ output for the purpose of calibrating the transmit IQ
@@ -289,7 +274,10 @@ void DoXmitCalibrate() {
 void ProcessIQData2()
 {
   uint32_t N_BLOCKS_EX = N_B_EX;
-
+  float bandCouplingFactor[5] = {0.5, 0.5, 0.35, 0.15, 0.5}; // AFP 2-11-23
+  float bandOutputFactor; // AFP 2-11-23
+  float rfGainValue;   // AFP 2-11-23
+  float recBandFactor[5] = {1.0, 1.0, 10.0, 10.0, 10.0}; // AFP 2-11-23
   /**********************************************************************************  AFP 12-31-20
         Get samples from queue buffers
         Teensy Audio Library stores ADC data in two buffers size=128, Q_in_L and Q_in_R as initiated from the audio lib.
@@ -299,15 +287,36 @@ void ProcessIQData2()
         BUFFER_SIZE*N_BLOCKS = 2024 samples
      **********************************************************************************/
 
-  arm_scale_f32 (cosBuffer3, 0.01, float_buffer_L_EX, 256);  // AFP 10-24-22 Use pre-calculated sin & cos instead of Hilbert
-  arm_scale_f32 (sinBuffer3, 0.01, float_buffer_R_EX, 256);  // AFP 10-34-22
+  bandOutputFactor = bandCouplingFactor[currentBandA] * CWPowerCalibrationFactor[currentBandA] / CWPowerCalibrationFactor[1]; //AFP 2-7-23
+  if (IQChoice == 2) {
+
+    arm_scale_f32 (cosBuffer4, bandOutputFactor, float_buffer_L_EX, 256);  // // AFP 2-11-23 Use pre-calculated sin & cos instead of Hilbert
+    arm_scale_f32 (sinBuffer4, bandOutputFactor, float_buffer_R_EX, 256);  // // AFP 2-11-23 Sidetone = 375
+    if (bands[currentBandA].mode == DEMOD_LSB) {
+    
+      arm_scale_f32 (float_buffer_L_EX, -IQAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);  //Adjust level of L buffer // AFP 2-11-23
+      IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);  // Adjust phase
+    } else {
+      if (bands[currentBandA].mode == DEMOD_USB) {
+        arm_scale_f32 (float_buffer_L_EX, IQAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256); // AFP 2-11-23
+        IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
+      }
+    }
+
+
+  } else {
+    if (IQChoice == 3) {
+      arm_scale_f32 (cosBuffer3, bandOutputFactor, float_buffer_L_EX, 256);  // AFP 2-11-23 Use pre-calculated sin & cos instead of Hilbert
+      arm_scale_f32 (sinBuffer3, bandOutputFactor, float_buffer_R_EX, 256);  // AFP 2-11-23 Sidetone = 3000
+    }
+  }
   //float rfGainValue;
   if (bands[currentBandA].mode == DEMOD_LSB) {
-    arm_scale_f32 (float_buffer_L_EX, IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);  //Adjust level of L buffer
+    arm_scale_f32 (float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);  //Adjust level of L buffer // AFP 2-11-23
     IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);  // Adjust phase
   } else {
     if (bands[currentBandA].mode == DEMOD_USB) {
-      arm_scale_f32 (float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);
+      arm_scale_f32 (float_buffer_L_EX, IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256); // AFP 2-11-23
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
     }
   }
@@ -322,8 +331,8 @@ void ProcessIQData2()
 
 
   //  192KHz effective sample rate here
-  arm_scale_f32(float_buffer_L_EX, 20, float_buffer_L_EX, 2048); //Scale to compensate for losses in Interpolation
-  arm_scale_f32(float_buffer_R_EX, 20, float_buffer_R_EX, 2048);
+  //arm_scale_f32(float_buffer_L_EX, 10, float_buffer_L_EX, 2048); //Scale to compensate for losses in Interpolation
+  //arm_scale_f32(float_buffer_R_EX, 10, float_buffer_R_EX, 2048);
 
 
   // are there at least N_BLOCKS buffers in each channel available ?
@@ -359,6 +368,15 @@ void ProcessIQData2()
       SetFreq();            //AFP 10-04-22
     }                       //AFP 10-04-22
     centerTuneFlag = 0;     //AFP 10-04-22
+    rfGainValue = pow(10, (float)rfGainAllBands / 20); //AFP 2-11-23
+    arm_scale_f32 (float_buffer_L, rfGainValue, float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 2-11-23
+    arm_scale_f32 (float_buffer_R, rfGainValue, float_buffer_R, BUFFER_SIZE * N_BLOCKS); //AFP 2-11-23
+
+    /**********************************************************************************  AFP 12-31-20
+      Scale the data buffers by the RFgain value defined in bands[currentBand] structure
+    **********************************************************************************/
+    arm_scale_f32 (float_buffer_L, recBandFactor[currentBand], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 2-11-23
+    arm_scale_f32 (float_buffer_R, recBandFactor[currentBand], float_buffer_R, BUFFER_SIZE * N_BLOCKS); //AFP 2-11-23
 
     // Manual IQ amplitude correction
     if (bands[currentBandA].mode == DEMOD_LSB) {
@@ -366,7 +384,7 @@ void ProcessIQData2()
       IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBandA], BUFFER_SIZE * N_BLOCKS);
     } else {
       if (bands[currentBandA].mode == DEMOD_USB) {
-        arm_scale_f32 (float_buffer_L, -IQAmpCorrectionFactor[currentBandA], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 04-14-22
+        arm_scale_f32 (float_buffer_L, IQAmpCorrectionFactor[currentBandA], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 04-14-22
         IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBandA], BUFFER_SIZE * N_BLOCKS);
       }
     }
@@ -406,38 +424,20 @@ void ProcessIQData2()
   Return value;
     void
 *****/
-void ShowSpectrum2()  //AFP Extensively Modified 3-15-21 Adjusted 12-13-21 to align all elements
+void ShowSpectrum2()  //AFP 2-10-23
 {
   int centerLine              =  (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
   int x1                      = 0;
+  //==== // AFP 2-11-23
   float adjdB = 0.0;
-  float adjAmplitudeLSB = 0.0;
-  float refAmplitudeLSB = 0.0;
-  float adjAmplitudeUSB = 0.0;
-  float refAmplitudeUSB = 0.0;
+  float adjAmplitude = 0.0;
+  float refAmplitude = 0.0;
 
+  //=========== // AFP 2-11-23
   tft.drawFastVLine(centerLine, SPECTRUM_TOP_Y, h, RA8875_GREEN);     // Draws centerline on spectrum display
-  tft.writeTo(L2);
- if(calTypeFlag == 0){
-  if (bands[currentBandA].mode == DEMOD_LSB) {
-    tft.fillRect(centerLine - 191, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
-  } else {
-    if (bands[currentBandA].mode == DEMOD_USB) {
-      tft.fillRect(centerLine - 209, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
-    }
-  }
- } else {
-  if(calTypeFlag == 1){
-     if (bands[currentBandA].mode == DEMOD_LSB) {
-    tft.fillRect(centerLine +35, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
-  } else {
-    if (bands[currentBandA].mode == DEMOD_USB) {
-      tft.fillRect(centerLine - 51, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
-    }
-  } 
-  }
- }
-  tft.writeTo(L1);
+
+
+  //tft.writeTo(L1);
   pixelnew[0] = 0;
   pixelnew[1] = 0;
   pixelold[0] = 0;
@@ -455,28 +455,41 @@ void ShowSpectrum2()  //AFP Extensively Modified 3-15-21 Adjusted 12-13-21 to al
     y1_new = pixelnew[x1 - 1];
     y_old  = pixelold[x1];
     y_old2 = pixelold[x1 - 1];
+
+    //================= // AFP 2-11-23
     if (calTypeFlag == 0) {  // Receive Cal
-      if (x1 == 186) refAmplitudeLSB = y_new ;
-      if (x1 == 70) adjAmplitudeLSB = y_new ;
-      if (x1 == 198) refAmplitudeUSB = y_new ;
-      if (x1 == 58) adjAmplitudeUSB = y_new ;
+      if (bands[currentBandA].mode == DEMOD_LSB) {
+        if (x1 == 319) refAmplitude = y_new ;
+        if (x1 == 449) adjAmplitude = y_new ;
+      } else {
+        if (bands[currentBandA].mode == DEMOD_USB) {
+          if (x1 == 61) refAmplitude = y_new ;
+          if (x1 == 195) adjAmplitude = y_new ;
+        }
+      }
     } else {
       if (calTypeFlag == 1) {  //Transmit Cal
-        if (x1 == 232) refAmplitudeLSB = y_new ;
-        if (x1 == 296) adjAmplitudeLSB = y_new ;
-        if (x1 == 280) refAmplitudeUSB = y_new ;
-        if (x1 == 216) adjAmplitudeUSB = y_new ;
+        if (bands[currentBandA].mode == DEMOD_LSB) {
+          if (x1 == 240) refAmplitude = y_new ;
+          if (x1 == 304) adjAmplitude = y_new ;
+        } else {
+          if (bands[currentBandA].mode == DEMOD_USB) {
+            if (x1 == 272) refAmplitude = y_new ;
+            if (x1 == 208) adjAmplitude = y_new ;
+          }
+        }
       }
     }
+    //=== // AFP 2-11-23
     if (y_new > base_y)      y_new = base_y;
     if (y_old > base_y)      y_old = base_y;
-    if (y_old2 > base_y)     y_old2 = base_y;
-    if (y1_new > base_y)     y1_new = base_y;
+    if (y_old2 > base_y)    y_old2 = base_y;
+    if (y1_new > base_y)    y1_new = base_y;
 
-    if (y_new < 0)            y_new = 0;
-    if (y_old < 0)            y_old = 0;
-    if (y_old2 < 0)          y_old2 = 0;
-    if (y1_new < 0)          y1_new = 0;
+    if (y_new < 0)           y_new = 0;
+    if (y_old < 0)           y_old = 0;
+    if (y_old2 < 0)         y_old2 = 0;
+    if (y1_new < 0)         y1_new = 0;
 
     //====== CW Receive code AFP 08-04-22  =================
     if (xmtMode == SSB_MODE) {
@@ -493,20 +506,35 @@ void ShowSpectrum2()  //AFP Extensively Modified 3-15-21 Adjusted 12-13-21 to al
         tft.drawLine(x1 - 1 , spectrumNoiseFloor - y1_new, x1 - 1 , spectrumNoiseFloor - y_new , RA8875_YELLOW); // Draw new
       }
     }
-  }
-  //tft.setFontScale( (enum RA8875tsize) 0);
-  tft.fillRect(350, 125, 50, tft.getFontHeight(), RA8875_BLACK);
-  if (bands[currentBandA].mode == DEMOD_LSB) {
-    adjdB = (adjAmplitudeLSB - refAmplitudeLSB ) / 1.95;
-  } else {
-    if (bands[currentBandA].mode == DEMOD_USB) {
-      adjdB = (adjAmplitudeUSB - refAmplitudeUSB ) / 1.95;
+
+    //===  AFP 2-11-23
+    if (calTypeFlag == 0) {  // Receive Cal
+      adjdB = (adjAmplitude - refAmplitude ) / 1.95;
+      tft.writeTo(L2);
+      if (bands[currentBandA].mode == DEMOD_LSB) {
+        tft.fillRect(449 - 5, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
+      } else {
+        tft.fillRect(195 - 9, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
+      }
+      //tft.writeTo(L1);
+    } else { //Transmit Cal
+      adjdB = (adjAmplitude - refAmplitude ) / 1.95;
+      tft.writeTo(L2);
+      if (bands[currentBandA].mode == DEMOD_LSB) {
+        tft.fillRect(304 - 7, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
+      } else {
+        if (bands[currentBandA].mode == DEMOD_USB) {   //mode == DEMOD_LSB
+          tft.fillRect(208 - 10, SPECTRUM_TOP_Y, 20, h + 10, DARK_RED);
+        }
+        //tft.writeTo(L1);
+      }
     }
+    tft.writeTo(L1);
   }
-  //tft.setTextColor(RA8875_CYAN);
+  //= AFP 2-11-23
+  tft.fillRect(350, 125, 50, tft.getFontHeight(), RA8875_BLACK);
   tft.setCursor(350, 125);
   tft.print(adjdB, 1);
-
 
   tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
   while (tft.readStatus());

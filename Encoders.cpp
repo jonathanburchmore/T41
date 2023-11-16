@@ -92,11 +92,9 @@ void FilterSetSSB()
 void EncoderCenterTune()
 {
   long tuneChange = 0L;
-  //  long oldFreq    = centerFreq;
-
   unsigned char result  = tuneEncoder.process();   // Read the encoder
 
-  if (result == 0)                                // Nothing read
+  if (result == 0)                                 // Nothing read
     return;
 
   centerTuneFlag = 1; //AFP 10-03-22
@@ -104,25 +102,20 @@ void EncoderCenterTune()
   if (T41State == CW_XMIT && decoderFlag == DECODE_ON) {        // No reason to reset if we're not doing decoded CW AFP 09-27-22
     ResetHistograms();
   }
-
-  switch (result) {
-    case DIR_CW:                                  // Turned it clockwise, 16
-      tuneChange = 1L;
-      break;
-
-    case DIR_CCW:                                 // Turned it counter-clockwise
-      tuneChange = -1L;
-      break;
+  if (result == DIR_CW) {
+    tuneChange = 1L;
+  } else {
+    tuneChange = -1L;
   }
-  //  newFreq = (long)freqIncrement * tuneChange;
 
   centerFreq += ((long)freqIncrement * tuneChange);                    // tune the master vfo
-
 
   //  if (centerFreq != oldFreq) {           // If the frequency has changed...
   //=== AFP 10-19-22
 
   TxRxFreq = centerFreq + NCOFreq;
+  lastFrequencies[currentBand][activeVFO] = TxRxFreq;
+
   //currentFreqA= centerFreq + NCOFreq;
   DrawBandWidthIndicatorBar(); // AFP 10-20-22
   //FilterOverlay(); // AFP 10-20-22
@@ -284,7 +277,7 @@ int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, c
 int SetWPM()
 {
   int val;
-  long lastWPM     = currentWPM;
+  long lastWPM = currentWPM;
 
   tft.setFontScale( (enum RA8875tsize) 1);
 
@@ -310,7 +303,7 @@ int SetWPM()
       filterEncoderMove = 0;
     }
 
-    val = ReadSelectedPushButton();                                  // Read pin that controls all switches
+    val = ReadSelectedPushButton();                              // Read pin that controls all switches
     val = ProcessButtonPress(val);
     if (val == MENU_OPTION_SELECT) {                             // Make a choice??
       currentWPM = lastWPM;
@@ -366,7 +359,7 @@ long SetTransmitDelay()                               // new function JJP 9/1/22
     if (val == MENU_OPTION_SELECT) {                             // Make a choice??
       cwTransmitDelay = lastDelay;
       EEPROMData.cwTransmitDelay = cwTransmitDelay;
-      EEPROMWrite();
+      //      EEPROMWrite();
       break;
     }
   }
@@ -389,6 +382,7 @@ void EncoderFineTune()
   char result;
 
   result = fineTuneEncoder.process();       // Read the encoder
+//  MyDelay(50L);
   if (result == 0) {                        // Nothing read
     fineTuneEncoderMove = 0L;
     return;
@@ -402,10 +396,14 @@ void EncoderFineTune()
   //if (spectrum_zoom == 0) {
   NCOFreq += stepFT * fineTuneEncoderMove; //AFP 11-01-22
   centerTuneFlag = 1;
+  SubFineTune();
+}
 
+void SubFineTune()
+{
   // ============  AFP 10-28-22
   if (activeVFO == VFO_A) {
-    currentFreqA = centerFreq + NCOFreq;   //AFP 10-05-22
+    currentFreqA = centerFreq + NCOFreq;   //AFP 10-05-22   
   } else {
     currentFreqB = centerFreq + NCOFreq;  //AFP 10-05-22
   }
@@ -413,16 +411,35 @@ void EncoderFineTune()
   if (spectrum_zoom != 0) {
     if (NCOFreq > (95000 / (1 << spectrum_zoom)) || NCOFreq < (-93000 / (1 << spectrum_zoom))) {
       NCOFreq    = 0L;
-      centerFreq = TxRxFreq = currentFreqA;
+      if (activeVFO == VFO_A) {                           // JJP 2/25/23
+        centerFreq = TxRxFreq = currentFreqA;             // JJP 2/25/23
+        lastFrequencies[currentBand][VFO_A] = TxRxFreq;  // JJP 2/25/23
+      } else {                                            // JJP 2/25/23
+        centerFreq = TxRxFreq = currentFreqB;             // JJP 2/25/23    
+        lastFrequencies[currentBand][VFO_B] = TxRxFreq;  // JJP 2/25/23
+      }
     }
   } else {
     if (NCOFreq > (142000) || NCOFreq < (-43000)) {  // Offset tuning window in zoom 1x
       NCOFreq    = 0L;
-      centerFreq = TxRxFreq = currentFreqA;  //AFP 10-28-22
+      if (activeVFO == VFO_A) {                           // JJP 2/25/23
+        centerFreq = TxRxFreq = currentFreqA;             // JJP 2/25/23
+        lastFrequencies[currentBand][VFO_A] = TxRxFreq;  // JJP 2/25/23
+      } else {                                            // JJP 2/25/23
+        centerFreq = TxRxFreq = currentFreqB;             // JJP 2/25/23    
+        lastFrequencies[currentBand][VFO_B] = TxRxFreq;  // JJP 2/25/23
+      }
     }
     centerTuneFlag = 1;
   }
   fineTuneEncoderMove = 0L;
+  if (activeVFO == VFO_A) {
+    TxRxFreq = currentFreqA;
+    lastFrequencies[currentBand][VFO_A] = TxRxFreq;  // JJP 2/25/23
+  } else {
+    TxRxFreq = currentFreqB;
+    lastFrequencies[currentBand][VFO_B] = TxRxFreq;  // JJP 2/25/23
+  }
 }
 FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
 

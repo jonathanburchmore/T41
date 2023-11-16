@@ -2,13 +2,13 @@
 #define BEENHERE
 
 //======================================== Library include files ========================================================
+#include <stdint.h>
 #include <Adafruit_GFX.h>
 #include "Fonts/FreeMonoBold24pt7b.h"
 #include "Fonts/FreeMonoBold18pt7b.h"
 #include "Fonts/FreeMono24pt7b.h"
 #include "Fonts/FreeMono9pt7b.h"
-#include <Audio.h>
-//=== Extended Audio Library  https://github.com/chipaudette/OpenAudio_ArduinoLibrary
+#include <Audio.h>                                  //https://github.com/chipaudette/OpenAudio_ArduinoLibrary
 #include <OpenAudio_ArduinoLibrary.h>               // AFP 11-01-22
 #include <TimeLib.h>                                // Part of Teensy Time library
 #include <Wire.h>
@@ -28,27 +28,30 @@
 #include <util/crc16.h>                             // mdrhere
 #include <utility/imxrt_hw.h>                       // for setting I2S freq, Thanks, FrankB!
 #include <EEPROM.h>
+
 //======================================== Symbolic Constants for Debugging and Version Control ========================
-#define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
-
-#define VERSION                     "V040"
-#define RIGNAME                     "T41-EP SDT"
-#define NUMBER_OF_SWITCHES          18            // Number of push button switches. 16 on older boards
-#define TOP_MENU_COUNT              12            // Menus to process AFP 09-27-22
-#define SPLASH_DELAY                1000L         // Probably should be 4000 to actually read it
-#define RIGNAME_X_OFFSET            570           // Pixel count to rig name field                                       // Says we are using a Teensy 4 or 4.1
-#define RA8875_DISPLAY              1             // Comment out if not using RA8875 display
-#define TEMPMON_ROOMTEMP            25.0f
-
-//#define STORE_SWITCH_VALUES                       // Uncomment to save the analog switch values for your push button matrix
-
-#define OFF                         0
-#define ON                          1
+#define DEBUG 		                                  // Uncommented for debugging
+#define SD_CARD_PRESENT             1               // Comment out if no SD card in system
 
 //================================ mapping globals and Symbolic constants ================
 #define MAP_FILE_NAME               "HomeLocationOriginalResizeBy4.bmp"  // Put name of your BMP map here
 #define MY_LON                     -84.42677                             // Put you longitude here
 #define MY_LAT                      39.07466                             //          latitde
+//========================================================================================
+
+#define VERSION                     "V042"
+#define RIGNAME                     "T41-EP SDT"
+#define NUMBER_OF_SWITCHES          18              // Number of push button switches. 16 on older boards
+#define TOP_MENU_COUNT              12              // Menus to process AFP 09-27-22
+#define SPLASH_DELAY                1000L           // Probably should be 4000 to actually read it
+#define RIGNAME_X_OFFSET            570             // Pixel count to rig name field                                       // Says we are using a Teensy 4 or 4.1
+#define RA8875_DISPLAY              1               // Comment out if not using RA8875 display
+#define TEMPMON_ROOMTEMP            25.0f
+
+//#define STORE_SWITCH_VALUES                       // Uncomment to save the analog switch values for your push button matrix
+#define OFF                         0
+#define ON                          1
+
 #define CENTER_SCREEN_X             387
 #define CENTER_SCREEN_Y             240
 #define IMAGE_CORNER_X              190 // ImageWidth = 378 Therefore 800 - 378 = 422 / 2 = 211
@@ -59,7 +62,6 @@
 #define DEGREES2RADIANS             0.01745329
 #define RADIANS2DEGREES             57.29578
 #define PI_BY_180                   0.01745329
-#define SD_CARD_PRESENT             1
 #define NO_SD_CARD_PRESENT          0
 #define VALID_EEPROM_DATA           1
 #define INVALID_EEPROM_DATA         0
@@ -322,7 +324,9 @@
 
 #define DEFAULTFREQINCREMENT        1000L       //Values 10, 50, 100, 250, 1000, 10000  AFP 09-26-22
 #define FAST_TUNE_INCREMENT         50L
-#define DEFAULTFREQINDEX            4           //  Index 10Hz=> 0, 50Hz=> 1, 100Hz=> 2, 250Hz=> 3, 1000Hz=> 4, 10000Hz=> 5  AFP 09-26-22
+#define DEFAULTFREQINDEX            4           //  Index 10Hz=> 0, 50Hz=> 1, 100Hz=> 2, 250Hz=> 3, 
+                                                //  1000Hz=> 4, 10000Hz=> 5, 100000=> 6, 1000000=> 7 
+#define MAX_FREQ_INDEX              8
 #define TEMPMON_ROOMTEMP            25.0f
 #define MAX_WPM                     60
 #define MAX_TONE                    1000
@@ -665,6 +669,7 @@ extern uint32_t corrResultIndex;  //AFP 02-02-22
 extern float32_t sinBuffer[];    //AFP 02-02-22
 extern float32_t sinBuffer2[];
 extern float32_t sinBuffer3[];
+extern float32_t sinBuffer4[];
 extern float32_t float_Corr_Buffer[];   //AFP 02-02-22
 extern float32_t aveCorrResult;   //AFP 02-02-22
 extern float32_t magFFTResults[];
@@ -673,7 +678,9 @@ extern int audioTemp;
 extern int audioTempPrevious;
 extern int filterWidth;
 extern int filterWidthX;                                           // The current filter X.
-extern int filterWidthY;                                           // The current filter Y.
+extern int filterWidthY;    
+extern int x1AdjMax; //AFP 2-6-23
+// The current filter Y.
 extern float sigStart;
 extern float sigDuration;
 extern float gapStartData;
@@ -1253,6 +1260,13 @@ struct dispSc
   uint16_t    baseOffset;
   float32_t   offsetIncrement;
 };
+struct cities {
+  char callPrefix[12];
+  char country[30];
+  double lat;
+  double lon;
+};
+extern struct cities dxCities[];
 
 extern struct dispSc displayScale[];
 
@@ -1496,6 +1510,7 @@ extern int helpyear;
 extern int helpsec;
 extern int idx, idpk;
 extern int IQChoice;
+extern int IQCalType;
 extern int IQEXChoice;
 extern int lidx, hidx;
 extern int keyType;
@@ -1729,7 +1744,8 @@ extern float32_t coefficient_set[];
 extern float32_t corr[];
 extern float32_t Cos;
 extern float32_t cosBuffer2[];  //AFP 08-18-22
-extern float32_t cosBuffer3[];  //AFP 10-31-22
+extern float32_t cosBuffer3[];  //AFP 10-31-2
+extern float32_t cosBuffer4[];  //AFP 2-7-23
 extern float32_t CPU_temperature ;
 extern float32_t cursorIncrementFraction;
 extern float32_t CWPowerCalibrationFactor[]; //AFP 10-21-22
@@ -1750,7 +1766,6 @@ extern float32_t dsQ;
 extern float32_t fast_backaverage;
 extern float32_t fast_backmult;
 extern float32_t fast_decay_mult;
-extern float32_t farnsworthValue;
 extern float32_t FFT_spec[];
 extern float32_t FFT_spec_old[];
 extern float32_t fil_out;
@@ -2033,8 +2048,7 @@ void CalcCplxFIRCoeffs(float * coeffs_I, float * coeffs_Q, int numCoeffs, float3
 void CalcNotchBins();
 void Calculatedbm();
 void CaptureKeystrokes();
-
-int  CalibrateOptions(); // AFP 10-22-22
+int  CalibrateOptions(int IQChoice); // AFP 10-22-22, changed JJP 2/3/23
 int  CalibrateFrequency();
 void CenterFastTune();
 void ClearEEPROM();
@@ -2220,6 +2234,7 @@ void sineTone(long freqSideTone);
 void SpectralNoiseReduction(void);
 void SpectralNoiseReductionInit();
 void Splash();
+void SubFineTune();
 int  SubmenuSelect(const char *options[], int numberOfChoices, int defaultStart);
 
 void T4_rtc_set(unsigned long t);

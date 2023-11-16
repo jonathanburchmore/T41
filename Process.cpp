@@ -201,7 +201,7 @@ void ProcessIQData()
      **********************************************************************************/
     //============================== AFP 10-22-22  Begin new
     if (calibrateFlag == 1) {
-      CalibrateOptions();
+      CalibrateOptions(IQChoice);
     }
 
     //============================== AFP 10-21-22  End new
@@ -491,7 +491,7 @@ void ProcessIQData()
       // ----------------------  CW Narrow band filters  AFP 10-18-22 -------------------------
       if (CWFilterIndex != 5) {
         switch (CWFilterIndex) {
-          case 0:  // 0.8 KHz
+          case 0:  // 0.84 KHz
             arm_biquad_cascade_df2T_f32(&S1_CW_AudioFilter1, float_buffer_L, float_buffer_L_AudioCW, 256);//AFP 10-18-22
             arm_copy_f32(float_buffer_L_AudioCW, float_buffer_L, FFT_length / 2);                         //AFP 10-18-22
             arm_copy_f32(float_buffer_L_AudioCW, float_buffer_R, FFT_length / 2);

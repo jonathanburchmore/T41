@@ -20,6 +20,8 @@
 *****/
 void SelectCWFilter()
 {
+  const char* CWFilter[] = {"840Hz", "1.0kHz", "1.3kHz", "1.8kHz", "2.0kHz", "Off"};
+  
   CWFilterIndex = SubmenuSelect(CWFilter, 6, 0);
   RedrawDisplayScreen();
 }

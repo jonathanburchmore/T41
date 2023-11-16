@@ -1,4 +1,3 @@
-
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
@@ -80,16 +79,6 @@ void ExecuteButtonPress(int val)
   }
   switch (val) {
     case MENU_OPTION_SELECT:                                     // 0
-      /*                                    Useful comment in understanding how menues align:
-        const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",      "NR Set",   "IQ Manual",
-                               "EQ Rec Set", "EQ Xmt Set",   "Mic Comp", "Calibrate Freq", "Noise Floor",
-                               "RF Set",     "VFO Select",   "EEPROM",
-                              };
-
-        int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions, &IQOptions,
-                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &CalibrateFrequency, &ButtonSetNoiseFloor,
-                               &RFOptions, &VFOSelect, &EEPROMOptions
-                              };      */
 
       if (menuStatus == PRIMARY_MENU_ACTIVE) {                             // Doing primary menu
         ErasePrimaryMenu();
@@ -214,14 +203,14 @@ void ExecuteButtonPress(int val)
       break;
 
     case UNUSED_2:                                                // 17  // AFP 10-11-22
+#ifdef SD_CARD_PRESENT
       int buttonIndex, doneViewing, valPin;
-
+    
       MyDelay(100L);
       DrawKeyboard();
       CaptureKeystrokes();
       BearingHeading(keyboardBuffer);
-//      bmpDraw( (char *) "HomeLocationOriginalResizeBy4.bmp", IMAGE_CORNER_X, IMAGE_CORNER_Y);
-      bmpDraw( (char *) MAP_FILE_NAME, IMAGE_CORNER_X, IMAGE_CORNER_Y);
+      bmpDraw( (char *) MAP_FILE_NAME, IMAGE_CORNER_X, IMAGE_CORNER_Y); // MAP_FILE_NAME = "HomeLocationOriginalResizeBy4.bmp"
       doneViewing = false;
       while (true) {
         valPin = ReadSelectedPushButton();                        // Poll UI push buttons
@@ -248,7 +237,12 @@ void ExecuteButtonPress(int val)
       RedrawDisplayScreen();
       ShowFrequency();
       DrawFrequencyBarValue();
-
+#else
+      tft.setCursor(80, 2);
+      tft.setTextColor(RA8875_RED);
+      tft.print("No SD card");
+      return;
+#endif
       break;
 
     default:
@@ -270,7 +264,7 @@ void ButtonFreqIncrement()
 {
   tuneIndex--;
   if (tuneIndex < 0)
-    tuneIndex = 5;
+    tuneIndex = MAX_FREQ_INDEX - 1;
   freqIncrement = incrementValues[tuneIndex];
   UpdateIncrementField();
 }
@@ -288,7 +282,7 @@ void ButtonFreqIncrement()
 void NoActiveMenu()
 {
   tft.setFontScale( (enum RA8875tsize) 1);
-  tft.setTextColor(RA8875_RED);
+  tft.setTextColor(RED);
   tft.setCursor(10, 0);
   tft.print("No menu selected");
 

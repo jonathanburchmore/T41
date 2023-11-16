@@ -140,9 +140,8 @@ void EEPROMRead()
   lastFrequencies[4][1]      = EEPROMData.lastFrequencies[4][1];
   lastFrequencies[5][1]      = EEPROMData.lastFrequencies[5][1];
   lastFrequencies[6][1]      = EEPROMData.lastFrequencies[6][1];
-
-  centerFreq                 = EEPROMData.lastFrequencies[currentBandA][activeVFO]; // 4 bytes
-
+  
+  centerFreq                 = EEPROMData.lastFrequencies[currentBand][activeVFO]; // 4 bytes
 }
 
 
@@ -161,7 +160,7 @@ void EEPROMWrite()
 
   EEPROMData.AGCMode                    = AGCMode;
   EEPROMData.CWFilterIndex              = CWFilterIndex;
-  EEPROMData.nrOptionSelect             = nrOptionSelect;     // 1 byte
+  EEPROMData.nrOptionSelect             = nrOptionSelect;     
   EEPROMData.rfGainAllBands             = rfGainAllBands;
 
   EEPROMData.activeVFO                  = activeVFO;  // 2 bytes
@@ -227,7 +226,9 @@ void EEPROMWrite()
   EEPROMData.lastFrequencies[currentBand][activeVFO]  = currentFreq;   // 4 bytes
   EEPROMData.lastFrequencies[currentBandA][VFO_A]     = currentFreqA;     // 4 bytes
   EEPROMData.lastFrequencies[currentBandB][VFO_B]     = currentFreqB;     // 4 bytes
-
+  EEPROMData.freqCorrectionFactor                     = freqCorrectionFactor;
+  
+  EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);
   CopyEEPROMToSD();
   syncEEPROM = 0;                                                   // SD EEPROM different that memory EEPROM
   EEPROMSyncIndicator(0);
@@ -386,6 +387,7 @@ void EEPROMShow()
 void EEPROMSaveDefaults()
 {
   strncpy(EEPROMData.versionSettings, VERSION, sizeof(EEPROMData.versionSettings)); // Update version
+  
   EEPROMData.AGCMode                    = 1;      // 1 byte
   EEPROMData.audioVolume                = 30;     // 4 bytes
   EEPROMData.rfGainAllBands             = 1;
@@ -485,37 +487,37 @@ void EEPROMSaveDefaults()
   EEPROMData.SSBPowerCalibrationFactor[6]   = 0.022;   //AFP 10-29-22
 
   //----- I/Q Calibration Parameters -----
-  EEPROMData.IQAmpCorrectionFactor[0]            = 1.008;
-  EEPROMData.IQAmpCorrectionFactor[1]            = 1.027;
-  EEPROMData.IQAmpCorrectionFactor[2]            = 1.057;
-  EEPROMData.IQAmpCorrectionFactor[3]            = 1.061;
-  EEPROMData.IQAmpCorrectionFactor[4]            = 1.06;
-  EEPROMData.IQAmpCorrectionFactor[5]            = 1.092;
-  EEPROMData.IQAmpCorrectionFactor[6]            = 1.105;
+  EEPROMData.IQAmpCorrectionFactor[0]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[1]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[2]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[3]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[4]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[5]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[6]            = 1.0;
 
-  EEPROMData.IQPhaseCorrectionFactor[0]          = 0.003;
-  EEPROMData.IQPhaseCorrectionFactor[1]          = 0.007;
-  EEPROMData.IQPhaseCorrectionFactor[2]          = -0.027;
-  EEPROMData.IQPhaseCorrectionFactor[3]          = -0.041;
-  EEPROMData.IQPhaseCorrectionFactor[4]          = -0.047;
-  EEPROMData.IQPhaseCorrectionFactor[5]          = -0.032;
-  EEPROMData.IQPhaseCorrectionFactor[6]          = -0.044;
+  EEPROMData.IQPhaseCorrectionFactor[0]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[1]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[2]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[3]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[4]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[5]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[6]          = 0.0;
 
-  EEPROMData.IQXAmpCorrectionFactor[0]           = 1.098;
-  EEPROMData.IQXAmpCorrectionFactor[1]           = 1.043;
-  EEPROMData.IQXAmpCorrectionFactor[2]           = 0.956;
-  EEPROMData.IQXAmpCorrectionFactor[3]           = 0.956;
-  EEPROMData.IQXAmpCorrectionFactor[4]           = 0.741;
-  EEPROMData.IQXAmpCorrectionFactor[5]           = 0.9;
-  EEPROMData.IQXAmpCorrectionFactor[6]           = 0.9;
+  EEPROMData.IQXAmpCorrectionFactor[0]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[1]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[2]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[3]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[4]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[5]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[6]           = 1.0;
 
-  EEPROMData.IQXPhaseCorrectionFactor[0]        = 0.021;
-  EEPROMData.IQXPhaseCorrectionFactor[1]        = 0.239;
-  EEPROMData.IQXPhaseCorrectionFactor[2]        = 0.581;
-  EEPROMData.IQXPhaseCorrectionFactor[3]        = 0.887;
-  EEPROMData.IQXPhaseCorrectionFactor[4]        = 0.891;
-  EEPROMData.IQXPhaseCorrectionFactor[5]        = 0.75;
-  EEPROMData.IQXPhaseCorrectionFactor[6]        = 0.75;
+  EEPROMData.IQXPhaseCorrectionFactor[0]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[1]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[2]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[3]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[4]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[5]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[6]        = 0.0;
   //----- Favorite Frequencies -----
   EEPROMData.favoriteFreqs[0]                =  3560000;             // These are CW/SSB calling frequencies for HF bands
   EEPROMData.favoriteFreqs[1]                =  3690000;
@@ -550,7 +552,7 @@ void EEPROMSaveDefaults()
 
   EEPROMData.centerFreq            = EEPROMData.lastFrequencies[currentBand][activeVFO];   // 4 bytes
 
-  //  EEPROM.put(0, EEPROMData);
+  EEPROM.put(0, EEPROMData);
   if (sdCardPresent == 1) {                         // No SD card
     syncEEPROM = 0;                                 // SD EEPROM may be different that memory EEPROM
     EEPROMSyncIndicator(0);
@@ -630,7 +632,7 @@ void SetFavoriteFrequency()
       } else {
         currentFreqB = TxRxFreq;
       }
-      EEPROMWrite();
+//      EEPROMWrite();
       SetFreq();
       BandInformation();
       ShowBandwidth();
@@ -825,8 +827,8 @@ void CopyEEPROM()
     powerOutSSB[i]                        = EEPROMData.powerOutSSB[i];     // 4 bytes AFP 10-28-22
     IQAmpCorrectionFactor[i]              = EEPROMData.IQAmpCorrectionFactor[i];
     IQPhaseCorrectionFactor[i]            = EEPROMData.IQPhaseCorrectionFactor[i];
-    IQXAmpCorrectionFactor[i]             = EEPROMData.IQXAmpCorrectionFactor[i];
-    IQXPhaseCorrectionFactor[i]           = EEPROMData.IQXPhaseCorrectionFactor[i];
+    IQXAmpCorrectionFactor[i]             = EEPROMData.IQXAmpCorrectionFactor[i]; //AFP 2-21-23
+    IQXPhaseCorrectionFactor[i]           = EEPROMData.IQXPhaseCorrectionFactor[i]; //AFP 2-21-23
   }
 
   if (EEPROMData.lastFrequencies[0][1] < 3560000L || EEPROMData.lastFrequencies[0][0] > 3985000L) {  // Already set?
@@ -970,37 +972,37 @@ void EEPROMSaveDefaults2()
   EEPROMData.SSBPowerCalibrationFactor[5]  = 0.020;   //AFP 10-29-22
   EEPROMData.SSBPowerCalibrationFactor[6]  = 0.022;   //AFP 10-29-22
 
-  EEPROMData.IQAmpCorrectionFactor[0]            = 1.008;
-  EEPROMData.IQAmpCorrectionFactor[1]            = 1.027;
-  EEPROMData.IQAmpCorrectionFactor[2]            = 1.057;
-  EEPROMData.IQAmpCorrectionFactor[3]            = 1.061;
-  EEPROMData.IQAmpCorrectionFactor[4]            = 1.06;
-  EEPROMData.IQAmpCorrectionFactor[5]            = 1.092;
-  EEPROMData.IQAmpCorrectionFactor[6]            = 1.105;
+  EEPROMData.IQAmpCorrectionFactor[0]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[1]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[2]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[3]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[4]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[5]            = 1.0;
+  EEPROMData.IQAmpCorrectionFactor[6]            = 1.0;
 
-  EEPROMData.IQPhaseCorrectionFactor[0]          = 0.003;
-  EEPROMData.IQPhaseCorrectionFactor[1]          = 0.007;
-  EEPROMData.IQPhaseCorrectionFactor[2]          = -0.027;
-  EEPROMData.IQPhaseCorrectionFactor[3]          = -0.041;
-  EEPROMData.IQPhaseCorrectionFactor[4]          = -0.047;
-  EEPROMData.IQPhaseCorrectionFactor[5]          = -0.032;
-  EEPROMData.IQPhaseCorrectionFactor[6]          = -0.044;
+  EEPROMData.IQPhaseCorrectionFactor[0]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[1]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[2]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[3]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[4]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[5]          = 0.0;
+  EEPROMData.IQPhaseCorrectionFactor[6]          = 0.0;
 
-  EEPROMData.IQXAmpCorrectionFactor[0]           = 1.098;
-  EEPROMData.IQXAmpCorrectionFactor[1]           = 1.043;
-  EEPROMData.IQXAmpCorrectionFactor[2]           = 0.956;
-  EEPROMData.IQXAmpCorrectionFactor[3]           = 0.956;
-  EEPROMData.IQXAmpCorrectionFactor[4]           = 0.741;
-  EEPROMData.IQXAmpCorrectionFactor[5]           = 0.9;
-  EEPROMData.IQXAmpCorrectionFactor[6]           = 0.9;
+  EEPROMData.IQXAmpCorrectionFactor[0]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[1]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[2]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[3]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[4]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[5]           = 1.0;
+  EEPROMData.IQXAmpCorrectionFactor[6]           = 1.0;
 
-  EEPROMData.IQXPhaseCorrectionFactor[0]        = 0.021;
-  EEPROMData.IQXPhaseCorrectionFactor[1]        = 0.239;
-  EEPROMData.IQXPhaseCorrectionFactor[2]        = 0.581;
-  EEPROMData.IQXPhaseCorrectionFactor[3]        = 0.887;
-  EEPROMData.IQXPhaseCorrectionFactor[4]        = 0.891;
-  EEPROMData.IQXPhaseCorrectionFactor[5]        = 0.75;
-  EEPROMData.IQXPhaseCorrectionFactor[6]        = 0.75;
+  EEPROMData.IQXPhaseCorrectionFactor[0]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[1]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[2]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[3]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[4]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[5]        = 0.0;
+  EEPROMData.IQXPhaseCorrectionFactor[6]        = 0.0;
 
   EEPROMData.favoriteFreqs[0]                =  3560000L;             // These are CW/SSB calling frequencies for HF bands
   EEPROMData.favoriteFreqs[1]                =  3690000L;
@@ -1056,18 +1058,18 @@ int CopySDToEEPROM()
   char character;
   char line[150];
   char *target;
-  char temp[25];
+  char temp[50];
   int index = 0;
   int lineCount = 0;
 
-  if (!SD.begin(chipSelect)) {          // SD failed
+  if (!SD.begin(chipSelect)) {        // SD failed
     // don't do anything more:
-    return 0;                           // Go home and report it
+    return 0;                         // Go home and report it
   }
 
   File file = SD.open("SDEEPROMData.txt", FILE_READ); // Try to open file...
   if (file == 0) {
-    return 0;                           // Could not get a file handle, so go home and report it
+    return 0;                         // Could not get a file handle, so go home and report it
   }
 
   while (file.available() > 0) {
@@ -1619,7 +1621,7 @@ void EEPROMSyncIndicator(int inSync)
     tft.setTextColor(RA8875_WHITE);
     tft.print("EEPROM");
   } else {                                                                  // Erase message
-    tft.fillRect(BAND_INDICATOR_X + 167, BAND_INDICATOR_Y + 70, tft.getFontWidth() * 7, tft.getFontHeight(), RA8875_BLACK);
+    tft.fillRect(BAND_INDICATOR_X + 167, BAND_INDICATOR_Y + 70, tft.getFontWidth() * 5, tft.getFontHeight(), RA8875_BLACK);
   }
 }
 
@@ -2243,9 +2245,9 @@ int CopyEEPROMToSD()
     return 0;                                                             // Go home
   }
   file.seek(0L);                                        // Reset to BOF so we don't append
-  strcpy(temp, "EEPROMData.versionSettings = ");
-  strcat(temp, VERSION);
-  file.println(temp);
+  strcpy(buffer, "EEPROMData.versionSettings = ");
+  strcat(buffer, VERSION);
+  file.println(buffer);
 
   strcpy(buffer, "EEPROMData.AGCMode = ");
   itoa(AGCMode, temp, DEC);
@@ -2938,6 +2940,7 @@ int CopyEEPROMToSD()
   Return value;
     int               0 = no valid data, 1 = valid data
 *****/
+/*
 int SDDataCheck()
 {
   char buffer[100], c = '\0';
@@ -2965,7 +2968,7 @@ int SDDataCheck()
   file.seek(0L);                                        // Reset to BOF so we don't append
   return 1;
 }
-
+*/
 /*****
   Purpose: See if the EEPROM has ever been set
 
@@ -3007,6 +3010,7 @@ void UpdateEEPROMVersionNumber()
   Return value;
     int               0 = SD is untouched, 1 = has data
 *****/
+/*
 int FirstTimeSDCard()
 {
   char c = '\0';
@@ -3036,7 +3040,7 @@ int FirstTimeSDCard()
     return 0;                                           // There's no data on the card
   }
 }
-
+*/
 
 /*****
   Purpose: Reads the SD EEPROM data and writes it to the Serial object
@@ -3068,7 +3072,6 @@ void SDEEPROMDump()
   }
 }
 
-
 /*****
   Purpose: Clears the first 1K of emulated EEPROM to 0xff
 
@@ -3097,22 +3100,25 @@ void ClearEEPROM()
 *****/
 void EEPROMStartup()
 {
-  int len;
-
   EEPROMRead();
+/*
+Serial.print("EEPROMData.versionSettings = |");
+Serial.print(EEPROMData.versionSettings);
+Serial.println("|");
+Serial.print("VERSION = |");
+Serial.print(VERSION);
+Serial.println("|");
+*/
   if (strcmp(EEPROMData.versionSettings, VERSION) == 0) {     // Up to date?
     return;                                                   // Yep.
   }
+  strcpy(EEPROMData.versionSettings, VERSION);              // Update the version, but leave everything else unchanged
 
-  len = strlen(EEPROMData.versionSettings);
-
-  if (len > 5 && len < 8) {                                   // See if versions match
-    strcpy(EEPROMData.versionSettings, VERSION);              // Update the version, but leave everything else unchanged
-    return;
-  }
   EEPROMSaveDefaults();                                       // Write the defaults so at least the radio can function
   SaveAnalogSwitchValues();
   EEPROMRead();
+  EEPROM.put(0, EEPROMData);
+  
   CopyEEPROMToSD();
 #ifdef DEBUG1
   SDEEPROMDump();

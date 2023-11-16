@@ -106,13 +106,17 @@ void ShowSpectrum()  //AFP Extensively Modified 3-15-21 Adjusted 12-13-21 to ali
   {
     if (x1 == 1) {
       updateDisplayFlag = 1;      //Set flag so the display data are saved only once during each display refresh cycle at the start of the cycle, not 512 times
+    }  else {
+      updateDisplayFlag = 0;      //  Do not save the the display data for the remainder of the     
     }
-    else updateDisplayFlag = 0;   //  Do not save the the display data for the remainder of the
     FilterSetSSB();               // Insert Filter encoder update here  AFP 06-22-22
+   
     if (T41State == SSB_RECEIVE || T41State == CW_RECEIVE ) { // AFP 08-24-22
-      ProcessIQData();              // Call the Audio process from within the display routine to eliminate conflicts with drawing the spectrum and waterfall displays
+      ProcessIQData();            // Call the Audio process from within the display routine to eliminate conflicts with drawing the spectrum and waterfall displays
     }
-    EncoderCenterTune();                //Moved the tuning encoder to reduce lag times and interference during tuning.
+    
+    EncoderCenterTune();          // Moved the tuning encoder to reduce lag times and interference during tuning.
+    
     y_new  = pixelnew[x1];
     y1_new = pixelnew[x1 - 1];
     y_old  = pixelold[x1];
@@ -144,7 +148,6 @@ void ShowSpectrum()  //AFP Extensively Modified 3-15-21 Adjusted 12-13-21 to ali
         tft.drawLine(x1  , spectrumNoiseFloor - y1_new, x1  , spectrumNoiseFloor - y_new , RA8875_YELLOW); // Draw new
       }
     }
-
     //============= End new code
     if (x1 < 253) { //AFP 09-01-22
       if ( keyPressedOn == 1) {//AFP 09-01-22
@@ -916,11 +919,11 @@ void UpdateIncrementField()
   tft.setTextColor(RA8875_WHITE);                                 // Frequency increment
   tft.setCursor(INCREMENT_X, INCREMENT_Y);
   tft.print("Increment: ");
-  tft.setCursor(INCREMENT_X + 140, INCREMENT_Y);
-  tft.print("FT Incr: ");
+  tft.setCursor(INCREMENT_X + 148, INCREMENT_Y);
+  tft.print("FT Inc: ");
 
-  tft.fillRect(INCREMENT_X + 90, INCREMENT_Y, tft.getFontWidth() * 6, tft.getFontHeight(), RA8875_BLACK);
-  tft.setCursor(FIELD_OFFSET_X, INCREMENT_Y);
+  tft.fillRect(INCREMENT_X + 90, INCREMENT_Y, tft.getFontWidth() * 7, tft.getFontHeight(), RA8875_BLACK);
+  tft.setCursor(FIELD_OFFSET_X - 3, INCREMENT_Y);
   tft.setTextColor(RA8875_GREEN);
   tft.print(freqIncrement);
 
@@ -1163,7 +1166,7 @@ void SetFavoriteFrequencies()
     selectExitMenues.update();                            // Exit submenu button
     if (selectExitMenues.fallingEdge()) {
       EEPROMData.favoriteFreqs[index] = currentFreq;      // Update the EEPROM value
-      EEPROMWrite();                                      // Save it
+///      EEPROMWrite();                                      // Save it
       break;
     }
   }
