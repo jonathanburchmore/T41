@@ -120,6 +120,7 @@ void CalibratePrologue() {
   calOnFlag = 0;
   radioState = CW_RECEIVE_STATE;  // KF5N
   SetFreq();                      // Return Si5351 to normal operation mode.  KF5N
+  lastState = 1111;  // This is required due to the function deactivating the receiver.  This forces a pass through the receiver set-up code.  KF5N October 16, 2023
   return;
 }
 

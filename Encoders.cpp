@@ -136,6 +136,7 @@ void EncoderCenterTune() {
   //  }
 }
 
+
 /*****
   Purpose: Encoder volume control
 
@@ -148,6 +149,8 @@ void EncoderCenterTune() {
 void EncoderVolume()  //============================== AFP 10-22-22  Begin new
 {
   char result;
+  int increment [[maybe_unused]] = 0;
+
   result = volumeEncoder.process();  // Read the encoder
 
   if (result == 0) {  // Nothing read
@@ -162,20 +165,29 @@ void EncoderVolume()  //============================== AFP 10-22-22  Begin new
       adjustVolEncoder = -1;
       break;
   }
-  audioVolume += adjustVolEncoder;
+  audioVolume += adjustVolEncoder; 
+  // simulate log taper.  As we go higher in volume, the increment increases.
 
-  if (audioVolume > 100) {  // In range?
-    audioVolume = 100;
-  } else {
-    if (audioVolume < 0) {
-      audioVolume = 0;
-    }
+  if (audioVolume < (MIN_AUDIO_VOLUME + 10)) increment = 2;
+  else if (audioVolume < (MIN_AUDIO_VOLUME + 20)) increment = 3;
+  else if (audioVolume < (MIN_AUDIO_VOLUME + 30)) increment = 4;
+  else if (audioVolume < (MIN_AUDIO_VOLUME + 40)) increment = 5;
+  else if (audioVolume < (MIN_AUDIO_VOLUME + 50)) increment = 6;
+  else if (audioVolume < (MIN_AUDIO_VOLUME + 60)) increment = 7;
+  else increment = 8;
+
+
+  if (audioVolume > MAX_AUDIO_VOLUME) {
+    audioVolume = MAX_AUDIO_VOLUME;
+  } else  {
+    if (audioVolume < MIN_AUDIO_VOLUME) 
+      audioVolume = MIN_AUDIO_VOLUME;
   }
-  //set flags for IC calibration
 
   volumeChangeFlag = true;  // Need this because of unknown timing in display updating.
 
 }  //============================== AFP 10-22-22  End new
+
 
 /*****
   Purpose: Use the encoder to change the value of a number in some other function

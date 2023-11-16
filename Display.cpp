@@ -57,7 +57,12 @@ void ShowName() {
   tft.setCursor(RIGNAME_X_OFFSET - 20, 1);
   tft.print(RIGNAME);
   tft.setFontScale(0);
-  tft.print(" ");  // Added to correct for deleted leading space 4/16/2022 JACK
+  tft.print(" ");                  // Added to correct for deleted leading space 4/16/2022 JACK
+#ifdef FOURSQRP                    // Give visual indication that were using the 4SQRP code.  W8TEE October 11, 2023.
+  tft.setTextColor(RA8875_GREEN);  // Make it green
+#else
+  tft.setTextColor(RA8875_RED);  // Make it red
+#endif
   tft.print(VERSION);
 }
 
@@ -263,6 +268,12 @@ void ShowBandwidth() {
   tft.writeTo(L1);
 }
 
+//DB2OO, 30-AUG-23: this variable determines the pixels per S step. In the original code it was 12.2 pixels !?
+#ifdef TCVSDR_SMETER
+const float pixels_per_s = 12;
+#else
+const float pixels_per_s = 12.2;
+#endif
 /*****
   Purpose: DrawSMeterContainer()
   Parameter list:
@@ -272,40 +283,53 @@ void ShowBandwidth() {
 *****/
 void DrawSMeterContainer() {
   int i;
+  // DB2OO, 30-AUG-23: the white line must only go till S9
+  tft.drawFastHLine(SMETER_X, SMETER_Y - 1, 9 * pixels_per_s, RA8875_WHITE);
+  tft.drawFastHLine(SMETER_X, SMETER_Y + SMETER_BAR_HEIGHT+2, 9 * pixels_per_s, RA8875_WHITE);  // changed 6 to 20
 
-  tft.drawFastHLine(SMETER_X, SMETER_Y - 1, 12 * s_w, RA8875_WHITE);
-  tft.drawFastHLine(SMETER_X, SMETER_Y + 20, 12 * s_w, RA8875_WHITE);  // changed 6 to 20
-
-  for (i = 0; i < 10; i++) {                                                // Draw tick marks
-    tft.drawFastVLine(SMETER_X + i * 12.2, SMETER_Y - 6, 7, RA8875_WHITE);  // charge 8 to 18
+  for (i = 0; i < 10; i++) {                                                // Draw tick marks for S-values
+#ifdef TCVSDR_SMETER
+    //DB2OO, 30-AUG-23: draw wider tick marks in the style of the Teensy Convolution SDR
+    tft.drawRect(SMETER_X + i * pixels_per_s, SMETER_Y - 6-(i%2)*2, 2, 6+(i%2)*2, RA8875_WHITE);
+#else      
+    tft.drawFastVLine(SMETER_X + i * 12.2, SMETER_Y - 6, 7, RA8875_WHITE);
+#endif    
   }
 
-  tft.drawFastHLine(SMETER_X + 120, SMETER_Y - 1, 62, RA8875_GREEN);
-  tft.drawFastHLine(SMETER_X + 120, SMETER_Y + 20, 62, RA8875_GREEN);
+  // DB2OO, 30-AUG-23: the green line must start at S9
+  tft.drawFastHLine(SMETER_X + 9*pixels_per_s, SMETER_Y - 1, SMETER_BAR_LENGTH+2-9*pixels_per_s, RA8875_GREEN);
+  tft.drawFastHLine(SMETER_X + 9*pixels_per_s, SMETER_Y + SMETER_BAR_HEIGHT+2, SMETER_BAR_LENGTH+2-9*pixels_per_s, RA8875_GREEN);
 
-  for (i = 0; i < 5; i++) {                                                     // Draw tick marks
-    tft.drawFastVLine(SMETER_X + 120 + i * 12, SMETER_Y - 6, 7, RA8875_GREEN);  // charge 8 to 18
+  for (i = 1; i <= 3; i++) {                                                     // Draw tick marks for s9+ values in 10dB steps
+#ifdef TCVSDR_SMETER
+    //DB2OO, 30-AUG-23: draw wider tick marks in the style of the Teensy Convolution SDR
+    tft.drawRect(SMETER_X + 9*pixels_per_s + i * pixels_per_s*10.0/6.0, SMETER_Y - 8+(i%2)*2, 2, 8-(i%2)*2, RA8875_GREEN);
+#else      
+    tft.drawFastVLine(SMETER_X + 9*pixels_per_s + i * pixels_per_s*10.0/6.0, SMETER_Y - 6, 7, RA8875_GREEN);  
+#endif
   }
 
-  tft.drawFastVLine(SMETER_X, SMETER_Y - 1, 20, RA8875_WHITE);  // charge 8 to 18
-  tft.drawFastVLine(SMETER_X + 182, SMETER_Y - 1, 20, RA8875_GREEN);
+  tft.drawFastVLine(SMETER_X, SMETER_Y - 1, SMETER_BAR_HEIGHT+3, RA8875_WHITE);  
+  tft.drawFastVLine(SMETER_X + SMETER_BAR_LENGTH+2, SMETER_Y - 1, SMETER_BAR_HEIGHT+3, RA8875_GREEN);
 
   tft.setFontScale((enum RA8875tsize)0);
 
   tft.setTextColor(RA8875_WHITE);
-  tft.setCursor(SMETER_X - 10, SMETER_Y - 25);
+  //DB2OO, 30-AUG-23: moved single digits a bit to the right, to align 
+  tft.setCursor(SMETER_X - 8, SMETER_Y - 25);
   tft.print("S");
-  tft.setCursor(SMETER_X + 7, SMETER_Y - 25);
+  tft.setCursor(SMETER_X + 8, SMETER_Y - 25);
   tft.print("1");
-  tft.setCursor(SMETER_X + 31, SMETER_Y - 25);  // was 28, 48, 68, 88, 120 and -15 changed to -20
+  tft.setCursor(SMETER_X + 32, SMETER_Y - 25);  // was 28, 48, 68, 88, 120 and -15 changed to -20
   tft.print("3");
-  tft.setCursor(SMETER_X + 55, SMETER_Y - 25);
+  tft.setCursor(SMETER_X + 56, SMETER_Y - 25);
   tft.print("5");
-  tft.setCursor(SMETER_X + 79, SMETER_Y - 25);
+  tft.setCursor(SMETER_X + 80, SMETER_Y - 25);
   tft.print("7");
-  tft.setCursor(SMETER_X + 103, SMETER_Y - 25);
+  tft.setCursor(SMETER_X + 104, SMETER_Y - 25);
   tft.print("9");
-  tft.setCursor(SMETER_X + 145, SMETER_Y - 25);
+  //DB2OO, 30-AUG-23 +20dB needs to get more left
+  tft.setCursor(SMETER_X + 133, SMETER_Y - 25);
   tft.print("+20dB");
 
   DrawFrequencyBarValue();
@@ -648,7 +672,7 @@ void FormatFrequency(long freq, char *freqBuffer) {
       for (i = 4; i < len; i++) {
         freqBuffer[i] = outBuffer[i - 1];  // Next 3 digit chars
       }
-      freqBuffer[i] = '0';  // trailing 0
+      freqBuffer[i] = '0';       // trailing 0
       freqBuffer[i + 1] = '\0';  // Make it a string
       break;
 
@@ -796,22 +820,69 @@ void DisplaydbM() {
   char buff[10];
   const char *unit_label;
   int16_t smeterPad;
+#ifdef TCVSDR_SMETER
+  const float32_t slope = 10.0;
+  const float32_t cons = -92;
+#else
   float32_t audioLogAveSq;
-  float32_t slope = 10.0;
-  float32_t cons = -92;
+#endif
 
-  audioLogAveSq = 10 * log10f_fast(audioMaxSquaredAve) + 10;                                      //AFP 09-18-22
-  smeterPad = map(audioLogAveSq, 5, 35, 575, 635);                                                //AFP 09-18-22
+  //DB2OO, 30-AUG-23: the S-Meter bar and the dBm value were inconsistent, as they were using different base values.
+  // Moreover the bar could go over the limits of the S-meter box, as the map() function, does not constrain the values
+  // with TCVSDR_SMETER defined the S-Meter bar will be consistent with the dBm value and the S-Meter bar will always be restricted to the box
   tft.fillRect(SMETER_X + 1, SMETER_Y + 1, SMETER_BAR_LENGTH, SMETER_BAR_HEIGHT, RA8875_BLACK);   //AFP 09-18-22  Erase old bar
-  tft.fillRect(SMETER_X + 1, SMETER_Y + 1, smeterPad - SMETER_X, SMETER_BAR_HEIGHT, RA8875_RED);  //AFP 09-18-22
-  dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)attenuator + slope * log10f_fast(audioMaxSquaredAve) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
+#ifdef TCVSDR_SMETER
+  //DB2OO, 9-OCT_23: dbm_calibration set to -22 in SDT.ino; gainCorrection is a value between -2 and +6 to compensate the frequency dependant pre-Amp gain
+  // attenuator is 0 and could be set in a future HW revision; RFgain is initialized to 1 in the bands[] init in SDT.ino; cons=-92; slope=10
+  dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)attenuator + slope * log10f_fast(audioMaxSquaredAve) + 
+        cons - (float32_t)bands[currentBand].RFgain * 1.5 - rfGainAllBands; //DB2OO, 08-OCT-23; added rfGainAllBands
+#else
+  //DB2OO, 9-OCT-23: audioMaxSquaredAve is proportional to the input power. With rfGainAllBands=0 it is approx. 40 for -73dBm @ 14074kHz with the V010 boards and the pre-Amp fed by 12V
+  // for audioMaxSquaredAve=40 audioLogAveSq will be 26
+  audioLogAveSq = 10 * log10f_fast(audioMaxSquaredAve) + 10;                                      //AFP 09-18-22
+  //DB2OO, 9-OCT-23: calculate dBm value from audioLogAveSq and ignore band gain differences and a potential attenuator like in original code
+  dbm = audioLogAveSq - 100;
+
+//DB2OO, 9-OCT-23: this is the orginal code, that will map a 30dB difference (35-5) to 60 (635-575) pixels, i.e. 5 S steps to 5*12 pixels
+// SMETER_X is 528 --> X=635 would be 107 pixels / 12pixels per S step --> approx. S9
+//  smeterPad = map(audioLogAveSq, 5, 35, 575, 635);                                                //AFP 09-18-22
+//  tft.fillRect(SMETER_X + 1, SMETER_Y + 1, smeterPad - SMETER_X, SMETER_BAR_HEIGHT, RA8875_RED);  //AFP 09-18-22
+#endif
+  // determine length of S-meter bar, limit it to the box and draw it
+  smeterPad = map(dbm, -73.0-9*6.0 /*S1*/, -73.0 /*S9*/, 0, 9*pixels_per_s);
+  //DB2OO; make sure, that it does not extend beyond the field
+  smeterPad = max(0, smeterPad);
+  smeterPad = min(SMETER_BAR_LENGTH, smeterPad);
+  tft.fillRect(SMETER_X + 1, SMETER_Y + 2, smeterPad, SMETER_BAR_HEIGHT-2, RA8875_RED); //DB2OO: bar 2*1 pixel smaller than the field
+
   tft.setTextColor(RA8875_WHITE);
+
+  //DB2OO, 17-AUG-23: create PWM analog output signal on the "HW_SMETER" output. This is scaled for a 250uA  S-meter full scale, 
+  // connected to HW_SMTER output via a 8.2kOhm resistor and a 4.7kOhm resistor and 10uF capacitor parallel to the S-Meter
+#ifdef HW_SMETER
+  { int hw_s;
+    hw_s = map((int)dbm-3, -73-(8*6), -73+60, 0, 228);
+    hw_s = max(0, min(hw_s, 255));
+    analogWrite(HW_SMETER, hw_s);
+  }
+#endif
+
+// DB2OO, 13-OCT-23: if DEBUG_SMETER defined debug messages on S-Meter variables will be put out 
+//#define DEBUG_SMETER
+
+#ifdef DEBUG_SMETER
+//added, to debug S-Meter display problems
+  Serial.printf("DisplaydbM(): dbm=%.1f, dbm_calibration=%.1f, bands[currentBand].gainCorrection=%.1f, attenuator=%d, bands[currentBand].RFgain=%d, rfGainAllBands=%d\n", 
+                                dbm, dbm_calibration, bands[currentBand].gainCorrection, attenuator, bands[currentBand].RFgain, rfGainAllBands);
+  Serial.printf("\taudioMaxSquaredAve=%.4f, audioLogAveSq=%.1f\n", audioMaxSquaredAve, audioLogAveSq);
+#endif
 
   unit_label = "dBm";
   tft.setFontScale((enum RA8875tsize)0);
 
-  tft.fillRect(SMETER_X + 185, SMETER_Y, 80, tft.getFontHeight(), RA8875_BLACK);  // The dB figure at end of S meter
-  MyDrawFloat(dbm, 1, SMETER_X + 184, SMETER_Y, buff);
+  tft.fillRect(SMETER_X + 185, SMETER_Y, 80, tft.getFontHeight(), RA8875_BLACK);  // The dB figure at end of S 
+  //DB2OO, 29-AUG-23: consider no decimals in the S-meter dBm value as it is very busy with decimals
+  MyDrawFloat(dbm, /*0*/ 1, SMETER_X + 184, SMETER_Y, buff);
   tft.setTextColor(RA8875_GREEN);
   tft.print(unit_label);
 }
@@ -938,8 +1009,10 @@ void UpdateVolumeField() {
   tft.setCursor(FIELD_OFFSET_X, BAND_INDICATOR_Y);
   tft.print(audioVolume);
 }
+
+
 /*****
-  Purpose: Updates the AGC on the display
+  Purpose: Updates the AGC on the display.  Long option added. G0ORX September 6, 2023
 
   Parameter list:
     void
@@ -948,8 +1021,8 @@ void UpdateVolumeField() {
     void
 *****/
 void UpdateAGCField() {
-  tft.fillRect(AGC_X_OFFSET, AGC_Y_OFFSET, 100, tft.getFontHeight(), RA8875_BLACK);
   tft.setFontScale((enum RA8875tsize)1);
+  tft.fillRect(AGC_X_OFFSET, AGC_Y_OFFSET, tft.getFontWidth() * 6, tft.getFontHeight(), RA8875_BLACK);
   tft.setCursor(BAND_INDICATOR_X + 150, BAND_INDICATOR_Y);
   switch (AGCMode) {  // The opted for AGC
     case 0:           // Off
@@ -960,17 +1033,23 @@ void UpdateAGCField() {
       tft.print(" off");
       tft.setFontScale((enum RA8875tsize)1);
       break;
-    case 1:  // Slow
+
+    case 1:  // Long
+      tft.setTextColor(RA8875_YELLOW);
+      tft.print("AGC L");
+      break;
+
+    case 2:  // Slow
       tft.setTextColor(RA8875_WHITE);
       tft.print("AGC S");
       break;
 
-    case 2:  // Medium
+    case 3:  // Medium
       tft.setTextColor(ORANGE);
       tft.print("AGC M");
       break;
 
-    case 3:  // Fast
+    case 4:  // Fast
       tft.setTextColor(RA8875_GREEN);
       tft.print("AGC F");
       break;
@@ -978,9 +1057,9 @@ void UpdateAGCField() {
     default:
       break;
   }
-  //tft.setCursor(BAND_INDICATOR_X + 180, BAND_INDICATOR_Y);
-  //tft.print("AGC");
 }
+
+
 /*****
   Purpose: Updates the increment setting on the display
 
@@ -1086,6 +1165,8 @@ void UpdateZoomField() {
   tft.setTextColor(RA8875_GREEN);
   tft.print(zoomOptions[zoomIndex]);
 }
+
+
 /*****
   Purpose: Updates the compression setting in Info Window
 
@@ -1095,17 +1176,25 @@ void UpdateZoomField() {
   Return value;
     void
 *****/
-void UpdateCompressionField() {
-  tft.fillRect(COMPRESSION_X, COMPRESSION_Y, 200, 8, RA8875_BLACK);
-
+void UpdateCompressionField()  // JJP 8/26/2023
+{
+  tft.fillRect(COMPRESSION_X, COMPRESSION_Y, 200, 15, RA8875_BLACK);
   tft.setFontScale((enum RA8875tsize)0);
   tft.setTextColor(RA8875_WHITE);  // Display zoom factor
   tft.setCursor(COMPRESSION_X, COMPRESSION_Y);
-  tft.print("Compress: ");
+  tft.print("Compress:");
   tft.setCursor(FIELD_OFFSET_X, COMPRESSION_Y);
   tft.setTextColor(RA8875_GREEN);
-  tft.print(currentMicThreshold);
+  if (compressorFlag == 1) {  // JJP 8/26/2023
+    tft.print("On  ");
+    tft.print(currentMicThreshold);
+  } else {
+    tft.setCursor(FIELD_OFFSET_X, COMPRESSION_Y);
+    tft.print("Off");
+  }
 }
+
+
 /*****
   Purpose: Updates whether the decoder is on or off
 
@@ -1160,7 +1249,16 @@ void UpdateWPMField() {
   tft.setCursor(FIELD_OFFSET_X, WPM_Y);
   EEPROMData.currentWPM = currentWPM;
   if (EEPROMData.keyType == KEYER) {
-    tft.print("Paddles -- ");
+    //tft.print("Paddles -- "); // KD0RC
+    // KD0RC start
+    tft.print("Paddles ");
+    if (paddleFlip == 0) {
+      tft.print("R");
+    } else {
+      tft.print("L");
+    }
+    tft.print(" ");
+    // KD0RC end
     tft.print(EEPROMData.currentWPM);
   } else {
     tft.print("Straight Key");

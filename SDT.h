@@ -3,7 +3,7 @@
 
 //======================================== User section that might need to be changed ===================================
 #include "MyConfigurationFile.h"                                          // This file name should remain unchanged
-#define VERSION                     "V049.1"                               // Change this for updates. If you make this longer than 9 characters, brace yourself for surprises
+#define VERSION                     "V049.2"                               // Change this for updates. If you make this longer than 9 characters, brace yourself for surprises
 #define UPDATE_SWITCH_MATRIX        0                                     // 1 = Yes, redo the switch matrix values, 0 = leave switch matrix values as is from the last change
 struct maps {
   char mapNames[50];
@@ -233,6 +233,8 @@ extern struct maps myMapFiles[];
 #define SCALE_CONSTANT          (1.0 / (1.0 - ADAPTIVE_SCALE_FACTOR)) // Insure array has enough observations to scale
 #define FILTER_WIDTH            25                    // The default filter highlight in spectrum displah
 #define ZOOM_2X_BIN_COUNT       187.5                 // The 2x bin count for display
+#define MAX_AUDIO_VOLUME        100
+#define MIN_AUDIO_VOLUME         16                   //yours might be different. On my rig, this is where the band noise disappears.
 
 #define AUDIO_POST_PROCESSOR_BANDS  8                     // Number of audio segments
 #define EEPROM_FAVORITES_X          100
@@ -323,30 +325,27 @@ extern struct maps myMapFiles[];
 #define TFT_MISO                    12
 #define TFT_SCLK                    13
 #define TFT_RST                     255
-//========================================= Encoder pins
-#ifdef                              NORM_ENCODER
-#define VOLUME_ENCODER_A            2     // Volume encoder  
-#define VOLUME_ENCODER_B            3
-#define ENCODER3_ENCODER_A          4     // Fine Tune encoder 
-#define ENCODER3_ENCODER_B          5
-#define FILTER_ENCODER_A            15    // Filter encoder
-#define FILTER_ENCODER_B            14
-#define TUNE_ENCODER_A              16    // Tune encoder
-#define TUNE_ENCODER_B              17
+//========================================= Encoder pins  Jack Purdum W8TEE September 25, 2023
+#ifdef FOURSQRP
+    #define VOLUME_ENCODER_A          3
+    #define VOLUME_ENCODER_B          2
+    #define FILTER_ENCODER_A         14
+    #define FILTER_ENCODER_B         15
+    #define FINETUNE_ENCODER_A        5
+    #define FINETUNE_ENCODER_B        4
+    #define TUNE_ENCODER_A           17
+    #define TUNE_ENCODER_B           16
+#else
+    #define VOLUME_ENCODER_A          2
+    #define VOLUME_ENCODER_B          3
+    #define FILTER_ENCODER_A         15
+    #define FILTER_ENCODER_B         14
+    #define FINETUNE_ENCODER_A        4
+    #define FINETUNE_ENCODER_B        5
+    #define TUNE_ENCODER_A           16
+    #define TUNE_ENCODER_B           17
 #endif
-//  ====================== AFP 11-13-22 =============
-#ifdef                             FOURSQRP
-#define VOLUME_ENCODER_A            5     // Volume encoder  
-#define VOLUME_ENCODER_B            4
-#define ENCODER3_ENCODER_A          17    // Fine Tune encoder 
-#define ENCODER3_ENCODER_B          16
-#define FILTER_ENCODER_A            15    // Filter encoder
-#define FILTER_ENCODER_B            14
-#define TUNE_ENCODER_A              3    // Center Tune encoder
-#define TUNE_ENCODER_B              2
-#endif
-
-              
+             
 //========================================= Filter Board pins
 #define FILTERPIN80M                30    // 80M filter relay
 #define FILTERPIN40M                31    // 40M filter relay
@@ -1121,7 +1120,7 @@ extern struct config_t {
   int decoderFlag         = DECODER_STATE;            // JJP 7-3-23
   int keyType             = STRAIGHT_KEY_OR_PADDLES;  // straight key = 0, keyer = 1  JJP 7-3-23
   int currentWPM          = DEFAULT_KEYER_WPM;        // 4 bytes default = 15 JJP 7-3-23
-  float32_t sidetoneVolume= .001;                     // 4 bytes
+  float32_t sidetoneVolume = 20.0;                     // 4 bytes
   long cwTransmitDelay    = 750;                      // 4 bytes
 
   int activeVFO           = 0;                        // 2 bytes
@@ -1177,6 +1176,7 @@ extern struct config_t {
   float myLong                  = MY_LON;
   float myLat                   = MY_LAT;
   int currentNoiseFloor[NUMBER_OF_BANDS];             // JJP 7/17/23
+  int compressorFlag;                                 // JJP 8/28/23
 
 } EEPROMData;                                 //  Total:       438 bytes
 
@@ -1230,7 +1230,7 @@ struct band {
   int FLoCut;
   int RFgain;
   uint8_t band_type;
-  int gainCorrection; // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
+  float32_t gainCorrection; // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
   int AGC_thresh;
   int16_t pixel_offset;
 };
@@ -1944,6 +1944,7 @@ extern float32_t sample_meanLNew;
 extern float32_t sample_meanRNew;
 extern float32_t save_volts;
 extern float32_t sidetoneVolume;
+extern const float32_t volumeLog[101];
 extern float32_t slope_constant;
 extern float32_t spectrum_display_scale;          // 30.0
 extern float32_t stereo_factor;
@@ -2014,6 +2015,7 @@ extern double elapsed_micros_sum;
 //======================================== Function prototypes =========================================================
 
 void AGC();
+void AGCLoadValues(); // AGC fix.  G0ORX September 5, 2023
 int  AGCOptions();
 void AGCPrep();
 float32_t AlphaBetaMag(float32_t  inphase, float32_t  quadrature);
@@ -2157,6 +2159,8 @@ float32_t log10f_fast(float32_t X);
 void MainTune();
 int  MicOptions();
 int  ModeOptions();
+//DB2OO, 29-AUG-23: added
+void MorseCharacterClear(void);
 void MorseCharacterDisplay(char currentLetter);
 void MyDelay(unsigned long millisWait);
 void MyDrawFloat(float val, int decimals, int x, int y, char *buff);
@@ -2208,7 +2212,9 @@ void SetFreq();
 int  SetI2SFreq(int freq);
 void SetIIRCoeffs(float32_t f0, float32_t Q, float32_t sample_rate, uint8_t filter_type);
 void SetKeyType();
-void SetSidetoneVolume();
+void SetKeyPowerUp();
+void SetSidetoneVolume();  // Abandon this function if encoder-based sidetone volume works.  KF5N August 29, 2023
+void SetSideToneVolume();  // This function uses encoder to set sidetone volume.  KF5N August 29, 2023
 long SetTransmitDelay();
 void SetTransmitDitLength(int wpm);     // JJP 8/19/23
 void SetupMode(int sideBand);

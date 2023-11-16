@@ -13,7 +13,40 @@
   Any and all other uses, written or implied, by the GPLv3 license are forbidden without written 
   permission from from Jack Purdum, W8TEE, and Al Peter, AC8GY.
 
-V049.1 Aug 21, 2023, 2023 Greg Raven (KF5N)
+V049.2 October 16, 2023 Greg Raven (KF5N)
+  1. Changed folder to SDT and file to SDT.ino.
+  2. Mic compression indicator fixed.
+  3. Updates to fix remaining paddle flip issues.
+  4. Mic compressor fixes.
+  5. CW sidetone adjustment via encoder.
+  6. Changed volume control to logarithmic.
+  7. Changed instances of currentBandA to currentBand in CW Excite.
+  8. Removed Serial print statement.
+  9. Removed Serial print statements from volume control.
+ 10. Increased audio memory to 450.
+ 11. Working sidetone adjust with encoder.
+ 12. Perfect log responding volume control for sidetone.
+ 13. Inserted G0ORX main loop efficiency improvement.  Si5351 CLK2 is now set to PLLB.
+ 14. John G0ORX AGC enhancements.
+ 15. AGC updates.
+ 16. Fixed minor problem with RX/TX indicator showing TX coming out of setup().
+ 17. Added defines for ITU_REGION and TIME24H for internationalization. (DB2OO)
+ 18. S-Meter bar aligned to dBm value (DB2OO)
+ 19. Fixed override of EEPROM defaults in EEPROMRead(). (DB2OO)
+ 20. Jack changed encoder pins for 4SQRP.
+ 21. Changed ENCODER3_ENCODER_A/B to FINETUNE_ENCODER_A/B.
+ 22. Updated SetBandRelay() function to toggle only necessary GPOs.
+ 23. Fixed receiver outage after sidetone adjust.  Sidetone default = 50.0
+ 24. S-Meter: added debug code and rfGainAllBands (DB2OO)
+ 25. Add additional debug info in DisplaydbM() (DB2OO)
+ 26. Removed attribute DMAMEM from audioSpectBuffer because it breaks the S-meter.
+ 27. Added Jack's code to change color of version when running 4SQRP.
+ 28. Deleted increment variable in Encoders.cpp.  Was causing a compile warning.
+ 29. ITU_REGION set to 2, TCXO_25MHZ undefined, DEBUG_SMETER undefined.
+ 30. Added comments to ITU_REGION.
+ 31. Updated changes list in SDT.ino.  Added macro to increment variable in Encoders.cpp to eliminate warning.
+
+V049.1 Aug 21, 2023 Greg Raven (KF5N)
   1. Changed 3 instances of VFO_A to activeVFO in function ButtonFrequencyEntry().
   2. Added TxRxFreq = centerFreq to EEPROMRead() to fix frequency related bugs.
   3. Added clean-up code to CopySDtoEEPROM() in function EEPROMOptions().
@@ -464,18 +497,26 @@ struct maps myMapFiles[10] = {
   { "", 0.0, 0.0 }
 };
 
-
 bool save_last_frequency = false;
-struct band bands[NUMBER_OF_BANDS] = {  //AFP Changed 1-30-21
-  //freq    band low   band hi   name    mode      Low    Hi  Gain  type    gain  AGC   pixel
-  //                                             filter filter             correct     offset
-  3700000, 3500000, 4000000, "80M", DEMOD_LSB, -200, -3000, 1, HAM_BAND, 1, 30, 20,
-  7150000, 7000000, 7300000, "40M", DEMOD_LSB, -200, -3000, 1, HAM_BAND, 1, 30, 20,
-  14200000, 14000000, 14350000, "20M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 1, 30, 20,
-  18100000, 18068000, 18168000, "17M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 1, 30, 20,
-  21200000, 21000000, 21450000, "15M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 1, 30, 20,
-  24920000, 24890000, 24990000, "12M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 1, 30, 20,
-  28350000, 28000000, 29700000, "10M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 1, 30, 20
+struct band bands[NUMBER_OF_BANDS] = {  //AFP Changed 1-30-21 // G0ORX Changed AGC to 20
+//freq    band low   band hi   name    mode      Low    Hi  Gain  type    gain  AGC   pixel
+//                                             filter filter             correct     offset
+//DB2OO, 29-AUG-23: take ITU_REGION into account for band limits
+// and changed "gainCorrection" to see the correct dBm value on all bands.
+// Calibration done with TinySA as signal generator with -73dBm levels (S9) at the FT8 frequencies
+// with V010 QSD with the 12V mod of the pre-amp
+#if defined(ITU_REGION) && ITU_REGION == 1
+  3700000, 3500000, 3800000, "80M", DEMOD_LSB, -200, -3000, 1, HAM_BAND, -2.0, 20, 20,
+  7150000, 7000000, 7200000, "40M", DEMOD_LSB, -200, -3000, 1, HAM_BAND, -2.0, 20, 20,
+#else
+  3700000, 3500000, 4000000, "80M", DEMOD_LSB, -200, -3000, 1, HAM_BAND, -2.0, 20, 20,
+  7150000, 7000000, 7300000, "40M", DEMOD_LSB, -200, -3000, 1, HAM_BAND, -2.0, 20, 20,
+#endif
+  14200000, 14000000, 14350000, "20M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 2.0, 20, 20,
+  18100000, 18068000, 18168000, "17M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 2.0, 20, 20,
+  21200000, 21000000, 21450000, "15M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 5.0, 20, 20,
+  24920000, 24890000, 24990000, "12M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 6.0, 20, 20,
+  28350000, 28000000, 29700000, "10M", DEMOD_USB, 3000, 200, 1, HAM_BAND, 8.5, 20, 20
 };
 
 const char *topMenus[] = { "CW Options", "RF Set", "VFO Select",
@@ -614,7 +655,7 @@ Bounce KeyPin1 = Bounce(KEYER_DIT_INPUT_TIP, 5);
 Rotary volumeEncoder = Rotary(VOLUME_ENCODER_A, VOLUME_ENCODER_B);        //( 2,  3)
 Rotary tuneEncoder = Rotary(TUNE_ENCODER_A, TUNE_ENCODER_B);              //(16, 17)
 Rotary filterEncoder = Rotary(FILTER_ENCODER_A, FILTER_ENCODER_B);        //(15, 14)
-Rotary fineTuneEncoder = Rotary(ENCODER3_ENCODER_A, ENCODER3_ENCODER_B);  //( 4,  5)
+Rotary fineTuneEncoder = Rotary(FINETUNE_ENCODER_A, FINETUNE_ENCODER_B);  //( 4,  5)
 
 Metro ms_500 = Metro(500);  // Set up a Metro
 Metro ms_300000 = Metro(300000);
@@ -1278,7 +1319,7 @@ int ANR_in_idx = 0;
 int ANR_mask = ANR_dline_size - 1;
 int ANR_position = 0;
 int ANR_taps = 64;
-int attenuator;
+int attenuator = 0;
 int attack_buffsize;
 int audioVolume = 30;  // KF5N JJP 7/14/23
 int audioVolumeOld2 = 30;
@@ -1291,7 +1332,7 @@ int bandswitchPins[] = {
   28,  // 20M
   29,  // 17M
   29,  // 15M
-  0,   // 12M
+  0,   // 12M  Note that 12M and 10M both use the 10M filter, which is always in (no relay).  KF5N September 27, 2023.
   0    // 10M
 };
 int button9State;
@@ -1481,7 +1522,7 @@ uint64_t output12khz;
 unsigned long long Clk2SetFreq;                  // AFP 09-27-22
 unsigned long long Clk1SetFreq = 1000000000ULL;  // AFP 09-27-22
 unsigned long ditLength;
-unsigned long transmitDitLength;                  // JJP 8/19/23
+unsigned long transmitDitLength;  // JJP 8/19/23
 float dcfRefLevel;
 float CPU_temperature = 0.0;
 
@@ -1523,10 +1564,10 @@ float32_t attack_mult;
 float32_t audio;
 float32_t audiotmp = 0.0f;
 float32_t audiou;
-float32_t audioSpectBuffer[1024];
+float32_t audioSpectBuffer[1024];  // This can't be DMAMEM.  It will break the S-Meter.  KF5N October 10, 2023
 float32_t bass = 0.0;
 float32_t farnsworthValue;
-int currentMicThreshold = -18;
+int currentMicThreshold;  // Don't need to define here, will happen with EEPROMRead().  KF5N August 27, 2023
 float currentMicCompRatio = 5.0;
 float currentMicAttack = 0.1;
 float currentMicRelease = 2.0;
@@ -1835,6 +1876,18 @@ const float32_t sqrtHann[256] = {
   0.024637449, 0.01231966, 0
 };
 
+// Voltage in one-hundred 1 dB steps for volume control.
+const float32_t volumeLog[] = { 0.000010, 0.000011, 0.000013, 0.000014, 0.000016, 0.000018, 0.000020, 0.000022, 0.000025, 0.000028,
+                                0.000032, 0.000035, 0.000040, 0.000045, 0.000050, 0.000056, 0.000063, 0.000071, 0.000079, 0.000089,
+                                0.000100, 0.000112, 0.000126, 0.000141, 0.000158, 0.000178, 0.000200, 0.000224, 0.000251, 0.000282,
+                                0.000316, 0.000355, 0.000398, 0.000447, 0.000501, 0.000562, 0.000631, 0.000708, 0.000794, 0.000891,
+                                0.001000, 0.001122, 0.001259, 0.001413, 0.001585, 0.001778, 0.001995, 0.002239, 0.002512, 0.002818,
+                                0.003162, 0.003548, 0.003981, 0.004467, 0.005012, 0.005623, 0.006310, 0.007079, 0.007943, 0.008913,
+                                0.010000, 0.011220, 0.012589, 0.014125, 0.015849, 0.017783, 0.019953, 0.022387, 0.025119, 0.028184,
+                                0.031623, 0.035481, 0.039811, 0.044668, 0.050119, 0.056234, 0.063096, 0.070795, 0.079433, 0.089125,
+                                0.100000, 0.112202, 0.125893, 0.141254, 0.158489, 0.177828, 0.199526, 0.223872, 0.251189, 0.281838,
+                                0.316228, 0.354813, 0.398107, 0.446684, 0.501187, 0.562341, 0.630957, 0.707946, 0.794328, 0.891251, 1.000000 };
+
 double elapsed_micros_idx_t = 0;
 double elapsed_micros_mean;
 double elapsed_micros_sum;
@@ -1994,18 +2047,18 @@ float TGetTemp() {
 *****/
 float VolumeToAmplification(int volume) {
   float x = volume / 100.0f;  //"volume" Range 0..100
-
-#if 0
-  float a = 3.1623e-4;
-  float b = 8.059f;
-  float ampl = a * expf( b * x );
-  if (x < 0.1f) ampl *= x * 10.0f;
-#else
+                              //#if 0
+                              //  float a = 3.1623e-4;
+                              //  float b = 8.059f;
+                              //  float ampl = a * expf( b * x );
+                              //  if (x < 0.1f) ampl *= x * 10.0f;
+                              //#else
   //Approximation:
   float ampl = 5 * x * x * x * x * x;  //70dB
-#endif
+                                       //#endif
   return ampl;
 }
+
 
 // Teensy 4.0, 4.1
 /*****
@@ -2060,7 +2113,7 @@ int SetI2SFreq(int freq) {
 /*****
   Purpose: to cause a delay in program execution
 
-  Paramter list:
+  Parameter list:
     unsigned long millisWait    // the number of millseconds to wait
 
   Return value:
@@ -2075,66 +2128,48 @@ void MyDelay(unsigned long millisWait) {
 /*****
   Purpose: to collect array inits in one place
 
-  Paramter list:
+  Parameter list:
     void
 
   Return value:
     void
 *****/
 void InitializeDataArrays() {
-  /*
-  memset(FFT_spec_old,            0, SPECTRUM_RES * sizeof(FFT_spec_old[0]));
-  memset(pixelnew,                0, SPECTRUM_RES * sizeof(pixelold[0]));
-  memset(pixelold,                0, SPECTRUM_RES * sizeof(pixelold[0]));
-  memset(pixelold,                0, SPECTRUM_RES * sizeof(buffer_spec_FFT[0]));
-  memset(FFT_spec,                0, SPECTRUM_RES * 2 * sizeof(FFT_spec[0]));
-  memset(NR_FFT_buffer,           0, NR_FFT_L * sizeof(NR_FFT_buffer[0]));
-  memset(NR_output_audio_buffer,  0, NR_FFT_L * sizeof(NR_output_audio_buffer[0]));
-  memset(NR_last_iFFT_result,     0, NR_FFT_L * sizeof(NR_last_iFFT_result[0]));
-  memset(NR_last_sample_buffer_L, 0, NR_FFT_L * sizeof(NR_last_sample_buffer_L[0]));
-  memset(NR_last_sample_buffer_R, 0, NR_FFT_L * sizeof(NR_last_sample_buffer_R[0]));
-  memset(NR_M,                    0, NR_FFT_L * sizeof(NR_M[0]));
-  memset(NR_lambda,               0, NR_FFT_L * sizeof(NR_lambda[0]));
-  memset(NR_G,                    0, NR_FFT_L * sizeof(NR_G[0]));
-  memset(NR_SNR_prio,             0, NR_FFT_L * sizeof(NR_SNR_prio[0]));
-  memset(NR_SNR_post,             0, NR_FFT_L * sizeof(NR_SNR_post[0]));
-  memset(NR_Hk_old,               0, NR_FFT_L * sizeof(NR_Hk_old[0]));
-  memset(NR_X,                    0, NR_FFT_L / 2 * 3 * sizeof(NR_X[0]));
-  memset(NR_Nest,                 0, NR_FFT_L / 2 * 2 * sizeof(NR_Nest[0]));
-  memset(NR_Gts,                  0, NR_FFT_L / 2 * 2 * sizeof(NR_Gts[0]));
-  memset(NR_E,                    0, NR_FFT_L / 2 * NR_N_frames * sizeof(NR_E[0]));
-  memset(ANR_d,                   0, ANR_DLINE_SIZE * sizeof(ANR_d[0]));
-  memset(ANR_w,                   0, ANR_DLINE_SIZE * sizeof(ANR_w[0]));
-  memset(LMS_StateF32,            0, (MAX_LMS_TAPS + MAX_LMS_DELAY) * sizeof(LMS_StateF32[0]));
-  memset(LMS_NormCoeff_f32,       0, (MAX_LMS_TAPS + MAX_LMS_DELAY) * sizeof(LMS_NormCoeff_f32[0]));
-  memset(LMS_nr_delay,            0, (512 + MAX_LMS_DELAY) * sizeof(LMS_nr_delay[0]));
-*/
-  memset(FFT_spec_old, 0, 4096);            // SPECTRUM_RES = 512 * 4 = 2048
-  memset(pixelnew, 0, 1024);                // 512 * 2
-  memset(pixelold, 0, 1024);                // 512 * 2
-  memset(pixelCurrent, 0, 1024);            // 512 * 2  KF5N JJP  7/14/23
-  memset(buffer_spec_FFT, 0, 4096);         // SPECTRUM_RES = 512 * 2 = 1024
-  memset(FFT_spec, 0, 4096);                // 512 * 2 * 4
-  memset(NR_FFT_buffer, 0, 2048);           // NR_FFT_L * sizeof(NR_FFT_buffer[0]));
-  memset(NR_output_audio_buffer, 0, 1024);  // 256 * sizeof(NR_output_audio_buffer[0]));
-  memset(NR_last_iFFT_result, 0, 512);
-  memset(NR_last_sample_buffer_L, 0, 512);
-  memset(NR_last_sample_buffer_R, 0, 512);
-  memset(NR_M, 0, 512);
-  memset(NR_lambda, 0, 512);
-  memset(NR_G, 0, 512);
-  memset(NR_SNR_prio, 0, 512);
-  memset(NR_SNR_post, 0, 512);
-  memset(NR_Hk_old, 0, 512);
-  memset(NR_X, 0, 1536);
-  memset(NR_Nest, 0, 1024);
-  memset(NR_Gts, 0, 1024);
-  memset(NR_E, 0, 7680);
-  memset(ANR_d, 0, 2048);
-  memset(ANR_w, 0, 2048);
-  memset(LMS_StateF32, 0, 1408);  // 96 + 256 * 4
-  memset(LMS_NormCoeff_f32, 0, 1408);
-  memset(LMS_nr_delay, 0, 2312);
+  //DB2OO, 11-SEP-23: don't use the fixed sizes, but use the caculated ones, otherwise a code change will create very difficult to find problems
+#define CLEAR_VAR(x) memset(x, 0, sizeof(x))
+  memset(FFT_spec_old, 0, sizeof(FFT_spec_old));
+#ifdef DEBUG
+  Serial.printf("InitializeDataArrays(): sizeof(FFT_spec_old) %d", sizeof(FFT_spec_old));
+  Serial.printf("\tsizeof(NR_output_audio_buffer) %d", sizeof(NR_output_audio_buffer));
+  Serial.printf("\tsizeof(LMS_StateF32) %d", sizeof(LMS_StateF32));
+  Serial.println();
+#endif
+  CLEAR_VAR(FFT_spec_old);             //memset(FFT_spec_old, 0, 4096);            // SPECTRUM_RES = 512 * 4 = 2048
+  CLEAR_VAR(pixelnew);                 //memset(pixelnew, 0, 1024);                // 512 * 2
+  CLEAR_VAR(pixelold);                 //memset(pixelold, 0, 1024);                // 512 * 2
+  CLEAR_VAR(pixelCurrent);             //memset(pixelCurrent, 0, 1024);            // 512 * 2  KF5N JJP  7/14/23
+  CLEAR_VAR(buffer_spec_FFT);          //memset(buffer_spec_FFT, 0, 4096);         // SPECTRUM_RES = 512 * 2 = 1024
+  CLEAR_VAR(FFT_spec);                 //memset(FFT_spec, 0, 4096);                // 512 * 2 * 4
+  CLEAR_VAR(NR_FFT_buffer);            //memset(NR_FFT_buffer, 0, 2048);           // NR_FFT_L * sizeof(NR_FFT_buffer[0]));
+  CLEAR_VAR(NR_output_audio_buffer);   //memset(NR_output_audio_buffer, 0, 1024);  // 256 * sizeof(NR_output_audio_buffer[0]));
+  CLEAR_VAR(NR_last_iFFT_result);      //memset(NR_last_iFFT_result, 0, 512);
+  CLEAR_VAR(NR_last_sample_buffer_L);  //memset(NR_last_sample_buffer_L, 0, 512);
+  CLEAR_VAR(NR_last_sample_buffer_R);  //memset(NR_last_sample_buffer_R, 0, 512);
+  CLEAR_VAR(NR_M);                     //memset(NR_M, 0, 512);
+  CLEAR_VAR(NR_lambda);                //memset(NR_lambda, 0, 512);
+  CLEAR_VAR(NR_G);                     //memset(NR_G, 0, 512);
+  CLEAR_VAR(NR_SNR_prio);              //memset(NR_SNR_prio, 0, 512);
+  CLEAR_VAR(NR_SNR_post);              //memset(NR_SNR_post, 0, 512);
+  CLEAR_VAR(NR_Hk_old);                //memset(NR_Hk_old, 0, 512);
+  CLEAR_VAR(NR_X);                     //memset(NR_X, 0, 1536);
+  CLEAR_VAR(NR_Nest);                  //memset(NR_Nest, 0, 1024);
+  CLEAR_VAR(NR_Gts);                   //memset(NR_Gts, 0, 1024);
+  CLEAR_VAR(NR_E);                     //memset(NR_E, 0, 7680);
+  CLEAR_VAR(ANR_d);                    //memset(ANR_d, 0, 2048);
+  CLEAR_VAR(ANR_w);                    //memset(ANR_w, 0, 2048);
+  CLEAR_VAR(LMS_StateF32);             //memset(LMS_StateF32, 0, 1408);  // 96 + 256 * 4
+  CLEAR_VAR(LMS_NormCoeff_f32);        //memset(LMS_NormCoeff_f32, 0, 1408);
+  CLEAR_VAR(LMS_nr_delay);             //memset(LMS_nr_delay, 0, 2312);
 
   CalcCplxFIRCoeffs(FIR_Coef_I, FIR_Coef_Q, m_NumTaps, (float32_t)bands[currentBand].FLoCut, (float32_t)bands[currentBand].FHiCut, (float)SR[SampleRate].rate / DF);
 
@@ -2323,7 +2358,6 @@ void InitializeDataArrays() {
 *****/
 void Splash() {
   int centerCall;
-
   tft.fillWindow(RA8875_BLACK);
   tft.setFontScale(3);
   tft.setTextColor(RA8875_GREEN);
@@ -2341,7 +2375,6 @@ void Splash() {
   tft.setTextColor(RA8875_WHITE);
   tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 15, YPIXELS / 4 + 80);  // 38 = letters in string
   tft.print("Al Peter, AC8GY     Jack Purdum, W8TEE");
-
   tft.setCursor((XPIXELS / 2) - (12 * tft.getFontWidth()) / 2, YPIXELS / 2 + 110);  // 12 = letters in "Property of:"
   tft.print("Property of:");
   tft.setFontScale(2);
@@ -2349,19 +2382,16 @@ void Splash() {
   centerCall = (XPIXELS - strlen(MY_CALL) * tft.getFontWidth()) / 2;
   tft.setCursor(centerCall, YPIXELS / 2 + 160);
   tft.print(MY_CALL);
-
   MyDelay(SPLASH_DELAY);
-
   tft.fillWindow(RA8875_BLACK);
 }
 
-//===============================================================================================================================
 //===============================================================================================================================
 //==========================  Setup ================================
 /*****
   Purpose: program entry point that sets the environment for program
 
-  Paramter list:
+  Parameter list:
     void
 
   Return value:
@@ -2369,8 +2399,6 @@ void Splash() {
 *****/
 void setup() {
   Serial.begin(9600);
-
-  //  while (!Serial) ;                     // Wait for Serial object to initialize
   setSyncProvider(getTeensy3Time);  // get TIME from real time clock with 3V backup battery
   setTime(now());
   Teensy3Clock.set(now());  // set the RTC
@@ -2378,15 +2406,13 @@ void setup() {
 
   sgtl5000_1.setAddress(LOW);
   sgtl5000_1.enable();
-  AudioMemory(400);
+  AudioMemory(500);  //  Increased to 450 from 400.  Memory was hitting max.  KF5N August 31, 2023
   AudioMemory_F32(10);
   sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
-  //sgtl5000_1.inputSelect(AUDIO_INPUT_LINEIN);
   sgtl5000_1.micGain(20);
   sgtl5000_1.lineInLevel(0);
   sgtl5000_1.lineOutLevel(20);
   sgtl5000_1.adcHighPassFilterDisable();  //reduces noise.  https://forum.pjrc.com/threads/27215-24-bit-audio-boards?p=78831&viewfull=1#post78831
-
   sgtl5000_2.setAddress(HIGH);
   sgtl5000_2.enable();
   sgtl5000_2.inputSelect(AUDIO_INPUT_LINEIN);
@@ -2401,14 +2427,11 @@ void setup() {
   digitalWrite(MUTE, LOW);
   pinMode(PTT, INPUT_PULLUP);
   pinMode(BUSY_ANALOG_PIN, INPUT);
-
   pinMode(FILTER_ENCODER_A, INPUT);
   pinMode(FILTER_ENCODER_B, INPUT);
-
   pinMode(OPTO_OUTPUT, OUTPUT);
   pinMode(KEYER_DIT_INPUT_TIP, INPUT_PULLUP);
   pinMode(KEYER_DAH_INPUT_RING, INPUT_PULLUP);
-
   pinMode(TFT_MOSI, OUTPUT);
   digitalWrite(TFT_MOSI, HIGH);
   pinMode(TFT_SCLK, OUTPUT);
@@ -2418,26 +2441,18 @@ void setup() {
 
   arm_fir_init_f32(&FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, FIR_Hilbert_state_L, 256);  //AFP01-16-22
   arm_fir_init_f32(&FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg45, FIR_Hilbert_state_R, 256);
-
   arm_fir_init_f32(&FIR_CW_DecodeL, 64, CW_Filter_Coeffs2, FIR_CW_DecodeL_state, 256);  //AFP 10-25-22
   arm_fir_init_f32(&FIR_CW_DecodeR, 64, CW_Filter_Coeffs2, FIR_CW_DecodeR_state, 256);
-
   arm_fir_decimate_init_f32(&FIR_dec1_EX_I, 48, 4, coeffs192K_10K_LPF_FIR, FIR_dec1_EX_I_state, 2048);
   arm_fir_decimate_init_f32(&FIR_dec1_EX_Q, 48, 4, coeffs192K_10K_LPF_FIR, FIR_dec1_EX_Q_state, 2048);
-
-
   arm_fir_decimate_init_f32(&FIR_dec2_EX_I, 24, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_I_state, 512);
   arm_fir_decimate_init_f32(&FIR_dec2_EX_Q, 24, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_Q_state, 512);
-
   arm_fir_interpolate_init_f32(&FIR_int1_EX_I, 2, 48, coeffs48K_8K_LPF_FIR, FIR_int1_EX_I_state, 256);
   arm_fir_interpolate_init_f32(&FIR_int1_EX_Q, 2, 48, coeffs48K_8K_LPF_FIR, FIR_int1_EX_Q_state, 256);
-
   arm_fir_interpolate_init_f32(&FIR_int2_EX_I, 4, 32, coeffs192K_10K_LPF_FIR, FIR_int2_EX_I_state, 512);
   arm_fir_interpolate_init_f32(&FIR_int2_EX_Q, 4, 32, coeffs192K_10K_LPF_FIR, FIR_int2_EX_Q_state, 512);
 
   //***********************  EQ Gain Settings ************
-
-
   uint32_t iospeed_display = IOMUXC_PAD_DSE(3) | IOMUXC_PAD_SPEED(1);
   *(digital_pin_to_info_PGM + 13)->pad = iospeed_display;  //clk
   *(digital_pin_to_info_PGM + 11)->pad = iospeed_display;  //MOSI
@@ -2451,14 +2466,12 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(FILTER_ENCODER_A), EncoderFilter, CHANGE);
   attachInterrupt(digitalPinToInterrupt(FILTER_ENCODER_B), EncoderFilter, CHANGE);
   fineTuneEncoder.begin(true);
-  attachInterrupt(digitalPinToInterrupt(ENCODER3_ENCODER_A), EncoderFineTune, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENCODER3_ENCODER_B), EncoderFineTune, CHANGE);
-
+  attachInterrupt(digitalPinToInterrupt(FINETUNE_ENCODER_A), EncoderFineTune, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FINETUNE_ENCODER_B), EncoderFineTune, CHANGE);
   attachInterrupt(digitalPinToInterrupt(KEYER_DIT_INPUT_TIP), KeyTipOn, CHANGE);  // Changed to keyTipOn from KeyOn everywhere JJP 8/31/22
   attachInterrupt(digitalPinToInterrupt(KEYER_DAH_INPUT_RING), KeyRingOn, CHANGE);
 
   tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);  // parameter list from library code
-
   tft.setRotation(0);
 
   // Setup for scrolling attributes. Part of initSpectrum_RA8875() call written by Mike Lewis
@@ -2474,8 +2487,6 @@ void setup() {
   sdCardPresent = InitializeSDCard();  // Is there an SD card that can be initialized?
 
   // =============== Into EEPROM section =================
-
-  //       EEPROMSaveDefaults2();
   EEPROMStartup();
 
   syncEEPROM = 1;  // We've read current EEPROM values
@@ -2509,24 +2520,16 @@ void setup() {
   Q_in_R.begin();
   MyDelay(100L);
 
-  //powerOut = 0.20; // AFP 10-21-22
-
-  // ========================  Initial set up of EEPROM data ===============
-  // Read what's stored in EEPROM...junk or not?
-
-
   freqIncrement = incrementValues[tuneIndex];
   NR_Index = nrOptionSelect;
   NCOFreq = 0L;
-
-
   activeVFO = EEPROMData.activeVFO;        // 2 bytes
   audioVolume = EEPROMData.audioVolume;    // 4 bytes
   currentBand = EEPROMData.currentBand;    // 4 bytes
   currentBandA = EEPROMData.currentBandA;  // 4 bytes
   currentBandB = EEPROMData.currentBandB;
 
-  // ========================  End set up of paramters from EEPROM data ===============
+  // ========================  End set up of Parameters from EEPROM data ===============
   NCOFreq = 0;
 
   /****************************************************************************************
@@ -2534,6 +2537,7 @@ void setup() {
   ****************************************************************************************/
   si5351.reset();                                                                // KF5N.  Moved Si5351 start-up to setup. JJP  7/14/23
   si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, freqCorrectionFactor);  //JJP  7/14/23
+  si5351.set_ms_source(SI5351_CLK2, SI5351_PLLB);                                //  Allows CLK1 and CLK2 to exceed 100 MHz simultaneously.
   si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA);                          //AFP 10-13-22
   si5351.drive_strength(SI5351_CLK2, SI5351_DRIVE_8MA);                          //CWP AFP 10-13-22
 
@@ -2542,45 +2546,24 @@ void setup() {
   } else {
     decoderFlag = DECODE_ON;  // Turns decoder on JJP 7/1/23
   }
-  /*
-  if (activeVFO == VFO_A) {  // VFO A
-    if (xmtMode == SSB_MODE) {
-      centerFreq = currentFreqA = EEPROMData.lastFrequencies[currentBandA][0];  // SSB
-    } else {
-      if (xmtMode == CW_MODE) {
-        centerFreq = currentFreqA = EEPROMData.lastFrequencies[currentBandA][1];  // CW
-      }
-    }
-    currentBand = currentBandA;
-  } else {
-    if (activeVFO == VFO_B) {  // VFO B
-      if (xmtMode == SSB_MODE) {
-        centerFreq = currentFreqB = EEPROMData.lastFrequencies[currentBandB][0];  // SSB
-      } else {
-        if (activeVFO == VFO_B) {
-          centerFreq = currentFreqB = EEPROMData.lastFrequencies[currentBandB][1];  // CW
-        }
-        currentBand = currentBandB;
-      }
-    }
-  }
-*/
+
   TxRxFreq = centerFreq + NCOFreq;
 
   InitializeDataArrays();
   splitOn = 0;  // Split VFO not active
   SetupMode(bands[currentBand].mode);
 
-  ditLength = STARTING_DITLENGTH;  // 80 = 1200 / 15 wpm
-  averageDit = ditLength;
-  averageDah = ditLength * 3L;
+  //ditLength = STARTING_DITLENGTH;  // 80 = 1200 / 15 wpm
+  //averageDit = ditLength;
+  //averageDah = ditLength * 3L;
 
   float32_t theta = 0.0;              //AFP 10-25-22
   for (int kf = 0; kf < 255; kf++) {  //Calc sine wave
     theta = kf * 0.19634950849362;    // Simplify terms: theta = kf * 2 * PI * freqSideTone / 24000  JJP 6/28/23
     sinBuffer[kf] = sin(theta);
   }
-  currentWPM = EEPROMData.currentWPM;
+  //currentWPM = EEPROMData.currentWPM;  // Not required.  Retrieved by EEPROMRead().  KF5N August 27, 2023
+  SetKeyPowerUp();  // Use keyType and paddleFlip to configure key GPIs.  KF5N August 27, 2023
   SetDitLength(currentWPM);
   SetTransmitDitLength(currentWPM);
   CWFreqShift = 750;
@@ -2589,35 +2572,15 @@ void setup() {
   sineTone(BUFFER_SINE_COUNT);  // Set to 8
   filterEncoderMove = 0;
   fineTuneEncoderMove = 0L;
+  xrState = RECEIVE_STATE;  // Enter loop() in receive state.  KF5N July 22, 2023
   UpdateInfoWindow();
   DrawSpectrumDisplayContainer();
   RedrawDisplayScreen();
 
-  mainMenuIndex = 0;  // Changed from middle to first. Do Menu Down to get to Calibrate quickly
-
+  mainMenuIndex = 0;             // Changed from middle to first. Do Menu Down to get to Calibrate quickly
   menuStatus = NO_MENUS_ACTIVE;  // Blank menu field
   ShowName();
 
-  // ================  Excite AutoVolume (Compressor) =========== AFP 08-11-22
-  //                   Parameters:
-  //                   maxGain has 3 values 0 = 0dB, 1 = 6dB and 3 = 12dB
-  //                   response has 4 values 0 (0mS, 1 (25mS). 2 (50mS) and 3 100mS
-  //                   hardLimit 0 = "soft knee', and 1= "hard limit"
-  //                   threshold float in range 0dBfs to -97 dBFS (-18 typical)
-  //                   attack - rate of gain change in dBPS over threshold
-  //                   decay - rate rate of gain decrease below threshold in dBPS
-
-  //sgtl5000_1.audioPreProcessorEnable(); // AFP 09-22-22
-  //sgtl5000_1.autoVolumeControl(0, 1, 0, -18, 6, 100); //  AFP 09-01-22 parameters (maxGain dB,response,hardLimit,threshold, attack, decay)
-  //===================  End Compressor setup ==========
-  //  Power and calibration values read into arrays by EEPROM function.  These lines need to be removed.  KF5N July 22, 2023
-  //CWPowerCalibrationFactor[currentBandA] = EEPROMData.CWPowerCalibrationFactor[currentBandA];    //   //AFP 10-29-22
-  //SSBPowerCalibrationFactor[currentBandA] = EEPROMData.SSBPowerCalibrationFactor[currentBandA];  //    //AFP 10-29-22
-  //powerOutCW[currentBandA] = EEPROMData.powerOutCW[currentBandA];                                // 4 bytes  //AFP 10-28-22
-  //powerOutSSB[currentBandA] = EEPROMData.powerOutSSB[currentBandA];                              //  AFP 10-28-22
-  //zoomIndex     = 1;   Removed, use value from EEPROM.
-  //spectrum_zoom = 1;   Removed, use value from EEPROM.
-  xrState = RECEIVE_STATE;  // Go into receive state.  KF5N July 22, 2023
   ShowBandwidth();
   FilterBandwidth();
   ShowFrequency();
@@ -2631,45 +2594,25 @@ void setup() {
   comp1.setPreGain_dB(-10);  //set the gain of the Left-channel gain processor
   comp2.setPreGain_dB(-10);  //set the gain of the Right-channel gain processor
 
-  // centerTuneFlag = 1;  Not required with revised tuning scheme.  KF5N July 22, 2023
-
   sdCardPresent = SDPresentCheck();  // JJP 7/18/23
-
-  /*
-#ifndef SD_CARD_PRESENT
-  sdCardPresent = 0;
-#else
-  sdCardPresent = 1;
-  UpdateSDIndicator(sdCardPresent);
-  if (!SD.begin(chipSelect)) {
-    sdCardPresent = 0;
-    tft.print("SD card cannot be initialized");
-
-    MyDelay(2000L);
-  }
-#endif 
-*/
+  lastState = 1111;                  // To make sure the receiver will be configured on the first pass through.  KF5N September 3, 2023
 }
 //============================================================== END setup() =================================================================
 //===============================================================================================================================
-//===============================================================================================================================
-//===============================================================================================================================
 
 elapsedMicros usec = 0;  // Automatically increases as time passes; no ++ necessary.
-FASTRUN                  // Causes function to be allocated in RAM1 at startup for fastest performance.
 
-  /*****
+/*****
   Purpose: Code here executes forever, or until: 1) power is removed, 2) user does a reset, 3) a component
            fails, or 4) the cows come home.
 
-  Paramter list:
+  Parameter list:
     void
 
   Return value:
     void
 *****/
-  void
-  loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
+FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
 {
   int pushButtonSwitchIndex = -1;
   int valPin;
@@ -2690,7 +2633,7 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
   if (lastState != radioState) {
     SetFreq();  // Update frequencies if the radio state has changed.
   }
-  lastState = radioState;
+  //lastState = radioState;  // G0ORX 01092023
 
   //  Begin radio state machines
 
@@ -2698,28 +2641,30 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
 
   switch (radioState) {
     case (SSB_RECEIVE_STATE):
-      digitalWrite(MUTE, LOW);  // Audio Mute off
-      modeSelectInR.gain(0, 1);
-      modeSelectInL.gain(0, 1);
-      digitalWrite(RXTX, LOW);  //xmit off
-      T41State = SSB_RECEIVE;
-      xrState = RECEIVE_STATE;
-      modeSelectInR.gain(0, 1);
-      modeSelectInL.gain(0, 1);
-      modeSelectInExR.gain(0, 0);
-      modeSelectInExL.gain(0, 0);
-      modeSelectOutL.gain(0, 1);
-      modeSelectOutR.gain(0, 1);
-      modeSelectOutL.gain(1, 0);
-      modeSelectOutR.gain(1, 0);
-      modeSelectOutExL.gain(0, 0);
-      modeSelectOutExR.gain(0, 0);
-      phaseLO = 0.0;
-      barGraphUpdate = 0;
-      if (keyPressedOn == 1) {
-        return;
+      if (lastState != radioState) {  // G0ORX 01092023
+        digitalWrite(MUTE, LOW);      // Audio Mute off
+        modeSelectInR.gain(0, 1);
+        modeSelectInL.gain(0, 1);
+        digitalWrite(RXTX, LOW);  //xmit off
+        T41State = SSB_RECEIVE;
+        xrState = RECEIVE_STATE;
+        modeSelectInR.gain(0, 1);
+        modeSelectInL.gain(0, 1);
+        modeSelectInExR.gain(0, 0);
+        modeSelectInExL.gain(0, 0);
+        modeSelectOutL.gain(0, 1);
+        modeSelectOutR.gain(0, 1);
+        modeSelectOutL.gain(1, 0);
+        modeSelectOutR.gain(1, 0);
+        modeSelectOutExL.gain(0, 0);
+        modeSelectOutExR.gain(0, 0);
+        phaseLO = 0.0;
+        barGraphUpdate = 0;
+        if (keyPressedOn == 1) {
+          return;
+        }
+        ShowTransmitReceiveStatus();
       }
-      ShowTransmitReceiveStatus();
       ShowSpectrum();
       break;
     case SSB_TRANSMIT_STATE:
@@ -2769,24 +2714,26 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
 
   switch (radioState) {
     case CW_RECEIVE_STATE:
-      digitalWrite(MUTE, LOW);  //turn off mute
-      T41State = CW_RECEIVE;
-      ShowTransmitReceiveStatus();
-      xrState = RECEIVE_STATE;
-      //SetFreq();   // KF5N
-      modeSelectInR.gain(0, 1);
-      modeSelectInL.gain(0, 1);
-      modeSelectInExR.gain(0, 0);
-      modeSelectInExL.gain(0, 0);
-      modeSelectOutL.gain(0, 1);
-      modeSelectOutR.gain(0, 1);
-      modeSelectOutL.gain(1, 0);
-      modeSelectOutR.gain(1, 0);
-      modeSelectOutExL.gain(0, 0);
-      modeSelectOutExR.gain(0, 0);
-      phaseLO = 0.0;
-      barGraphUpdate = 0;
-      keyPressedOn = 0;
+      if (lastState != radioState) {  // G0ORX 01092023
+        digitalWrite(MUTE, LOW);      //turn off mute
+        T41State = CW_RECEIVE;
+        ShowTransmitReceiveStatus();
+        xrState = RECEIVE_STATE;
+        //SetFreq();   // KF5N
+        modeSelectInR.gain(0, 1);
+        modeSelectInL.gain(0, 1);
+        modeSelectInExR.gain(0, 0);
+        modeSelectInExL.gain(0, 0);
+        modeSelectOutL.gain(0, 1);
+        modeSelectOutR.gain(0, 1);
+        modeSelectOutL.gain(1, 0);
+        modeSelectOutR.gain(1, 0);
+        modeSelectOutExL.gain(0, 0);
+        modeSelectOutExR.gain(0, 0);
+        phaseLO = 0.0;
+        barGraphUpdate = 0;
+        keyPressedOn = 0;
+      }
       ShowSpectrum();  // if removed CW signal on is 2 mS
       break;
     case CW_TRANSMIT_STRAIGHT_STATE:
@@ -2805,13 +2752,13 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
       cwTimer = millis();
       while (millis() - cwTimer <= cwTransmitDelay) {  //Start CW transmit timer on
         digitalWrite(RXTX, HIGH);
-        if (digitalRead(paddleDit) == LOW && keyType == 0) {  // AFP 09-25-22  Turn on CW signal
-          cwTimer = millis();                                 //Reset timer
-          modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-          modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-          digitalWrite(MUTE, LOW);                            // unmutes audio
-          modeSelectOutL.gain(1, sidetoneVolume);             // Sidetone  AFP 10-01-22
-          modeSelectOutR.gain(1, sidetoneVolume);             // Sidetone  AFP 10-01-22
+        if (digitalRead(paddleDit) == LOW && keyType == 0) {       // AFP 09-25-22  Turn on CW signal
+          cwTimer = millis();                                      //Reset timer
+          modeSelectOutExL.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
+          modeSelectOutExR.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
+          digitalWrite(MUTE, LOW);                                 // unmutes audio
+          modeSelectOutL.gain(1, volumeLog[(int)sidetoneVolume]);  // Sidetone  AFP 10-01-22
+          //  modeSelectOutR.gain(1, volumeLog[(int)sidetoneVolume]);           // Right side not used.  KF5N September 1, 2023
         } else {
           if (digitalRead(paddleDit) == HIGH && keyType == 0) {  //Turn off CW signal
             keyPressedOn = 0;
@@ -2852,23 +2799,23 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
         modeSelectOutL.gain(0, 0);
         modeSelectOutR.gain(0, 0);
 
-        if (digitalRead(paddleDit) == LOW) {                    // Keyer Dit
+        if (digitalRead(paddleDit) == LOW) {  // Keyer Dit
           cwTimer = millis();
           ditTimerOn = millis();
-//          while (millis() - ditTimerOn <= ditLength) {
-          while (millis() - ditTimerOn <= transmitDitLength) {  // JJP 8/19/23
-            modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-            modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-            digitalWrite(MUTE, LOW);                            // unmutes audio
-            modeSelectOutL.gain(1, sidetoneVolume);             // Sidetone
-            modeSelectOutR.gain(1, sidetoneVolume);
-            CW_ExciterIQData();  // Creates CW output signal
+          //          while (millis() - ditTimerOn <= ditLength) {
+          while (millis() - ditTimerOn <= transmitDitLength) {       // JJP 8/19/23
+            modeSelectOutExL.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
+            modeSelectOutExR.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
+            digitalWrite(MUTE, LOW);                                 // unmutes audio
+            modeSelectOutL.gain(1, volumeLog[(int)sidetoneVolume]);  // Sidetone
+                                                                     //  modeSelectOutR.gain(1, volumeLog[(int)sidetoneVolume]);           // Right side not used.  KF5N September 1, 2023
+            CW_ExciterIQData();                                      // Creates CW output signal
             keyPressedOn = 0;
           }
           ditTimerOff = millis();
-//          while (millis() - ditTimerOff <= ditLength - 10) {  //Time between
+          //          while (millis() - ditTimerOff <= ditLength - 10) {  //Time between
           while (millis() - ditTimerOff <= transmitDitLength - 10L) {  // JJP 8/19/23
-            modeSelectOutExL.gain(0, 0);                      //Power =0
+            modeSelectOutExL.gain(0, 0);                               //Power =0
             modeSelectOutExR.gain(0, 0);
             modeSelectOutL.gain(1, 0);  // Sidetone off
             modeSelectOutR.gain(1, 0);
@@ -2879,20 +2826,20 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
           if (digitalRead(paddleDah) == LOW) {  //Keyer DAH
             cwTimer = millis();
             dahTimerOn = millis();
-//            while (millis() - dahTimerOn <= 3UL * ditLength) {
+            //            while (millis() - dahTimerOn <= 3UL * ditLength) {
             while (millis() - dahTimerOn <= 3UL * transmitDitLength) {  // JJP 8/19/23
-              modeSelectOutExL.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-              modeSelectOutExR.gain(0, powerOutCW[currentBand]);  //AFP 10-21-22
-              digitalWrite(MUTE, LOW);                            // unmutes audio
-              modeSelectOutL.gain(1, 0.002);                      // Sidetone
-              modeSelectOutR.gain(1, 0.002);
-              CW_ExciterIQData();  // Creates CW output signal
+              modeSelectOutExL.gain(0, powerOutCW[currentBand]);        //AFP 10-21-22
+              modeSelectOutExR.gain(0, powerOutCW[currentBand]);        //AFP 10-21-22
+              digitalWrite(MUTE, LOW);                                  // unmutes audio
+              modeSelectOutL.gain(1, volumeLog[(int)sidetoneVolume]);   // Dah sidetone was using constants.  KD0RC
+                                                                        //   modeSelectOutR.gain(1, volumeLog[(int)sidetoneVolume]);           // Right side not used.  KF5N September 1, 2023
+              CW_ExciterIQData();                                       // Creates CW output signal
               keyPressedOn = 0;
             }
             ditTimerOff = millis();
-//            while (millis() - ditTimerOff <= ditLength - 10UL) {  //Time between characters                         // mutes audio
+            //            while (millis() - ditTimerOff <= ditLength - 10UL) {  //Time between characters                         // mutes audio
             while (millis() - ditTimerOff <= transmitDitLength - 10UL) {  // JJP 8/19/23
-              modeSelectOutExL.gain(0, 0);                        //Power =0
+              modeSelectOutExL.gain(0, 0);                                //Power =0
               modeSelectOutExR.gain(0, 0);
               modeSelectOutL.gain(1, 0);  // Sidetone off
               modeSelectOutR.gain(1, 0);
@@ -2902,7 +2849,7 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
         }
         CW_ExciterIQData();
         keyPressedOn = 0;  // Fix for keyer click-clack.  KF5N August 16, 2023
-      }  //End Relay timer
+      }                    //End Relay timer
 
       modeSelectOutExL.gain(0, 0);  //Power = 0 //AFP 10-11-22
       modeSelectOutExR.gain(0, 0);  //AFP 10-11-22
@@ -2916,8 +2863,11 @@ FASTRUN                  // Causes function to be allocated in RAM1 at startup f
   }
 
   //  End radio state machine
-
-  ShowTransmitReceiveStatus();
+  if (lastState != radioState) {  // G0ORX 09012023
+    lastState = radioState;
+    ShowTransmitReceiveStatus();
+  }
+  //  ShowTransmitReceiveStatus();
 
 #ifdef DEBUG1
   if (elapsed_micros_idx_t > (SR[SampleRate].rate / 960)) {

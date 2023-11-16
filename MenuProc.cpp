@@ -148,6 +148,7 @@ int CWOptions()  // new option for Sidetone and Delay JJP 9/1/22
 
     case 1:          // Type of key:
       SetKeyType();  // Straight key or keyer? Stored in EEPROMData.keyType; no heap/stack variable
+      SetKeyPowerUp();
       UpdateWPMField();
       break;
 
@@ -160,7 +161,8 @@ int CWOptions()  // new option for Sidetone and Delay JJP 9/1/22
       break;
 
     case 4:  // Sidetone volume
-      SetSidetoneVolume();
+    //  SetSidetoneVolume();
+      SetSideToneVolume();
       break;
 
     case 5:                // new function JJP 9/1/22
@@ -186,7 +188,7 @@ int CWOptions()  // new option for Sidetone and Delay JJP 9/1/22
 void SetSidetoneVolume() {
   const char *loudness[] = { "Whisper", "Low", "Medium", "Loud", "Cancel" };
   int retVal;
-  const float32_t sidetoneParameter[] = { 0.0005, 0.001, 0.002, 0.004, 0.0 };  //  AFP 10-01-22
+  const float32_t sidetoneParameter[] = {0.1, 0.25, 0.5,  1.0, 0.0};  // Louder sidetone. G0ORX.  Old values -> { 0.0005, 0.001, 0.002, 0.004, 0.0 };  //  AFP 10-01-22
 
   retVal = SubmenuSelect(loudness, 4, sidetoneVolume);
   if (retVal == 4)  // Did they make a choice?
@@ -242,12 +244,15 @@ int SpectrumOptions() { /*
     int           an index into the band array
 *****/
 int AGCOptions() {
-  const char *AGCChoices[] = { "Off", "Slow", "Medium", "Fast", "Cancel" };
+  const char *AGCChoices[] = { "Off", "Long", "Slow", "Medium", "Fast", "Cancel" }; // G0ORX (Added Long) September 5, 2023
 
-  AGCMode = SubmenuSelect(AGCChoices, 5, AGCMode);
-  if (AGCMode == 4) {
+  AGCMode = SubmenuSelect(AGCChoices, 6, AGCMode); // G0ORX
+  if (AGCMode == 5) {
     return AGCMode;  // Nope.
   }
+
+  AGCLoadValues(); // G0ORX September 5, 2023
+
   EEPROMData.AGCMode = AGCMode;                 // Store in EEPROM and...
   EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);  // ...save it
   UpdateAGCField();
@@ -558,9 +563,11 @@ int MicOptions()  // AFP 09-22-22 All new
   switch (micChoice) {
     case 0:                // On
       compressorFlag = 1;  // AFP 09-22-22
+      UpdateCompressionField();     // JJP 8/26/2023
       break;
     case 1:  // Off
       compressorFlag = 0;
+      UpdateCompressionField();     // JJP 8/26/2023
       break;
     case 2:
       SetCompressionLevel();
@@ -666,23 +673,24 @@ void DoPaddleFlip() {
         tft.setCursor(SECONDARY_MENU_X - 93, MENUS_Y + 1);
         tft.print(paddleState[choice]);
       }
-
-      if (pushButtonSwitchIndex == MENU_OPTION_SELECT) {  // Made a choice??
-        if (choice) {                                     // Means right-paddle dit
+      if (pushButtonSwitchIndex == MENU_OPTION_SELECT)
+      {  // Made a choice??
+        if (choice)
+        {  // Means right-paddle dit
           paddleDit = KEYER_DAH_INPUT_RING;
           paddleDah = KEYER_DIT_INPUT_TIP;
-        } else {
+          paddleFlip = 1; // KD0RC
+        }
+        else
+        {
           paddleDit = KEYER_DIT_INPUT_TIP;
           paddleDah = KEYER_DAH_INPUT_RING;
+          paddleFlip = 0;  // KD0RC
         }
         EEPROMData.paddleDit = paddleDit;
         EEPROMData.paddleDah = paddleDah;
-        // Override if straight key is selected.  KF5N August 9, 2023
-        if (keyType == 0) {
-          paddleDit = KEYER_DIT_INPUT_TIP;
-          paddleDah = KEYER_DAH_INPUT_RING;
-        }
         EraseMenus();
+        UpdateWPMField(); // KD0RC
         return;
       }
     }

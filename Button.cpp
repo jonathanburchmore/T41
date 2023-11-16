@@ -103,9 +103,9 @@ void ExecuteButtonPress(int val) {
 
     case BAND_UP:  // 2 Now calls ProcessIQData and Encoders calls
       EraseMenus();
-      digitalWrite(bandswitchPins[currentBand], LOW);
+      if(currentBand < 5) digitalWrite(bandswitchPins[currentBand], LOW);  // Added if so unused GPOs will not be touched.  KF5N October 16, 2023.
       ButtonBandIncrease();
-      digitalWrite(bandswitchPins[currentBand], HIGH);
+      if(currentBand < 5) digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
       NCOFreq = 0L;
       DrawBandWidthIndicatorBar();  // AFP 10-20-22
@@ -130,9 +130,9 @@ void ExecuteButtonPress(int val) {
     case BAND_DN:  // 5
       EraseMenus();
       ShowSpectrum();  //Now calls ProcessIQData and Encoders calls
-      digitalWrite(bandswitchPins[currentBand], LOW);
+      if(currentBand < 5) digitalWrite(bandswitchPins[currentBand], LOW);
       ButtonBandDecrease();
-      digitalWrite(bandswitchPins[currentBand], HIGH);
+      if(currentBand < 5) digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
       NCOFreq = 0L;
       DrawBandWidthIndicatorBar();  //AFP 10-20-22

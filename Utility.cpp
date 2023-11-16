@@ -526,7 +526,12 @@ void DisplayClock()
   temp[0]       = '\0';
   timeBuffer[0] = '\0';
   strcpy(timeBuffer, MY_TIMEZONE);         // e.g., EST
+#ifdef TIME_24H
+  //DB2OO, 29-AUG-23: use 24h format
+  itoa(hour(), temp, DEC);
+#else
   itoa(hourFormat12(), temp, DEC);
+#endif
   if (strlen(temp) < 2) {
     strcat(timeBuffer, "0");
   }

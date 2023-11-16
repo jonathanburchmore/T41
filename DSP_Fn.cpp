@@ -304,95 +304,48 @@ void CalcNotchBins()
 
 // ================= AGC
 
-/*****
-  Purpose: Setup AGC()
-  Parameter list:
-    void
-  Return value;
-    void
-*****/
-void AGCPrep()
-{
+// G0ORX broke this code out so can be called from other places
+
+void AGCLoadValues() {
   float32_t tmp;
   float32_t sample_rate = (float32_t)SR[SampleRate].rate / DF;
-  // Start variables taken from wdsp
-
-  tau_attack      = 0.001;                // tau_attack
-  //    tau_decay = 0.250;                // tau_decay
-  n_tau           = 1;                    // n_tau
-
-  // max_gain = 1000.0 to be applied??? or is this AGC threshold = knee level?
-  fixed_gain            = 0.7;            // if AGC == OFF
-  max_input             = 2.0;
-  out_targ              = 0.3;            // target value of audio after AGC
-  //    var_gain = 32.0;  // slope of the AGC --> this is 10 * 10^(slope / 20) --> for 10dB slope, this is 30
-  var_gain              = powf (10.0, (float32_t)agc_slope / 200.0); // 10 * 10^(slope / 20)
-
-  tau_fast_backaverage  = 0.250;      // tau_fast_backaverage
-  tau_fast_decay        = 0.005;      // tau_fast_decay
-  pop_ratio             = 5.0;        // pop_ratio
-  hang_enable           = 0;          // hang_enable
-  tau_hang_backmult     = 0.500;      // tau_hang_backmult
-  hangtime              = 0.250;      // hangtime
-  hang_thresh           = 0.250;      // hang_thresh
-  tau_hang_decay        = 0.100;      // tau_hang_decay
 
   //calculate internal parameters
-  if (agc_switch_mode)
+  switch (AGCMode)
   {
-    switch (AGCMode)
-    {
-      case 0:                                           //agcOFF
-        break;
+    case 0:                                           //agcOFF
+      break;
 
-      case 1: //agcFrank
-        hang_enable = 0;
-        hang_thresh = 0.100;                            // from which level on should hang be enabled
-        hangtime = 2.000;                               // hang time, if enabled
-        tau_hang_backmult = 0.500;                      // time constant exponential averager
-        agc_decay = 4000;                               // time constant decay long
-        tau_fast_decay = 0.05;                          // tau_fast_decay
-        tau_fast_backaverage = 0.250;                   // time constant exponential averager
-        break;
+    case 1:                                           //agcLONG
+      // G0ORX 
+      hangtime = 2.000;
+      tau_decay = 2.000;
+      break;
 
-      case 2:                                           //agcLONG     {"Off", "Frank", "Long", "Slow", "Medium", "Fast"};
-        // hangtime = 2.000;
-        hangtime = 4.000;
-        agc_decay = 4000;
-        break;
+    case 2:                                           //agcSLOW
+      // G0ORX
+      hangtime = 1.000;
+      tau_decay = 0.5;
+      break;
 
-      case 3:                                           //agcSLOW
-        //hangtime = 1.000;
-        hangtime = 4.000;
-        //agc_decay = 500;
-        agc_decay = 4000;
-        break;
+    case 3:                                           //agcMED        hang_thresh = 1.0;
+      // G0ORX
+      hangtime = 0.000;
+      tau_decay = 0.250;
+      break;
 
-      case 4:                                           //agcMED
-        hang_thresh = 1.0;
-        //hangtime = 0.000;
-        // agc_decay = 250;
-        hangtime = 4.000;
-        agc_decay = 4000;
-        break;
+    case 4:                                           //agcFAST
+      hang_thresh = 1.0;
+      // G0ORX
+      hangtime = 0.0;
+      tau_decay = 0.050;
+      break;
 
-      case 5:                                           //agcFAST
-        // hang_thresh = 1.0;
-        //hangtime = 0.000;
-        hangtime = 4.000;
-        agc_decay = 4000;
-        //agc_decay = 50;
-        break;
-
-      default:
-        break;
-    }
-    agc_switch_mode = 0;
+    default:
+      break;
   }
-  tau_decay = (float32_t)agc_decay / 1000.0;
-  //  max_gain = powf (10.0, (float32_t)agc_thresh / 20.0);
+  
   max_gain = powf (10.0, (float32_t)bands[currentBand].AGC_thresh / 20.0);
-
   attack_buffsize = (int)ceil(sample_rate * n_tau * tau_attack);
   in_index = attack_buffsize + out_index;
   attack_mult = 1.0 - expf(-1.0 / (sample_rate * tau_attack));
@@ -422,6 +375,45 @@ void AGCPrep()
   hang_decay_mult = 1.0 - expf(-1.0 / (sample_rate * tau_hang_decay));
 }
 
+/*****
+  Purpose: Setup AGC()
+  Parameter list:
+    void
+  Return value;
+    void
+*****/
+void AGCPrep()
+{
+  // Start variables taken from wdsp
+
+  tau_attack      = 0.001;                // tau_attack
+  tau_decay       = 0.250; // G0ORX
+  n_tau           = 4; // G0ORX
+
+  // max_gain = 1000.0 to be applied??? or is this AGC threshold = knee level?
+  max_gain              = 10000.0; // G0ORX
+  fixed_gain            = 20.0; // G0ORX
+  max_input             = 1.0; // G0ORX
+  out_targ              = 1.0; // G0ORX       // target value of audio after AGC
+  var_gain              = 1.5; // G0ORX
+
+  tau_fast_backaverage  = 0.250;      // tau_fast_backaverage
+  tau_fast_decay        = 0.005;      // tau_fast_decay
+  pop_ratio             = 5.0;        // pop_ratio
+  hang_enable           = 1; // G0ORX
+  tau_hang_backmult     = 0.500;      // tau_hang_backmult
+  hangtime              = 0.250;      // hangtime
+  hang_thresh           = 0.250;      // hang_thresh
+  tau_hang_decay        = 0.100;      // tau_hang_decay
+
+
+  AGCLoadValues(); // G0ORX
+
+}
+
+void AGCThresholdChanged() {
+  max_gain = powf (10.0, (float32_t)bands[currentBand].AGC_thresh / 20.0);
+}
 /*****
   Purpose: Audio AGC()
   Parameter list:
