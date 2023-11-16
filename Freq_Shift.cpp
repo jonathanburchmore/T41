@@ -74,13 +74,13 @@ void FreqShift1()
 void FreqShift2()
 {
   uint i;
-  long currentFreqAOld;
+  //long currentFreqAOld;  Not used.  KF5N July 22, 2023
   int sideToneShift = 0;
 
   if (fineTuneEncoderMove != 0L) {
-    SetFreq();           //AFP 10-04-22
-    ShowFrequency();
-    DrawBandWidthIndicatorBar();
+   // SetFreq();           //AFP 10-04-22
+   // ShowFrequency();
+   // DrawBandWidthIndicatorBar();
 
     // ); //AFP 10-04-22
     // EncoderFineTune();      //AFP 10-04-22
@@ -91,26 +91,25 @@ void FreqShift2()
     // centerFreq += freqIncrement;
     currentFreqA = centerFreq + NCOFreq;
     //SetFreq(); //AFP 10-04-22
-    ShowFrequency();
+    //ShowFrequency();
   }
 
   encoderStepOld = fineTuneEncoderMove;
-  currentFreqAOld = TxRxFreq;
+  //currentFreqAOld = TxRxFreq;
   TxRxFreq = centerFreq + NCOFreq;
-  if (abs(currentFreqAOld - TxRxFreq) < 9 * stepFT && currentFreqAOld != TxRxFreq) {  // AFP 10-30-22
-    ShowFrequency();
-    DrawBandWidthIndicatorBar();
-   
-  }
+  //if (abs(currentFreqAOld - TxRxFreq) < 9 * stepFineTune && currentFreqAOld != TxRxFreq) {  // AFP 10-30-22
+  //  ShowFrequency();
+  //  DrawBandWidthIndicatorBar();
+  //}
   if (xmtMode == SSB_MODE ) {
     sideToneShift = 0;
   } else {
     if (xmtMode == CW_MODE ) {
       if (bands[currentBand].mode == 1) {
-        sideToneShift = CWFreqShift;
+        sideToneShift = CWFreqShift;  // KF5N experiment
       } else {
         if (bands[currentBand].mode == 0) {
-          sideToneShift = -CWFreqShift;
+          sideToneShift = -CWFreqShift;  // KF5N experiment
         }
       }
     }

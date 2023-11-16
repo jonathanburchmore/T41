@@ -100,6 +100,8 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
 
   float32_t s;
 
+  memset(R, 0, sizeof(float32_t) * 11);
+
 #ifdef debug_alternate_NR  // generate test frames to test the noise blanker function
   // using the NR-setting (0..55) to select the test frame
   // 00 = noise blanker active on orig. audio; threshold factor=3

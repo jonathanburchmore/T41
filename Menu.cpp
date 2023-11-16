@@ -2,15 +2,17 @@
 #include "SDT.h"
 #endif
 /*
-const char *topMenus[]      = {"CW Options", "Spectrum Set", "AGC",      "NR Set",   "IQ Manual",
-                               "EQ Rec Set", "EQ Xmt Set",   "Mic Comp", "Calibrate Freq", "Noise Floor",
-                               "RF Set",     "VFO Select",   "EEPROM",   
-                              };
+const char *topMenus[] = { "Bearing", "CW Options", "RF Set", "VFO Select",
+                           "EEPROM", "AGC", "Spectrum Options",
+                           "Noise Floor", "Mic Gain", "Mic Comp",
+                           "EQ Rec Set", "EQ Xmt Set", "Calibrate" };
 
-int (*functionPtr[])()      = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions, &IQOptions,
-                               &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &CalibrateFrequency, &ButtonSetNoiseFloor,
-                               &RFOptions, &VFOSelect, &EEPROMOptions
-                              };
+int (*functionPtr[])() = { &BearingMaps, &CWOptions, &RFOptions, &VFOSelect,
+                           &EEPROMOptions, &AGCOptions, &SpectrumOptions,
+                           &ButtonSetNoiseFloor, &MicGainSet, &MicOptions,
+                           &EqualizerRecOptions, &EqualizerXmtOptions, &IQOptions
+
+};
 */
 /*****
   Purpose: void ShowMenu()

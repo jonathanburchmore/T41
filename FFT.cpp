@@ -106,9 +106,10 @@ void ZoomFFTExe(uint32_t blockSize)  //AFP changed resolution 03-12-21  Only for
       LPFcoeff = 0.001;
     }
     float32_t onem_LPFcoeff = 1.0 - LPFcoeff;
-    // save old pixels for lowpass filter
+    // save old pixels for lowpass filter This is also used to erase the old spectrum.  KF5N
     for (int i = 0; i < SPECTRUM_RES; i++) {
-      pixelold[i] = pixelnew[i];
+      //pixelold[i] = pixelnew[i];
+      pixelold[i] = pixelCurrent[i];  // KF5N
     }
     // perform complex FFT
     // calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]

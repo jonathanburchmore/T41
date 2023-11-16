@@ -58,13 +58,18 @@ void ProcessIQData()
       return;
     }
     // Set frequency here only to minimize interruption to signal stream during tuning
+    // This code was unnecessary in the revised tuning scheme.  KF5N July 22, 2023
     if (centerTuneFlag == 1) { //AFP 10-04-22
       DrawBandWidthIndicatorBar();
       ShowFrequency();
-      SetFreq();            //AFP 10-04-22
+  //    SetFreq();            //AFP 10-04-22
      // BandInformation();
     }                       //AFP 10-04-22
     centerTuneFlag = 0;     //AFP 10-04-22
+    if (resetTuningFlag == 1) {
+      ResetTuning();
+    }
+    resetTuningFlag = 0;
 
 
     /*******************************
@@ -133,13 +138,13 @@ void ProcessIQData()
 
     // Manual IQ amplitude correction
     // to be honest: we only correct the amplitude of the I channel ;-)
-    if (bands[currentBandA].mode == DEMOD_LSB || bands[currentBand].mode == DEMOD_AM || bands[currentBand].mode == DEMOD_SAM) {
-      arm_scale_f32 (float_buffer_L, -IQAmpCorrectionFactor[currentBandA], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 04-14-22
-      IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBandA], BUFFER_SIZE * N_BLOCKS);
+    if (bands[currentBand].mode == DEMOD_LSB || bands[currentBand].mode == DEMOD_AM || bands[currentBand].mode == DEMOD_SAM) {
+      arm_scale_f32 (float_buffer_L, -IQAmpCorrectionFactor[currentBand], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 04-14-22
+      IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBand], BUFFER_SIZE * N_BLOCKS);
     } else {
-      if (bands[currentBandA].mode == DEMOD_USB || bands[currentBand].mode == DEMOD_AM || bands[currentBand].mode == DEMOD_SAM) {
-        arm_scale_f32 (float_buffer_L, -IQAmpCorrectionFactor[currentBandA], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 04-14-22
-        IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBandA], BUFFER_SIZE * N_BLOCKS);
+      if (bands[currentBand].mode == DEMOD_USB || bands[currentBand].mode == DEMOD_AM || bands[currentBand].mode == DEMOD_SAM) {
+        arm_scale_f32 (float_buffer_L, -IQAmpCorrectionFactor[currentBand], float_buffer_L, BUFFER_SIZE * N_BLOCKS); //AFP 04-14-22
+        IQPhaseCorrection(float_buffer_L, float_buffer_R, IQPhaseCorrectionFactor[currentBand], BUFFER_SIZE * N_BLOCKS);
       }
     }
     // IQ phase correction
@@ -246,10 +251,10 @@ void ProcessIQData()
     // =================  AFP 10-21-22 Level Adjust ===========
     float freqKHzFcut;
     float volScaleFactor;
-    if (bands[currentBandA].mode == DEMOD_LSB) {
-      freqKHzFcut = -(float32_t)bands[currentBandA].FLoCut * 0.001;
+    if (bands[currentBand].mode == DEMOD_LSB) {
+      freqKHzFcut = -(float32_t)bands[currentBand].FLoCut * 0.001;
     } else {
-      freqKHzFcut = (float32_t)bands[currentBandA].FHiCut * 0.001;
+      freqKHzFcut = (float32_t)bands[currentBand].FHiCut * 0.001;
     }
     volScaleFactor = 7.0874 * pow(freqKHzFcut, -1.232);
     arm_scale_f32(float_buffer_L, volScaleFactor, float_buffer_L, FFT_length / 2);
@@ -317,11 +322,11 @@ void ProcessIQData()
         audioSpectBuffer[1024 - k] = (iFFT_buffer[k] * iFFT_buffer[k]);
       }
       for (int k = 0; k < 256; k++) {
-        if (bands[currentBandA].mode == 0  || bands[currentBand].mode == DEMOD_AM || bands[currentBand].mode == DEMOD_SAM) {  //AFP 10-26-22
+        if (bands[currentBand].mode == 0  || bands[currentBand].mode == DEMOD_AM || bands[currentBand].mode == DEMOD_SAM) {  //AFP 10-26-22
           //audioYPixel[k] = 20+  map((int)displayScale[currentScale].dBScale * log10f((audioSpectBuffer[1024 - k] + audioSpectBuffer[1024 - k + 1] + audioSpectBuffer[1024 - k + 2]) / 3), 0, 100, 0, 120);
           audioYPixel[k] = 50 +  map(15 * log10f((audioSpectBuffer[1024 - k] + audioSpectBuffer[1024 - k + 1] + audioSpectBuffer[1024 - k + 2]) / 3), 0, 100, 0, 120);
         }
-        else if (bands[currentBandA].mode == 1) {//AFP 10-26-22
+        else if (bands[currentBand].mode == 1) {//AFP 10-26-22
           //audioYPixel[k] = 20+   map((int)displayScale[currentScale].dBScale * log10f((audioSpectBuffer[k] + audioSpectBuffer[k + 1] + audioSpectBuffer[k + 2]) / 3), 0, 100, 0, 120);
           audioYPixel[k] = 50 +   map(15 * log10f((audioSpectBuffer[k] + audioSpectBuffer[k + 1] + audioSpectBuffer[k + 2]) / 3), 0, 100, 0, 120);
         }
@@ -377,7 +382,7 @@ void ProcessIQData()
        **********************************************************************************/
     //===================== AFP 10-27-22  =========
 
-    switch (bands[currentBandA].mode) {
+    switch (bands[currentBand].mode) {
       case DEMOD_LSB :
         for (unsigned i = 0; i < FFT_length / 2; i++) {
           //if (bands[currentBand].mode == DEMOD_USB || bands[currentBand].mode == DEMOD_LSB ) {  // for SSB copy real part in both outputs
@@ -491,7 +496,7 @@ void ProcessIQData()
       // ----------------------  CW Narrow band filters  AFP 10-18-22 -------------------------
       if (CWFilterIndex != 5) {
         switch (CWFilterIndex) {
-          case 0:  // 0.84 KHz
+          case 0:  // 0.8 KHz
             arm_biquad_cascade_df2T_f32(&S1_CW_AudioFilter1, float_buffer_L, float_buffer_L_AudioCW, 256);//AFP 10-18-22
             arm_copy_f32(float_buffer_L_AudioCW, float_buffer_L, FFT_length / 2);                         //AFP 10-18-22
             arm_copy_f32(float_buffer_L_AudioCW, float_buffer_R, FFT_length / 2);

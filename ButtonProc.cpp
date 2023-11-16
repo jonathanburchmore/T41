@@ -62,51 +62,60 @@ void ButtonMenuDecrease() {
   Return value:
     void
 *****/
-void ButtonBandIncrease()
-{
+void ButtonBandIncrease() {
+  int tempIndex;
+  tempIndex = currentBandA;
+  if (currentBand == NUMBER_OF_BANDS) {  // Incremented too far?
+    currentBand = 0;                     // Yep. Roll to list front.
+  }
   NCOFreq = 0L;
   switch (activeVFO) {
     case VFO_A:
+      tempIndex = currentBandA;
       if (save_last_frequency == 1) {
-        EEPROMData.lastFrequencies[currentBandA][VFO_A] = TxRxFreq;
-        lastFrequencies[currentBandA][VFO_A]            = TxRxFreq;
+        lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
       } else {
-        if ( directFreqFlag == 1) {
-          lastFrequencies[currentBandA][VFO_A]            = TxRxFreqOld;
-        } else {
-          lastFrequencies[currentBandA][VFO_A]            = TxRxFreq;
-       }
-        TxRxFreqOld = TxRxFreq;
+        if (save_last_frequency == 0) {
+          if (directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_A] = TxRxFreqOld;
+          } else {
+            if (directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
+        }
       }
       currentBandA++;
-      if (currentBandA == NUMBER_OF_BANDS) {                         // Incremented too far?
-        currentBandA = 0;                                            // Yep. Roll to list front.
+      if (currentBandA == NUMBER_OF_BANDS) {  // Incremented too far?
+        currentBandA = 0;                     // Yep. Roll to list front.
       }
       currentBand = currentBandA;
-      TxRxFreq = currentFreqA = centerFreq = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
+      centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
       break;
 
     case VFO_B:
-      //tempIndex = currentBandB;
+      tempIndex = currentBandB;
       if (save_last_frequency == 1) {
-        EEPROMData.lastFrequencies[currentBandB][VFO_B] = TxRxFreq;
-        lastFrequencies[currentBandB][VFO_B]            = TxRxFreq;
+        lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
       } else {
-        if ( directFreqFlag == 1) {
-          //EEPROMData.lastFrequencies[currentBandB][VFO_B] = TxRxFreqOld
-          lastFrequencies[currentBandB][VFO_B]            = TxRxFreqOld;
-        } else {
-          //EEPROMData.lastFrequencies[currentBandB][VFO_B] = TxRxFreq;
-          lastFrequencies[currentBandB][VFO_B]            = TxRxFreq;
+        if (save_last_frequency == 0) {
+          if (directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_B] = TxRxFreqOld;
+          } else {
+            if (directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
         }
-        TxRxFreqOld = TxRxFreq;
       }
       currentBandB++;
-      if (currentBandB == NUMBER_OF_BANDS) {                         // Incremented too far?
-        currentBandB = 0;                                            // Yep. Roll to list front.
+      if (currentBandB == NUMBER_OF_BANDS) {  // Incremented too far?
+        currentBandB = 0;                     // Yep. Roll to list front.
       }
       currentBand = currentBandB;
-      TxRxFreq = currentFreqB = centerFreq = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
+      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
       break;
 
     case VFO_SPLIT:
@@ -116,13 +125,20 @@ void ButtonBandIncrease()
   directFreqFlag = 0;
   EraseSpectrumDisplayContainer();
   DrawSpectrumDisplayContainer();
-  DrawFrequencyBarValue();
   SetBand();
   SetFreq();
   ShowFrequency();
   ShowSpectrumdBScale();
   MyDelay(1L);
   AudioInterrupts();
+  EEPROMWrite();
+  // Draw or not draw CW filter graphics to audio spectrum area.  KF5N July 30, 2023
+  tft.writeTo(L2);
+  tft.clearMemory();
+  tft.writeTo(L1);
+  if(xmtMode == CW_MODE) BandInformation(); 
+  DrawBandWidthIndicatorBar();
+  DrawFrequencyBarValue();
 }
 
 /*****
@@ -134,24 +150,40 @@ void ButtonBandIncrease()
   Return value:
     void
 *****/
-void ButtonBandDecrease() 
-{
+void ButtonBandDecrease() {
+  int tempIndex = currentBand;
+  ;
+  //  NCOFreq = 0L;
+
+  currentBand--;  // decrement band index
+
+  if (currentBand < 0) {                // decremented too far?
+    currentBand = NUMBER_OF_BANDS - 1;  // Yep. Roll to list end.
+  }
+
   switch (activeVFO) {
     case VFO_A:
       if (save_last_frequency == 1) {
-        EEPROMData.lastFrequencies[currentBandA][VFO_A] = TxRxFreq;
-        lastFrequencies[currentBandA][VFO_A] = TxRxFreq;
+        lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
       } else {
-        if ( directFreqFlag == 1) {
-          lastFrequencies[currentBandA][VFO_A] = TxRxFreqOld;
-        } else {
-          lastFrequencies[currentBandA][VFO_A] = TxRxFreq;
+        if (save_last_frequency == 0) {
+          if (directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_A] = TxRxFreqOld;
+
+          } else {
+            if (directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_A] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
         }
-        TxRxFreqOld = TxRxFreq;
       }
       currentBandA--;
-      if (currentBandA < 0) {                         // Incremented too far?
-        currentBandA = NUMBER_OF_BANDS - 1;           // Yep. Roll to list end.
+      if (currentBandA == NUMBER_OF_BANDS) {  // decremented too far?
+        currentBandA = 0;                     // Yep. Roll to list front.
+      }
+      if (currentBandA < 0) {                // Incremented too far?
+        currentBandA = NUMBER_OF_BANDS - 1;  // Yep. Roll to list front.
       }
       currentBand = currentBandA;
       centerFreq = TxRxFreq = currentFreqA = lastFrequencies[currentBandA][VFO_A] + NCOFreq;
@@ -159,24 +191,29 @@ void ButtonBandDecrease()
 
     case VFO_B:
       if (save_last_frequency == 1) {
-        EEPROMData.lastFrequencies[currentBandB][VFO_B] = TxRxFreq;
-        lastFrequencies[currentBandB][VFO_B] = TxRxFreq;
+        lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
       } else {
-        if ( directFreqFlag == 1) {
-          //EEPROMData.lastFrequencies[currentBandB][VFO_B] = TxRxFreqOld;
-          lastFrequencies[currentBandB][VFO_B] = TxRxFreqOld;
-        } else {
-          //EEPROMData.lastFrequencies[currentBandB][VFO_B] = TxRxFreq;
-          lastFrequencies[currentBandB][VFO_B] = TxRxFreq;
+        if (save_last_frequency == 0) {
+          if (directFreqFlag == 1) {
+            lastFrequencies[tempIndex][VFO_B] = TxRxFreqOld;
+
+          } else {
+            if (directFreqFlag == 0) {
+              lastFrequencies[tempIndex][VFO_B] = TxRxFreq;
+            }
+          }
+          TxRxFreqOld = TxRxFreq;
         }
-        TxRxFreqOld = TxRxFreq;
       }
       currentBandB--;
-      if (currentBandB < 0) {                         // Decremented too far?
-        currentBandB = NUMBER_OF_BANDS - 1;           // Yep. Roll to list end.
+      if (currentBandB == NUMBER_OF_BANDS) {  // Incremented too far?
+        currentBandB = 0;                     // Yep. Roll to list front.
+      }
+      if (currentBandB < 0) {                // Incremented too far?
+        currentBandB = NUMBER_OF_BANDS - 1;  // Yep. Roll to list front.
       }
       currentBand = currentBandB;
-      TxRxFreq = currentFreqB = centerFreq = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
+      centerFreq = TxRxFreq = currentFreqB = lastFrequencies[currentBandB][VFO_B] + NCOFreq;
       break;
 
     case VFO_SPLIT:
@@ -186,15 +223,21 @@ void ButtonBandDecrease()
   directFreqFlag = 0;
   EraseSpectrumDisplayContainer();
   DrawSpectrumDisplayContainer();
-  DrawFrequencyBarValue();
   SetBand();
   SetFreq();
   ShowFrequency();
   MyDelay(1L);
   ShowSpectrumdBScale();
   AudioInterrupts();
+  EEPROMWrite();
+  // Draw or not draw CW filter graphics to audio spectrum area.  KF5N July 30, 2023
+  tft.writeTo(L2);
+  tft.clearMemory();
+  tft.writeTo(L1);
+  if(xmtMode == CW_MODE) BandInformation(); 
+  DrawBandWidthIndicatorBar();
+  DrawFrequencyBarValue();
 }
-
 
 
 //================ AFP 09-27-22
@@ -220,6 +263,8 @@ void ButtonZoom() {
 
   ZoomFFTPrep();
   UpdateZoomField();
+  tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
+  tft.clearMemory();
   DrawBandWidthIndicatorBar();
   ShowSpectrumdBScale();
   DrawFrequencyBarValue();
@@ -241,7 +286,7 @@ void ButtonFilter() {
   switchFilterSideband = !switchFilterSideband;
   ControlFilterF();
   FilterBandwidth();
-  SetFreq();
+  //SetFreq();
   ShowFrequency();
 }
 
@@ -259,17 +304,20 @@ void ButtonDemodMode() {
   if (bands[currentBand].mode > DEMOD_MAX) {
     bands[currentBand].mode = DEMOD_MIN;  // cycle thru demod modes
   }
-  
   //AudioNoInterrupts();
-  DrawBandWidthIndicatorBar();
   BandInformation();
   SetupMode(bands[currentBand].mode);
   ShowFrequency();
   ControlFilterF();
+  tft.writeTo(L2);  // Destroy the bandwidth indicator bar.  KF5N July 30, 2023
+  tft.clearMemory();
+  if(xmtMode == CW_MODE) BandInformation(); 
+  DrawBandWidthIndicatorBar();  // Restory the bandwidth indicator bar.  KF5N July 30, 2023
   FilterBandwidth();
   DrawSMeterContainer();
   ShowAnalogGain();
   AudioInterrupts();
+  SetFreq();  // Must update frequency, for example moving from SSB to CW, the RX LO is shifted.  KF5N
 }
 
 
@@ -291,12 +339,12 @@ void ButtonMode()  //====== Changed AFP 10-05-22  =================
   }
   //fLoCutOld = bands[currentBand].FLoCut;
   //fHiCutOld = bands[currentBand].FHiCut;
-
-  tft.fillWindow();
+  SetFreq();  // Required due to RX LO shift from CW to SSB modes.  KF5N
+  //tft.fillWindow();  // This was erasing the waterfall when switching modes.  Removed by KF5N.
   DrawSpectrumDisplayContainer();
   DrawFrequencyBarValue();
   DrawInfoWindowFrame();
-  UpdateIncrementField();
+  DisplayIncrementField();
   AGCPrep();
   UpdateAGCField();
   EncoderVolume();
@@ -308,11 +356,16 @@ void ButtonMode()  //====== Changed AFP 10-05-22  =================
   DrawAudioSpectContainer();
   SpectralNoiseReductionInit();
   UpdateNoiseField();
-  DrawBandWidthIndicatorBar();
   ShowName();
   ShowSpectrumdBScale();
   ShowTransmitReceiveStatus();
   ShowFrequency();
+  // Draw or not draw CW filter graphics to audio spectrum area.  KF5N July 30, 2023
+  if(xmtMode == SSB_MODE) {
+  tft.writeTo(L2);
+  tft.clearMemory();
+  } else BandInformation();
+  DrawBandWidthIndicatorBar();
 }
 
 /*****
@@ -359,32 +412,37 @@ void ButtonNotchFilter() {
     int           the current noise floor value
 *****/
 int ButtonSetNoiseFloor() {
-  int currentNoiseFloor = SPECTRUM_BOTTOM - spectrumNoiseFloor;
+  int floor = currentNoiseFloor[currentBand];   // KF5N
   int val;
 
   tft.setFontScale((enum RA8875tsize)1);
   ErasePrimaryMenu();
   tft.fillRect(SECONDARY_MENU_X - 100, MENUS_Y, EACH_MENU_WIDTH + 120, CHAR_HEIGHT, RA8875_MAGENTA);
-  tft.setTextColor(RA8875_WHITE);
+  //tft.setTextColor(RA8875_WHITE);
+  tft.setTextColor(RA8875_BLACK);     // JJP 7/17/23
   tft.setCursor(SECONDARY_MENU_X - 98, MENUS_Y + 1);
   tft.print("Pixels above axis:");
   tft.setCursor(SECONDARY_MENU_X + 200, MENUS_Y + 1);
-  tft.print(currentNoiseFloor);
+  tft.print(currentNoiseFloor[currentBand]);
   MyDelay(150L);
 
   while (true) {
     if (filterEncoderMove != 0) {
-      currentNoiseFloor += filterEncoderMove;  // It moves the display
-      if (currentNoiseFloor < -15) {           //AFP 09-22-22                        // Don't exceed limits
-        currentNoiseFloor = -15;               //AFP 09-22-22
+      floor += filterEncoderMove;  // It moves the display
+      /* JJP 7/17/23
+      if (floor < -15) {           //AFP 09-22-22                        // Don't exceed limits
+        floor = -15;               //AFP 09-22-22
       } else {
-        if (currentNoiseFloor > SPECTRUM_HEIGHT) {
-          currentNoiseFloor = SPECTRUM_HEIGHT;
+        if (floor > SPECTRUM_HEIGHT) {
+          floor = SPECTRUM_HEIGHT;
         }
       }
+      */
+      EraseSpectrumWindow();
+      floor = DrawNewFloor(floor);
       tft.fillRect(SECONDARY_MENU_X + 190, MENUS_Y, 80, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setCursor(SECONDARY_MENU_X + 200, MENUS_Y + 1);
-      tft.print(currentNoiseFloor);
+      tft.print(floor);
       filterEncoderMove = 0;
     }
 
@@ -393,14 +451,17 @@ int ButtonSetNoiseFloor() {
     val = ProcessButtonPress(val);
     if (val == MENU_OPTION_SELECT)  // If they made a choice...
     {
-      spectrumNoiseFloor = SPECTRUM_BOTTOM - currentNoiseFloor;
-      if (spectrumNoiseFloor > SPECTRUM_BOTTOM + 15) {  //AFP 09-22-22
-        spectrumNoiseFloor = SPECTRUM_BOTTOM + 15;      //AFP 09-22-22
+      /* JJP 7/17/23
+      if (floor > SPECTRUM_BOTTOM + 15) {  //AFP 09-22-22
+        floor = SPECTRUM_BOTTOM + 15;      //AFP 09-22-22
       } else {
-        if (spectrumNoiseFloor < SPECTRUM_BOTTOM - 50)
-          spectrumNoiseFloor = SPECTRUM_BOTTOM - 50;
+        if (floor < SPECTRUM_BOTTOM - 50)
+          floor = SPECTRUM_BOTTOM - 50;
       }
-      EEPROMData.spectrumNoiseFloor = spectrumNoiseFloor;
+      */
+      currentNoiseFloor[currentBand]             = floor;
+      EEPROMData.spectrumNoiseFloor              = floor;
+      EEPROMData.currentNoiseFloor[currentBand]  = floor;
       EEPROMWrite();
       break;
     }
@@ -412,7 +473,37 @@ int ButtonSetNoiseFloor() {
   DrawSpectrumDisplayContainer();
   ShowSpectrumdBScale();
   ShowSpectrum();
+  tft.writeTo(L2);
+  DrawFrequencyBarValue();
+  tft.writeTo(L1);
   return spectrumNoiseFloor;
+}
+
+/*****
+  Purpose: Draw in a red line at the new floor position
+
+  Parameter list:
+    int floor     the pixel position for the new floor
+
+  Return value;
+    int           the current noise floor value
+*****/
+int DrawNewFloor(int floor)
+{
+  static int oldY = SPECTRUM_BOTTOM;
+
+  if (floor < 0) {
+    floor = 0;
+    oldY = SPECTRUM_BOTTOM - floor;
+    return floor;
+  }
+
+  tft.drawFastHLine(SPECTRUM_LEFT_X + 30, oldY - floor, 100, RA8875_BLACK);
+  tft.drawFastHLine(SPECTRUM_LEFT_X + 30, oldY - floor - 1, 100, RA8875_BLACK);
+  tft.drawFastHLine(SPECTRUM_LEFT_X + 30, oldY - floor, 100, RA8875_RED);
+  tft.drawFastHLine(SPECTRUM_LEFT_X + 30, oldY - floor - 1, 100, RA8875_RED);
+  oldY = SPECTRUM_BOTTOM - floor;
+  return floor;
 }
 
 /*****
@@ -494,8 +585,7 @@ void ButtonFrequencyEntry() {
                     0x34, 0x35, 0x36,
                     0x31, 0x32, 0x33,
                     0x30, 0x7F, 0x7F,
-                    0x7F, 0x7F, 0x99
-                  };
+                    0x7F, 0x7F, 0x99 };
   EraseMenus();
 #ifdef show_FEHelp
   int keyCol[] = { YELLOW, RED, RED,
@@ -503,22 +593,19 @@ void ButtonFrequencyEntry() {
                    RA8875_BLUE, RA8875_BLUE, RA8875_BLUE,
                    RED, RED, RED,
                    RED, RA8875_BLACK, RA8875_BLACK,
-                   YELLOW, YELLOW, RA8875_BLACK
-                 };
+                   YELLOW, YELLOW, RA8875_BLACK };
   int textCol[] = { RA8875_BLACK, RA8875_WHITE, RA8875_WHITE,
                     RA8875_WHITE, RA8875_BLACK, RA8875_BLACK,
                     RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
                     RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
                     RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
-                    RA8875_BLACK, RA8875_BLACK, RA8875_WHITE
-                  };
+                    RA8875_BLACK, RA8875_BLACK, RA8875_WHITE };
   const char *key_labels[] = { "<", "", "X",
                                "7", "8", "9",
                                "4", "5", "6",
                                "1", "2", "3",
                                "0", "D", "",
-                               "", "", "S"
-                             };
+                               "", "", "S" };
 
 #define KEYPAD_LEFT 350
 #define KEYPAD_TOP SPECTRUM_TOP_Y + 35
@@ -575,7 +662,8 @@ void ButtonFrequencyEntry() {
   tft.print("Enter Frequency");
 
   tft.fillRect(SECONDARY_MENU_X + 20, MENUS_Y, EACH_MENU_WIDTH + 10, CHAR_HEIGHT, RA8875_MAGENTA);
-  tft.setTextColor(RA8875_WHITE);
+  //tft.setTextColor(RA8875_WHITE);
+  tft.setTextColor(RA8875_BLACK);       // JJP 7/17/23
   tft.setCursor(SECONDARY_MENU_X + 21, MENUS_Y + 1);
   tft.print("kHz or MHz:");
   tft.setFontScale((enum RA8875tsize)0);
@@ -665,7 +753,8 @@ void ButtonFrequencyEntry() {
   NCOFreq = 0L;
   directFreqFlag = 1;
   centerFreq = TxRxFreq;
-  centerTuneFlag = 1;
+  centerTuneFlag = 1;  // Put back in so tuning bar is refreshed.  KF5N July 31, 2023
+  SetFreq();  // Used here instead of centerTuneFlag.  KF5N July 22, 2023
   //}
   if (save_last_frequency == 1) {
     lastFrequencies[currentBand][VFO_A] = enteredF;
@@ -674,13 +763,22 @@ void ButtonFrequencyEntry() {
       lastFrequencies[currentBand][VFO_A] = TxRxFreqOld;
     }
   }
+  tft.fillRect(0, 0, 799, 479, RA8875_BLACK);   // Clear layer 2  JJP 7/23/23
   tft.writeTo(L1);
   EraseSpectrumDisplayContainer();
-  EraseMenus();
-  BandInformation();
-  //SetBand();
   DrawSpectrumDisplayContainer();
   DrawFrequencyBarValue();
-  ShowFrequency();
+  SetBand();
   SetFreq();
+  ShowFrequency();
+  MyDelay(1L);
+  ShowSpectrumdBScale();
+  AudioInterrupts();
+  EEPROMWrite();
+  // Draw or not draw CW filter graphics to audio spectrum area.  KF5N July 30, 2023
+  tft.writeTo(L2);
+  tft.clearMemory();
+  if(xmtMode == CW_MODE) BandInformation(); 
+  DrawBandWidthIndicatorBar();
+  RedrawDisplayScreen(); // KD0RC
 }

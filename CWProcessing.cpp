@@ -20,10 +20,13 @@
 *****/
 void SelectCWFilter()
 {
-  const char* CWFilter[] = {"840Hz", "1.0kHz", "1.3kHz", "1.8kHz", "2.0kHz", "Off"};
-  
   CWFilterIndex = SubmenuSelect(CWFilter, 6, 0);
-  RedrawDisplayScreen();
+//  RedrawDisplayScreen();  Kills the bandwidth graphics in the audio display window, remove. KF5N July 30, 2023
+// Clear the current CW filter graphics and then restore the bandwidth indicator bar.  KF5N July 30, 2023
+  tft.writeTo(L2);
+  tft.clearMemory();
+  BandInformation();
+  DrawBandWidthIndicatorBar();
 }
 //=================  AFP10-18-22 ================
 /*****
@@ -39,15 +42,16 @@ void SelectCWFilter()
 void DoCWReceiveProcessing() {  // All New AFP 09-19-22
   float goertzelMagnitude1;
   float goertzelMagnitude2;
-  //arm_copy_f32(float_buffer_L, float_buffer_L_CW, 256);
+  int audioTemp;  // KF5N
   //arm_copy_f32(float_buffer_R, float_buffer_R_CW, 256);
   //arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_R, float_buffer_R_CW, 256);//AFP 09-01-22
   //arm_biquad_cascade_df2T_f32(&S1_CW_Filter, float_buffer_L, float_buffer_L_CW, 256);//AFP 09-01-22
 
   arm_fir_f32(&FIR_CW_DecodeL, float_buffer_L, float_buffer_L_CW, 256); // AFP 10-25-22  Park McClellan FIR filter const Group delay
- arm_fir_f32(&FIR_CW_DecodeR, float_buffer_R, float_buffer_R_CW, 256);  // AFP 10-25-22
+  arm_fir_f32(&FIR_CW_DecodeR, float_buffer_R, float_buffer_R_CW, 256);  // AFP 10-25-22
 
-  if (decoderFlag == DECODE_ON) {                  // AFP 09-27-22
+//  if (decoderFlag == DECODE_OFF) {                  // AFP 09-27-22
+  if (decoderFlag == DECODE_ON) {  // JJP 7/20/23
 
     //=== end CW Filter ===
 
@@ -290,7 +294,7 @@ void MorseCharacterDisplay(char currentLetter)
     col++;
     decodeBuffer[col] = '\0';                                               // Make is a string
   } else {
-    memcpy(decodeBuffer, &decodeBuffer[1], MAX_DECODE_CHARS - 1);           // Slide array down 1 character
+    memcpy(decodeBuffer, &decodeBuffer[1], MAX_DECODE_CHARS - 1);           // Slide array down 1 character. The compiler warning tells you that there's an overlap...exactly what we want
     decodeBuffer[col - 1] = currentLetter;                                  // Add to end
     decodeBuffer[col] = '\0';                                               // Make is a string
   }
@@ -346,11 +350,12 @@ void DisplayDitLength()
 *****/
 void Lookup(char currentAtom)
 {
-  /*
-    char *bigMorseCodeTree  = "#EISH5##4##V###3##UF########?#2##ARL#########.###WP######J###1##TNDB6#####X######KC######Y######MGZ7####,Q######O#8######9##0####";
-                         //012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678
-                         //         10        20        30        40        50        60        70        80        90       100       110       120
-  */
+/* This shows letter placement in the array after walking the binary tree
+
+char *bigMorseCodeTree  = (char *) "-EISH5--4--V---3--UF--------?-2--ARL---------.--.WP------J---1--TNDB6--.--X/-----KC------Y------MGZ7----,Q------O-8------9--0----";
+//                                  012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678
+//                                           10        20        30        40        50        60        70        80        90       100       110       120
+*/
   currentDashJump = currentDashJump >> 1;         // Fast divide by 2
 
   if (currentAtom == '.') {

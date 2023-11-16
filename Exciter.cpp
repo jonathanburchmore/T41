@@ -96,11 +96,13 @@ void ExciterIQData()
      **********************************************************************************/
 
     if (bands[currentBand].mode == DEMOD_LSB) { //AFP 12-27-21
-      arm_scale_f32 (float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);
+      //arm_scale_f32 (float_buffer_L_EX, -IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);
+      arm_scale_f32 (float_buffer_L_EX, + IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);     // Flip SSB sideband KF5N, minus sign was original
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
     }
     else if (bands[currentBand].mode == DEMOD_USB) { //AFP 12-27-21
-      arm_scale_f32 (float_buffer_L_EX, IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);
+      //arm_scale_f32 (float_buffer_L_EX, + IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);     // Flip SSB sideband KF5N, minus sign was original
+      arm_scale_f32 (float_buffer_L_EX, - IQXAmpCorrectionFactor[currentBandA], float_buffer_L_EX, 256);    // Flip SSB sideband KF5N
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQXPhaseCorrectionFactor[currentBandA], 256);
     }
     arm_scale_f32 (float_buffer_R_EX, 1.00, float_buffer_R_EX, 256);
@@ -154,5 +156,8 @@ void ExciterIQData()
 *****/
 void SetBandRelay(int state)
 {
-  digitalWrite(bandswitchPins[currentBand], state); //Set current band relay "on" AFP 12-16-21
+  for(int i = 0; i < 4; i = i + 1) {
+  digitalWrite(bandswitchPins[i], LOW); // Set ALL band relays low.  KF5N July 21, 2023
+  }
+  digitalWrite(bandswitchPins[currentBand], state);  //Set current band relay "on" AFP 12-16-21
 }

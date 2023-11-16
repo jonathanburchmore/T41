@@ -209,8 +209,6 @@ float32_t log10f_fast(float32_t X) {
   return (Y * 0.3010299956639812f);
 }
 
-
-
 /*****
   Purpose: void Calculatedbm()
 
@@ -505,12 +503,11 @@ void SaveAnalogSwitchValues()
       tft.setCursor(660, 20 + index * 25);
       tft.print(minVal);
       EEPROMData.switchValues[index] = minVal;
-      switchThreshholds[index] = minVal;
       index++;
       MyDelay(100L);
     }
   }
-//  EEPROM.put(0, EEPROMData);                        // Save values to EEPROM
+  EEPROM.put(0, EEPROMData);                        // Save values to EEPROM
 }
 
 // ================== Clock stuff
@@ -528,7 +525,7 @@ void DisplayClock()
 
   temp[0]       = '\0';
   timeBuffer[0] = '\0';
-  strcpy(timeBuffer, TIMEZONE);         // e.g., EST
+  strcpy(timeBuffer, MY_TIMEZONE);         // e.g., EST
   itoa(hourFormat12(), temp, DEC);
   if (strlen(temp) < 2) {
     strcat(timeBuffer, "0");
@@ -593,9 +590,7 @@ void SetupMode(int sideBand)
         break;
     }
   }
-
   ShowBandwidth();
-
   // tft.fillRect(pos_x_frequency + 10, pos_y_frequency + 24, 210, 16, RA8875_BLACK);
   //tft.fillRect(OPERATION_STATS_X + 170, FREQUENCY_Y + 30, tft.getFontWidth() * 5, tft.getFontHeight(), RA8875_BLACK);        // Clear top-left menu area
   old_demod_mode = bands[currentBand].mode; // set old_mode flag for next time, at the moment only used for first time radio is switched on . . .
@@ -623,3 +618,37 @@ void SetBand()
   ShowFrequency();
   FilterBandwidth();
 }
+
+
+/*****
+  Purpose: Tries to open the EEPROM SD file to see if an SD card is present in the system
+
+  Parameter list:
+    void
+
+  Return value;
+    int               0 = SD not initialized, 1 = has data
+*****/
+int SDPresentCheck()
+{
+  if (!SD.begin(chipSelect))
+  {
+    Serial.print("No SD card or cannot be initialized.");
+    tft.setFontScale((enum RA8875tsize) 1);
+    tft.setForegroundColor(RA8875_RED);
+    tft.setCursor(20, 300);
+    tft.print("No SD card or not initialized.");
+    tft.setForegroundColor(RA8875_WHITE);
+    return 0;
+  }
+  // open the file.
+  File dataFile = SD.open("SDEEPROMData.txt");
+  
+  if (dataFile) {
+    return 1;
+  } else {
+    return 0;
+  }
+
+}
+

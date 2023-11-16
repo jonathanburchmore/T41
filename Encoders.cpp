@@ -12,13 +12,15 @@
     void
     Modified AFP21-12-15
 *****/
-void FilterSetSSB()
-{
+void FilterSetSSB() {
   long filter_change;
 
   // SSB
   if (filter_pos != last_filter_pos) {
-    tft.fillRect((MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2 - filterWidth, SPECTRUM_TOP_Y + 17, filterWidth, SPECTRUM_HEIGHT - 20, RA8875_BLACK); // Erase old filter background
+    tft.writeTo(L2);  // Clear layer 2.  KF5N July 31, 2023
+    tft.clearMemory();
+    if(xmtMode == CW_MODE) BandInformation(); 
+    tft.fillRect((MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2 - filterWidth, SPECTRUM_TOP_Y + 17, filterWidth, SPECTRUM_HEIGHT - 20, RA8875_BLACK);  // Erase old filter background
     filter_change = (filter_pos - last_filter_pos);
     if (filter_change >= 1) {
       filterWidth--;
@@ -33,8 +35,8 @@ void FilterSetSSB()
     last_filter_pos = filter_pos;
     // =============  AFP 10-27-22
     switch (bands[currentBand].mode) {
-      case DEMOD_LSB :
-        if (switchFilterSideband == 0)      // "0" = normal, "1" means change opposite filter
+      case DEMOD_LSB:
+        if (switchFilterSideband == 0)  // "0" = normal, "1" means change opposite filter
         {
           bands[currentBand].FLoCut = bands[currentBand].FLoCut + filter_change * 50 * ENCODER_FACTOR;
           //fHiCutOld= bands[currentBand].FHiCut;
@@ -45,7 +47,7 @@ void FilterSetSSB()
           fLoCutOld = bands[currentBand].FLoCut;
         }
         break;
-      case DEMOD_USB :
+      case DEMOD_USB:
         if (switchFilterSideband == 0) {
           bands[currentBand].FHiCut = bands[currentBand].FHiCut - filter_change * 50 * ENCODER_FACTOR;
           //bands[currentBand].FLoCut= fLoCutOld;
@@ -55,13 +57,13 @@ void FilterSetSSB()
           // bands[currentBand].FHiCut= fHiCutOld;
         }
         break;
-      case DEMOD_AM :
+      case DEMOD_AM:
         bands[currentBand].FHiCut = bands[currentBand].FHiCut - filter_change * 50 * ENCODER_FACTOR;
         bands[currentBand].FLoCut = -bands[currentBand].FHiCut;
         FilterBandwidth();
         InitFilterMask();
         break;
-      case DEMOD_SAM : // AFP 11-03-22
+      case DEMOD_SAM:  // AFP 11-03-22
         bands[currentBand].FHiCut = bands[currentBand].FHiCut - filter_change * 50 * ENCODER_FACTOR;
         bands[currentBand].FLoCut = -bands[currentBand].FHiCut;
         FilterBandwidth();
@@ -71,14 +73,16 @@ void FilterSetSSB()
     // =============  AFP 10-27-22
 
     //ControlFilterF();
-    Menu2 = MENU_F_LO_CUT;      // set Menu2 to MENU_F_LO_CUT
+    Menu2 = MENU_F_LO_CUT;  // set Menu2 to MENU_F_LO_CUT
     FilterBandwidth();
+    ShowBandwidth();
+    DrawFrequencyBarValue();
     //    centerTuneFlag = 1; //AFP 10-03-22
     //SetFreq();               //  AFP 10-04-22
-    ShowFrequency();
+  //  ShowFrequency();
   }
   //notchPosOld = filter_pos;
-
+    tft.writeTo(L1);  // Exit function in layer 1.  KF5N August 3, 2023
 }
 
 
@@ -89,35 +93,42 @@ void FilterSetSSB()
   Return value;
     void
 *****/
-void EncoderCenterTune()
-{
+void EncoderCenterTune() {
   long tuneChange = 0L;
-  unsigned char result  = tuneEncoder.process();   // Read the encoder
+  //  long oldFreq    = centerFreq;
 
-  if (result == 0)                                 // Nothing read
+  unsigned char result = tuneEncoder.process();  // Read the encoder
+
+  if (result == 0)  // Nothing read
     return;
 
-  centerTuneFlag = 1; //AFP 10-03-22
+  //centerTuneFlag = 1;  //AFP 10-03-22  Not used in revised tuning scheme.  KF5N July 22, 2023
 
-  if (T41State == CW_XMIT && decoderFlag == DECODE_ON) {        // No reason to reset if we're not doing decoded CW AFP 09-27-22
+  if (T41State == CW_XMIT && decoderFlag == DECODE_ON) {  // No reason to reset if we're not doing decoded CW AFP 09-27-22
     ResetHistograms();
   }
-  if (result == DIR_CW) {
-    tuneChange = 1L;
-  } else {
-    tuneChange = -1L;
-  }
 
-  centerFreq += ((long)freqIncrement * tuneChange);                    // tune the master vfo
+  switch (result) {
+    case DIR_CW:  // Turned it clockwise, 16
+      tuneChange = 1L;
+      break;
+
+    case DIR_CCW:  // Turned it counter-clockwise
+      tuneChange = -1L;
+      break;
+  }
+  //  newFreq = (long)freqIncrement * tuneChange;
+
+  centerFreq += ((long)freqIncrement * tuneChange);  // tune the master vfo
+
 
   //  if (centerFreq != oldFreq) {           // If the frequency has changed...
   //=== AFP 10-19-22
 
   TxRxFreq = centerFreq + NCOFreq;
-  lastFrequencies[currentBand][activeVFO] = TxRxFreq;
-
+  SetFreq();  //  Change to receiver tuning process.  KF5N July 22, 2023
   //currentFreqA= centerFreq + NCOFreq;
-  DrawBandWidthIndicatorBar(); // AFP 10-20-22
+  DrawBandWidthIndicatorBar();  // AFP 10-20-22
   //FilterOverlay(); // AFP 10-20-22
   ShowFrequency();
   BandInformation();
@@ -134,26 +145,26 @@ void EncoderCenterTune()
   Return value;
     int               0 means encoder didn't move; otherwise it moved
 *****/
-void EncoderVolume()      //============================== AFP 10-22-22  Begin new
+void EncoderVolume()  //============================== AFP 10-22-22  Begin new
 {
   char result;
-  result = volumeEncoder.process();    // Read the encoder
+  result = volumeEncoder.process();  // Read the encoder
 
-  if (result == 0) {                                    // Nothing read
+  if (result == 0) {  // Nothing read
     return;
   }
   switch (result) {
-    case DIR_CW:                          // Turned it clockwise, 16
+    case DIR_CW:  // Turned it clockwise, 16
       adjustVolEncoder = 1;
       break;
 
-    case DIR_CCW:                         // Turned it counter-clockwise
+    case DIR_CCW:  // Turned it counter-clockwise
       adjustVolEncoder = -1;
       break;
   }
   audioVolume += adjustVolEncoder;
 
-  if (audioVolume > 100) {                // In range?
+  if (audioVolume > 100) {  // In range?
     audioVolume = 100;
   } else {
     if (audioVolume < 0) {
@@ -162,9 +173,9 @@ void EncoderVolume()      //============================== AFP 10-22-22  Begin n
   }
   //set flags for IC calibration
 
-  volumeChangeFlag = true;        // Need this because of unknown timing in display updating.
+  volumeChangeFlag = true;  // Need this because of unknown timing in display updating.
 
-}     //============================== AFP 10-22-22  End new
+}  //============================== AFP 10-22-22  End new
 
 /*****
   Purpose: Use the encoder to change the value of a number in some other function
@@ -178,12 +189,12 @@ void EncoderVolume()      //============================== AFP 10-22-22  Begin n
   Return value;
     int                         the new value
 *****/
-float GetEncoderValueLive(float minValue, float maxValue, float startValue, float increment, char prompt[]) //AFP 10-22-22
+float GetEncoderValueLive(float minValue, float maxValue, float startValue, float increment, char prompt[])  //AFP 10-22-22
 {
   float currentValue = startValue;
-  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setFontScale((enum RA8875tsize)1);
   tft.setTextColor(RA8875_WHITE);
-  tft.fillRect(250, 0, 280, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.fillRect(250, 0, 280, CHAR_HEIGHT, RA8875_BLACK);
   tft.setCursor(257, 1);
   tft.print(prompt);
   tft.setCursor(440, 1);
@@ -194,13 +205,13 @@ float GetEncoderValueLive(float minValue, float maxValue, float startValue, floa
   }
   //while (true) {
   if (filterEncoderMove != 0) {
-    currentValue += filterEncoderMove * increment;    // Bump up or down...
+    currentValue += filterEncoderMove * increment;  // Bump up or down...
     if (currentValue < minValue)
       currentValue = minValue;
     else if (currentValue > maxValue)
       currentValue = maxValue;
 
-    tft.fillRect(449, 0, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+    tft.fillRect(449, 0, 80, CHAR_HEIGHT, RA8875_BLACK);
     tft.setCursor(440, 1);
     if (abs(startValue) > 2) {
       tft.print(startValue, 0);
@@ -209,6 +220,7 @@ float GetEncoderValueLive(float minValue, float maxValue, float startValue, floa
     }
     filterEncoderMove = 0;
   }
+  //tft.setTextColor(RA8875_WHITE);
   return currentValue;
 }
 
@@ -226,12 +238,11 @@ float GetEncoderValueLive(float minValue, float maxValue, float startValue, floa
   Return value;
     int                         the new value
 *****/
-int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, char prompt[])
-{
+int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, char prompt[]) {
   int currentValue = startValue;
   int val;
 
-  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setFontScale((enum RA8875tsize)1);
 
   tft.setTextColor(RA8875_WHITE);
   tft.fillRect(250, 0, 280, CHAR_HEIGHT, RA8875_MAGENTA);
@@ -242,7 +253,7 @@ int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, c
 
   while (true) {
     if (filterEncoderMove != 0) {
-      currentValue += filterEncoderMove * increment;    // Bump up or down...
+      currentValue += filterEncoderMove * increment;  // Bump up or down...
       if (currentValue < minValue)
         currentValue = minValue;
       else if (currentValue > maxValue)
@@ -254,11 +265,11 @@ int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, c
       filterEncoderMove = 0;
     }
 
-    val = ReadSelectedPushButton();                     // Read the ladder value
+    val = ReadSelectedPushButton();  // Read the ladder value
     //MyDelay(100L); //AFP 09-22-22
-    if (val != -1  && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
-      val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
-      if (val == MENU_OPTION_SELECT) {                  // Make a choice??
+    if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
+      val = ProcessButtonPress(val);    // Use ladder value to get menu choice
+      if (val == MENU_OPTION_SELECT) {  // Make a choice??
         return currentValue;
       }
     }
@@ -274,12 +285,11 @@ int GetEncoderValue(int minValue, int maxValue, int startValue, int increment, c
   Return value;
     int           the current WPM
 *****/
-int SetWPM()
-{
+int SetWPM() {
   int val;
   long lastWPM = currentWPM;
 
-  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setFontScale((enum RA8875tsize)1);
 
   tft.fillRect(SECONDARY_MENU_X, MENUS_Y, EACH_MENU_WIDTH, CHAR_HEIGHT, RA8875_MAGENTA);
   tft.setTextColor(RA8875_WHITE);
@@ -289,8 +299,8 @@ int SetWPM()
   tft.print(currentWPM);
 
   while (true) {
-    if (filterEncoderMove != 0) {                     // Changed encoder?
-      currentWPM += filterEncoderMove;                // Yep
+    if (filterEncoderMove != 0) {       // Changed encoder?
+      currentWPM += filterEncoderMove;  // Yep
       lastWPM = currentWPM;
       if (lastWPM < 0)
         lastWPM = 5;
@@ -303,15 +313,16 @@ int SetWPM()
       filterEncoderMove = 0;
     }
 
-    val = ReadSelectedPushButton();                              // Read pin that controls all switches
+    val = ReadSelectedPushButton();  // Read pin that controls all switches
     val = ProcessButtonPress(val);
-    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+    if (val == MENU_OPTION_SELECT) {  // Make a choice??
       currentWPM = lastWPM;
       EEPROMData.currentWPM = currentWPM;
       UpdateWPMField();
       break;
     }
   }
+  UpdateEEPROMSyncIndicator(syncEEPROM = 0);  // EEPROM and current values not the same
   tft.setTextColor(RA8875_WHITE);
   EraseMenus();
   return currentWPM;
@@ -326,13 +337,13 @@ int SetWPM()
   Return value;
     long            the delay length in milliseconds
 *****/
-long SetTransmitDelay()                               // new function JJP 9/1/22
+long SetTransmitDelay()  // new function JJP 9/1/22
 {
   int val;
   long lastDelay = cwTransmitDelay;
-  long increment = 250;                               // Means a quarter second change per detent
+  long increment = 250;  // Means a quarter second change per detent
 
-  tft.setFontScale( (enum RA8875tsize) 1);
+  tft.setFontScale((enum RA8875tsize)1);
 
   tft.fillRect(SECONDARY_MENU_X - 150, MENUS_Y, EACH_MENU_WIDTH + 150, CHAR_HEIGHT, RA8875_MAGENTA);  // scoot left cuz prompt is long
   tft.setTextColor(RA8875_WHITE);
@@ -342,8 +353,8 @@ long SetTransmitDelay()                               // new function JJP 9/1/22
   tft.print(cwTransmitDelay);
 
   while (true) {
-    if (filterEncoderMove != 0) {                     // Changed encoder?
-      lastDelay += filterEncoderMove * increment;     // Yep
+    if (filterEncoderMove != 0) {                  // Changed encoder?
+      lastDelay += filterEncoderMove * increment;  // Yep
       if (lastDelay < 0L)
         lastDelay = 250L;
 
@@ -353,13 +364,13 @@ long SetTransmitDelay()                               // new function JJP 9/1/22
       filterEncoderMove = 0;
     }
 
-    val = ReadSelectedPushButton();                              // Read pin that controls all switches
+    val = ReadSelectedPushButton();  // Read pin that controls all switches
     val = ProcessButtonPress(val);
     //MyDelay(150L);  //ALF 09-22-22
-    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+    if (val == MENU_OPTION_SELECT) {  // Make a choice??
       cwTransmitDelay = lastDelay;
       EEPROMData.cwTransmitDelay = cwTransmitDelay;
-      //      EEPROMWrite();
+      EEPROMWrite();
       break;
     }
   }
@@ -376,80 +387,53 @@ long SetTransmitDelay()                               // new function JJP 9/1/22
   Return value;
     void               cannot return value from interrupt
 *****/
-FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
-void EncoderFineTune()
-{
+FASTRUN  // Causes function to be allocated in RAM1 at startup for fastest performance.
+  void
+  EncoderFineTune() {
   char result;
 
-  result = fineTuneEncoder.process();       // Read the encoder
-//  MyDelay(50L);
-  if (result == 0) {                        // Nothing read
+  result = fineTuneEncoder.process();  // Read the encoder
+  if (result == 0) {                   // Nothing read
     fineTuneEncoderMove = 0L;
     return;
   } else {
-    if (result == DIR_CW) {                 // 16 = CW, 32 = CCW
+    if (result == DIR_CW) {  // 16 = CW, 32 = CCW
       fineTuneEncoderMove = 1L;
     } else {
       fineTuneEncoderMove = -1L;
     }
   }
-  //if (spectrum_zoom == 0) {
-  NCOFreq += stepFT * fineTuneEncoderMove; //AFP 11-01-22
+  NCOFreq += stepFineTune * fineTuneEncoderMove;  //AFP 11-01-22
   centerTuneFlag = 1;
-  SubFineTune();
-}
-
-void SubFineTune()
-{
   // ============  AFP 10-28-22
   if (activeVFO == VFO_A) {
-    currentFreqA = centerFreq + NCOFreq;   //AFP 10-05-22   
+    currentFreqA = centerFreq + NCOFreq;  //AFP 10-05-22
   } else {
     currentFreqB = centerFreq + NCOFreq;  //AFP 10-05-22
   }
   // ===============  Recentering at band edges ==========
   if (spectrum_zoom != 0) {
-    if (NCOFreq > (95000 / (1 << spectrum_zoom)) || NCOFreq < (-93000 / (1 << spectrum_zoom))) {
-      NCOFreq    = 0L;
-      if (activeVFO == VFO_A) {                           // JJP 2/25/23
-        centerFreq = TxRxFreq = currentFreqA;             // JJP 2/25/23
-        lastFrequencies[currentBand][VFO_A] = TxRxFreq;  // JJP 2/25/23
-      } else {                                            // JJP 2/25/23
-        centerFreq = TxRxFreq = currentFreqB;             // JJP 2/25/23    
-        lastFrequencies[currentBand][VFO_B] = TxRxFreq;  // JJP 2/25/23
-      }
+    if (NCOFreq >= (95000 / (1 << spectrum_zoom)) || NCOFreq < (-93000 / (1 << spectrum_zoom))) {  // 47500 with 2x zoom.
+      centerTuneFlag = 0;
+      resetTuningFlag = 1;
+      return;
     }
   } else {
-    if (NCOFreq > (142000) || NCOFreq < (-43000)) {  // Offset tuning window in zoom 1x
-      NCOFreq    = 0L;
-      if (activeVFO == VFO_A) {                           // JJP 2/25/23
-        centerFreq = TxRxFreq = currentFreqA;             // JJP 2/25/23
-        lastFrequencies[currentBand][VFO_A] = TxRxFreq;  // JJP 2/25/23
-      } else {                                            // JJP 2/25/23
-        centerFreq = TxRxFreq = currentFreqB;             // JJP 2/25/23    
-        lastFrequencies[currentBand][VFO_B] = TxRxFreq;  // JJP 2/25/23
-      }
+    if (NCOFreq > 142000 || NCOFreq < -43000) {  // Offset tuning window in zoom 1x
+      centerTuneFlag = 0;
+      resetTuningFlag = 1;
+      return;
     }
-    centerTuneFlag = 1;
   }
   fineTuneEncoderMove = 0L;
-  if (activeVFO == VFO_A) {
-    TxRxFreq = currentFreqA;
-    lastFrequencies[currentBand][VFO_A] = TxRxFreq;  // JJP 2/25/23
-  } else {
-    TxRxFreq = currentFreqB;
-    lastFrequencies[currentBand][VFO_B] = TxRxFreq;  // JJP 2/25/23
-  }
+  TxRxFreq = centerFreq + NCOFreq;  // KF5N
 }
-FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
 
 
-
-void EncoderFilter()
-{
+FASTRUN  // Causes function to be allocated in RAM1 at startup for fastest performance.
+  void EncoderFilter() {
   char result;
-
-  result = filterEncoder.process();   // Read the encoder
+  result = filterEncoder.process();  // Read the encoder
 
   if (result == 0) {
     //    filterEncoderMove = 0;// Nothing read
@@ -457,17 +441,17 @@ void EncoderFilter()
   }
 
   switch (result) {
-    case DIR_CW:                          // Turned it clockwise, 16
+    case DIR_CW:  // Turned it clockwise, 16
       filterEncoderMove = 1;
       //filter_pos = last_filter_pos - 5 * filterEncoderMove;  // AFP 10-22-22
       break;
 
-    case DIR_CCW:                         // Turned it counter-clockwise
+    case DIR_CCW:  // Turned it counter-clockwise
       filterEncoderMove = -1;
       // filter_pos = last_filter_pos - 5 * filterEncoderMove;   // AFP 10-22-22
       break;
   }
-  if (calibrateFlag == 0) {// AFP 10-22-22
-    filter_pos = last_filter_pos - 5 * filterEncoderMove;// AFP 10-22-22
-  }// AFP 10-22-22
+  if (calibrateFlag == 0) {                                // AFP 10-22-22
+    filter_pos = last_filter_pos - 5 * filterEncoderMove;  // AFP 10-22-22
+  }                                                        // AFP 10-22-22
 }
