@@ -2619,11 +2619,15 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
   long ditTimerOff;  //AFP 09-22-22
   long dahTimerOn;
 
-  valPin = ReadSelectedPushButton();                     // Poll UI push buttons
-  if (valPin != BOGUS_PIN_READ) {                        // If a button was pushed...
-    pushButtonSwitchIndex = ProcessButtonPress(valPin);  // Winner, winner...chicken dinner!
-    ExecuteButtonPress(pushButtonSwitchIndex);
+  // Don't read push buttons while transmitting
+  if (lastState != SSB_TRANSMIT_STATE && lastState != CW_TRANSMIT_STRAIGHT_STATE && lastState != CW_TRANSMIT_KEYER_STATE) {
+    valPin = ReadSelectedPushButton();                     // Poll UI push buttons
+    if (valPin != BOGUS_PIN_READ) {                        // If a button was pushed...
+      pushButtonSwitchIndex = ProcessButtonPress(valPin);  // Winner, winner...chicken dinner!
+      ExecuteButtonPress(pushButtonSwitchIndex);
+    }
   }
+
   //  State detection
   if (xmtMode == SSB_MODE && digitalRead(PTT) == HIGH) radioState = SSB_RECEIVE_STATE;
   if (xmtMode == SSB_MODE && digitalRead(PTT) == LOW) radioState = SSB_TRANSMIT_STATE;
