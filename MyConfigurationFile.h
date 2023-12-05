@@ -4,10 +4,10 @@
 #define DECODER_STATE							0						                              // 0 = off, 1 = on
 #define DEFAULT_KEYER_WPM   			15                                        // Startup value for keyer wpm
 #define FREQ_SEP_CHARACTER  			'.'					                              // Some may prefer period, space, or combo
-#define MAP_FILE_NAME   					"Cincinnati.bmp"                          // Name you gave to BMP map file. Max is 50 chars
+#define MAP_FILE_NAME   					"Ramona.bmp"                          // Name you gave to BMP map file. Max is 50 chars
 #define MY_LAT										33.02083                                  // Coordinates for QTH
 #define MY_LON										-116.79166
-#define MY_CALL										"KJ7SSA"                                   // Default max is 10 chars
+#define MY_CALL										"KN6LFB"                                   // Default max is 10 chars
 #define MY_TIMEZONE          			"PST: "                                   // Default max is 10 chars
 //DB2OO, 29-AUG-23: TIME_24H to display 24 hour times (Utility.cpp). If this is not defined 12h display will be used
 #define TIME_24H                  1
