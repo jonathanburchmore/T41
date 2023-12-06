@@ -334,7 +334,10 @@ void SetSideToneVolume() {
   tft.print(sidetoneDisplay);  // Display in range of 0 to 100.
   modeSelectInR.gain(0, 0);
   modeSelectInL.gain(0, 0);
+  modeSelectInExL.gain(0, 0);
   modeSelectInExR.gain(0, 0);
+  int2Float1.disconnect();
+  int2Float2.disconnect();
   modeSelectOutL.gain(0, 0);
   modeSelectOutR.gain(0, 0);
   modeSelectOutExL.gain(0, 0);
