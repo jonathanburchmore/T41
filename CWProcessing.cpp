@@ -336,8 +336,8 @@ void SetSideToneVolume() {
   modeSelectInL.gain(0, 0);
   modeSelectInExL.gain(0, 0);
   modeSelectInExR.gain(0, 0);
-  int2Float1.disconnect();
-  int2Float2.disconnect();
+  patchCord1.disconnect();
+  patchCord2.disconnect();
   modeSelectOutL.gain(0, 0);
   modeSelectOutR.gain(0, 0);
   modeSelectOutExL.gain(0, 0);

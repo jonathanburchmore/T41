@@ -1037,6 +1037,9 @@ extern AudioMixer4           modeSelectInL;
 extern AudioMixer4           modeSelectInExR;
 extern AudioMixer4           modeSelectInExL;
 
+extern AudioConnection       patchCord1;
+extern AudioConnection       patchCord2;
+
 extern AudioMixer4           modeSelectOutL;
 extern AudioMixer4           modeSelectOutR;
 extern AudioMixer4           modeSelectOutExL;
